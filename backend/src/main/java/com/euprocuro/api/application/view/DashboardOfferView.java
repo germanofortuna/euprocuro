@@ -15,6 +15,7 @@ public class DashboardOfferView {
     String id;
     String interestPostId;
     String interestTitle;
+    String referenceImageUrl;
     String buyerId;
     String sellerName;
     String sellerEmail;

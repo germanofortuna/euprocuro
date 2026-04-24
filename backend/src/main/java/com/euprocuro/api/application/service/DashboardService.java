@@ -69,6 +69,7 @@ public class DashboardService implements DashboardUseCase {
                 .id(offer.getId())
                 .interestPostId(offer.getInterestPostId())
                 .interestTitle(interest == null ? "Interesse removido" : interest.getTitle())
+                .referenceImageUrl(interest == null ? null : interest.getReferenceImageUrl())
                 .buyerId(interest == null ? null : interest.getOwnerId())
                 .sellerName(offer.getSellerName())
                 .sellerEmail(offer.getSellerEmail())

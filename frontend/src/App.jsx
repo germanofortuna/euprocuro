@@ -226,6 +226,8 @@ export default function App() {
   const [interestForm, setInterestForm] = useState(initialInterestForm);
   const [editingInterestId, setEditingInterestId] = useState(null);
   const [offerForm, setOfferForm] = useState(initialOfferForm);
+  const [expandedInterests, setExpandedInterests] = useState({});
+  const [expandedOffers, setExpandedOffers] = useState({});
   const [filters, setFilters] = useState({
     query: "",
     category: "",
@@ -255,9 +257,9 @@ export default function App() {
 
   const deferredQuery = useDeferredValue(filters.query);
   const currentUser = session?.user ?? null;
-  const myInterests = (dashboard?.myInterests ?? []).slice().sort(byNewest);
-  const sentOffers = (dashboard?.offersSent ?? []).slice().sort(byNewest);
-  const receivedOffers = (dashboard?.offersReceived ?? []).slice().sort(byNewest);
+  const myInterests = useMemo(() => (dashboard?.myInterests ?? []).slice().sort(byNewest), [dashboard?.myInterests]);
+  const sentOffers = useMemo(() => (dashboard?.offersSent ?? []).slice().sort(byNewest), [dashboard?.offersSent]);
+  const receivedOffers = useMemo(() => (dashboard?.offersReceived ?? []).slice().sort(byNewest), [dashboard?.offersReceived]);
   const isSelectedInterestMine = selectedInterest?.ownerId === currentUser?.id;
 
   function openFeedback(type, title, message) {
@@ -321,6 +323,21 @@ export default function App() {
     setEditingInterestId(null);
     setInterestForm(initialInterestForm);
     navigateTo(loggedSections.NEW_INTEREST);
+  }
+
+  function toggleInterestExpansion(interest) {
+    setSelectedInterest(interest);
+    setExpandedInterests((current) => ({
+      ...current,
+      [interest.id]: !current[interest.id]
+    }));
+  }
+
+  function toggleOfferExpansion(offerId) {
+    setExpandedOffers((current) => ({
+      ...current,
+      [offerId]: !current[offerId]
+    }));
   }
 
   function startEditingInterest(interest) {
@@ -479,10 +496,27 @@ export default function App() {
   }, [session, selectedInterest?.id, isSelectedInterestMine]);
 
   useEffect(() => {
-    if (loggedSection === loggedSections.MY_INTERESTS && myInterests.length > 0 && !isSelectedInterestMine) {
+    if (loggedSection !== loggedSections.MY_INTERESTS || myInterests.length === 0) {
+      return;
+    }
+
+    const currentSelectedId = selectedInterest?.id;
+    const hasCurrentSelection = myInterests.some((interest) => interest.id === currentSelectedId);
+    if (!hasCurrentSelection) {
       setSelectedInterest(myInterests[0]);
     }
-  }, [loggedSection, myInterests, isSelectedInterestMine]);
+  }, [loggedSection, myInterests, selectedInterest?.id]);
+
+  useEffect(() => {
+    if (!selectedInterest?.id) {
+      return;
+    }
+
+    setExpandedInterests((current) => ({
+      ...current,
+      [selectedInterest.id]: true
+    }));
+  }, [selectedInterest?.id]);
 
   useEffect(() => {
     if (!session || !currentUser?.id) {
@@ -869,10 +903,6 @@ export default function App() {
         {showHero ? (
           <section className="hero hero--public">
             <div className="hero__copy">
-              <div className="brand-inline">
-                <img src={logo} alt="Eu Procuro" />
-                <span className="eyebrow">Busca inteligente</span>
-              </div>
               <h1>Encontre oportunidades publicadas e negocie direto com quem está procurando.</h1>
               <p>
                 A home mostra os interesses cadastrados na plataforma. Quem quiser publicar um novo
@@ -1134,6 +1164,112 @@ export default function App() {
     );
   }
 
+  function renderInterestListItem(interest) {
+    const isExpanded = Boolean(expandedInterests[interest.id]);
+    const isSelected = interest.id === selectedInterest?.id;
+
+    return (
+      <article
+        key={interest.id}
+        className={`accordion-card ${isSelected ? "accordion-card--selected" : ""}`}
+      >
+        <button
+          type="button"
+          className="accordion-card__summary"
+          onClick={() => toggleInterestExpansion(interest)}
+        >
+          <div className="accordion-card__leading">
+            {interest.referenceImageUrl ? (
+              <img
+                className="accordion-card__thumb"
+                src={interest.referenceImageUrl}
+                alt={interest.title}
+              />
+            ) : (
+              <div className="accordion-card__thumb accordion-card__thumb--placeholder">
+                {interest.title?.charAt(0) ?? "I"}
+              </div>
+            )}
+
+            <div className="accordion-card__summary-main">
+              <div className="accordion-card__copy">
+                <strong>{interest.title}</strong>
+                <span>{interest.location?.city ? `${interest.location.city}/${interest.location?.state}` : "Sem local informado"}</span>
+              </div>
+            </div>
+          </div>
+
+          <span className="accordion-card__toggle">{isExpanded ? "−" : "+"}</span>
+        </button>
+
+        {isExpanded ? (
+          <div className="accordion-card__content">
+            <p>{interest.description}</p>
+            <div className="accordion-card__meta">
+              <span>{currency(interest.budgetMax)}</span>
+              <span>{interest.tags?.slice(0, 3).join(" • ") || "Sem tags"}</span>
+            </div>
+          </div>
+        ) : null}
+      </article>
+    );
+  }
+
+  function renderOfferListItem(offer, side = "left", interestImageUrl = null) {
+    const isExpanded = Boolean(expandedOffers[offer.id]);
+    const resolvedImageUrl = interestImageUrl ?? offer.referenceImageUrl ?? null;
+    const primaryLabel = side === "right" ? offer.sellerName : offer.interestTitle;
+    const secondaryLabel = side === "right"
+      ? `${currency(offer.offeredPrice)} • ${formatTimestamp(offer.createdAt)}`
+      : `${currency(offer.offeredPrice)} • ${offer.sellerName ?? "Sem anunciante"}`;
+
+    return (
+      <article key={offer.id} className="accordion-card">
+        <button
+          type="button"
+          className="accordion-card__summary"
+          onClick={() => toggleOfferExpansion(offer.id)}
+        >
+          <div className="accordion-card__leading">
+            {resolvedImageUrl ? (
+              <img className="accordion-card__thumb" src={resolvedImageUrl} alt={offer.interestTitle} />
+            ) : (
+              <div className="accordion-card__thumb accordion-card__thumb--placeholder">
+                {(primaryLabel ?? "O").charAt(0)}
+              </div>
+            )}
+
+            <div className="accordion-card__summary-main">
+              <div className="accordion-card__copy">
+                <strong>{primaryLabel}</strong>
+                <span>{secondaryLabel}</span>
+              </div>
+            </div>
+          </div>
+
+          <span className="accordion-card__toggle">{isExpanded ? "−" : "+"}</span>
+        </button>
+
+        {isExpanded ? (
+          <div className="accordion-card__content">
+            <p>{offer.message || "Sem mensagem informada."}</p>
+            <div className="accordion-card__meta">
+              {side === "right" ? <span>{offer.sellerEmail || "Sem e-mail"}</span> : <span>{offer.interestTitle}</span>}
+              <span>{offer.sellerPhone || formatTimestamp(offer.createdAt)}</span>
+            </div>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => openConversation(offer.id)}
+            >
+              Abrir conversa
+            </button>
+          </div>
+        ) : null}
+      </article>
+    );
+  }
+
   function renderLoggedArea() {
     const statCards = [
       {
@@ -1233,16 +1369,7 @@ export default function App() {
               </div>
 
               {myInterests.length ? (
-                <div className="interest-list">
-                  {myInterests.map((interest) => (
-                    <InterestCard
-                      key={interest.id}
-                      interest={interest}
-                      selected={interest.id === selectedInterest?.id}
-                      onClick={setSelectedInterest}
-                    />
-                  ))}
-                </div>
+                <div className="accordion-list">{myInterests.map(renderInterestListItem)}</div>
               ) : (
                 <EmptyState
                   title="Nenhum interesse ativo"
@@ -1291,27 +1418,11 @@ export default function App() {
                         description="Quando alguém responder ao seu interesse, as mensagens aparecerão aqui."
                       />
                     ) : (
-                      offers.map((offer) => (
-                        <button
-                          key={offer.id}
-                          type="button"
-                          className="offer-card offer-card--button"
-                          onClick={() => openConversation(offer.id)}
-                        >
-                          <div className="offer-card__head">
-                            <div>
-                              <strong>{offer.sellerName}</strong>
-                              <span>{offer.sellerEmail}</span>
-                            </div>
-                            <strong>{currency(offer.offeredPrice)}</strong>
-                          </div>
-                          <p>{offer.message}</p>
-                          <div className="offer-card__footer">
-                            <span>{offer.sellerPhone}</span>
-                            <span>{formatTimestamp(offer.createdAt)}</span>
-                          </div>
-                        </button>
-                      ))
+                      <div className="accordion-list">
+                        {offers.map((offer) =>
+                          renderOfferListItem(offer, "right", selectedInterest.referenceImageUrl)
+                        )}
+                      </div>
                     )}
                   </div>
                 </>
@@ -1335,22 +1446,8 @@ export default function App() {
             </div>
 
             {sentOffers.length ? (
-              <div className="activity-grid">
-                {sentOffers.map((offer) => (
-                  <button
-                    key={offer.id}
-                    type="button"
-                    className="activity-card activity-card--text activity-card--button"
-                    onClick={() => openConversation(offer.id)}
-                  >
-                    <strong>{offer.interestTitle}</strong>
-                    <p>{offer.message}</p>
-                    <div className="offer-card__footer">
-                      <span>{currency(offer.offeredPrice)}</span>
-                      <span>{formatTimestamp(offer.createdAt)}</span>
-                    </div>
-                  </button>
-                ))}
+              <div className="accordion-list">
+                {sentOffers.map((offer) => renderOfferListItem(offer, "left"))}
               </div>
             ) : (
               <EmptyState
@@ -1371,22 +1468,8 @@ export default function App() {
             </div>
 
             {receivedOffers.length ? (
-              <div className="activity-grid">
-                {receivedOffers.map((offer) => (
-                  <button
-                    key={offer.id}
-                    type="button"
-                    className="activity-card activity-card--text activity-card--button"
-                    onClick={() => openConversation(offer.id)}
-                  >
-                    <strong>{offer.interestTitle}</strong>
-                    <p>{offer.message}</p>
-                    <div className="offer-card__footer">
-                      <span>{offer.sellerName}</span>
-                      <span>{currency(offer.offeredPrice)}</span>
-                    </div>
-                  </button>
-                ))}
+              <div className="accordion-list">
+                {receivedOffers.map((offer) => renderOfferListItem(offer, "left"))}
               </div>
             ) : (
               <EmptyState

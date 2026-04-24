@@ -50,6 +50,7 @@ class DashboardServiceTest {
                 .ownerId("buyer-1")
                 .ownerName("Ana")
                 .title("Quero um violao")
+                .referenceImageUrl("data:image/png;base64,abc")
                 .category(InterestCategory.SERVICOS)
                 .location(LocationInfo.builder().city("Campinas").state("SP").build())
                 .status(InterestStatus.OPEN)
@@ -92,6 +93,7 @@ class DashboardServiceTest {
         assertThat(result.getTotalOffersReceived()).isEqualTo(1);
         assertThat(result.getTotalOffersSent()).isEqualTo(1);
         assertThat(result.getOffersReceived()).hasSize(1);
+        assertThat(result.getOffersReceived().get(0).getReferenceImageUrl()).isEqualTo("data:image/png;base64,abc");
         assertThat(result.getOffersSent()).extracting("interestTitle").containsExactly("Interesse removido");
     }
 

@@ -250,11 +250,16 @@ img {
 .offers,
 .activity-grid,
 .interest-list,
+.accordion-list,
 .media-field,
 .cta-card,
 .preview-card {
   display: grid;
   gap: 14px;
+}
+
+.detail-block {
+  margin-top: 10px;
 }
 
 .hero__copy h1,
@@ -397,6 +402,7 @@ textarea:focus {
   background: transparent;
   color: var(--accent-strong);
   border: 1px solid rgba(11, 79, 187, 0.18);
+  margin-bottom: 10px;
 }
 
 .text-button {
@@ -559,7 +565,9 @@ textarea:focus {
 .detail-row,
 .offers__header,
 .offer-card__head,
-.offer-card__footer {
+.offer-card__footer,
+.accordion-card__summary-main,
+.accordion-card__meta {
   justify-content: space-between;
   gap: 12px;
 }
@@ -572,6 +580,7 @@ textarea:focus {
   border-radius: 999px;
   background: rgba(30, 111, 242, 0.1);
   color: var(--accent-strong);
+  margin-right: 5px;
 }
 
 .pill--boost {
@@ -604,6 +613,113 @@ textarea:focus {
   display: grid;
   gap: 10px;
   padding: 16px;
+}
+
+.accordion-list {
+  gap: 12px;
+}
+
+.accordion-card {
+  border: 1px solid rgba(11, 79, 187, 0.1);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.94);
+  overflow: hidden;
+}
+
+.accordion-card--selected {
+  border-color: rgba(30, 111, 242, 0.3);
+  box-shadow: 0 16px 34px rgba(10, 47, 108, 0.08);
+}
+
+.accordion-card__summary {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  text-align: left;
+}
+
+.accordion-card__leading {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.accordion-card__summary-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.accordion-card__thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 1px solid rgba(11, 79, 187, 0.12);
+  flex-shrink: 0;
+}
+
+.accordion-card__thumb--placeholder {
+  display: grid;
+  place-items: center;
+  background: rgba(30, 111, 242, 0.12);
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.accordion-card__copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.accordion-card__copy strong,
+.accordion-card__copy span,
+.accordion-card__content p,
+.accordion-card__meta span {
+  margin: 0;
+}
+
+.accordion-card__copy span,
+.accordion-card__meta span {
+  color: var(--muted);
+}
+
+.accordion-card__toggle {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 111, 242, 0.1);
+  color: var(--accent-strong);
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.accordion-card__content {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 16px;
+  border-top: 1px solid rgba(11, 79, 187, 0.08);
+}
+
+.accordion-card__content p {
+  color: var(--muted);
+  padding-top: 14px;
+}
+
+.accordion-card__meta {
+  display: flex;
+  flex-wrap: wrap;
 }
 
 .activity-card--button,

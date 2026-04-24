@@ -223,6 +223,7 @@ public final class RestMapper {
                 .id(view.getId())
                 .interestPostId(view.getInterestPostId())
                 .interestTitle(view.getInterestTitle())
+                .referenceImageUrl(view.getReferenceImageUrl())
                 .buyerId(view.getBuyerId())
                 .sellerName(view.getSellerName())
                 .sellerEmail(view.getSellerEmail())
