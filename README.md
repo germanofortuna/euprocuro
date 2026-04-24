@@ -29,7 +29,7 @@ O backend segue uma separacao clara entre camadas:
 
 - Home publica com busca por interesses publicados
 - Login e cadastro com senha criptografada em BCrypt
-- Sessao por token persistido no Mongo
+- Sessao por cookie HTTP-only em producao
 - Recuperacao de senha por e-mail
 - Fallback local para reset de senha quando SMTP nao estiver configurado
 - Area logada separada em paginas:
@@ -40,6 +40,9 @@ O backend segue uma separacao clara entre camadas:
 - Publicacao de interesses com imagem de referencia
 - Modais de feedback para mensagens de sucesso ou erro
 - RabbitMQ configurado para eventos de autenticacao, criacao de interesse e criacao de oferta
+- Headers basicos de seguranca, CORS por ambiente e rate limit nas rotas sensiveis
+- Pipeline de CI no GitHub Actions com build backend/frontend
+- Cobertura minima de 90% no core do backend, validada por JaCoCo
 
 ## Observacao sobre dados iniciais
 
@@ -74,6 +77,12 @@ Ou:
 mvn clean package
 ```
 
+Para subir com configuracoes de producao localmente:
+
+```bash
+SPRING_PROFILES_ACTIVE=prod mvn spring-boot:run
+```
+
 ## Rodando o frontend
 
 Na pasta `frontend`:
@@ -84,6 +93,12 @@ npm run dev
 ```
 
 Por padrao, o frontend consome a API em `http://localhost:8080/api`.
+
+Em hospedagem, configure `VITE_API_BASE` para a URL publica da API, por exemplo:
+
+```bash
+VITE_API_BASE=https://api.seudominio.com/api
+```
 
 ## Ambiente local esperado
 
@@ -106,6 +121,27 @@ APP_RESET_BASE_URL=http://localhost:5173
 ```
 
 Sem SMTP configurado, a API responde com um `previewResetLink` para facilitar o teste local do fluxo.
+No profile `prod`, esse preview fica desabilitado por padrao.
+
+## Seguranca para producao
+
+- Cookies de sessao HTTP-only com configuracao por ambiente
+- `Strict-Transport-Security`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` e `Permissions-Policy`
+- `CORS` limitado por `APP_CORS_ALLOWED_ORIGINS`
+- Rate limit para login, cadastro, reset de senha e envio de mensagens
+- `server.forward-headers-strategy=framework` para funcionar bem atras de proxy/Load Balancer
+
+Variaveis importantes para producao:
+
+```bash
+SPRING_PROFILES_ACTIVE=prod
+APP_CORS_ALLOWED_ORIGINS=https://app.seudominio.com
+APP_AUTH_COOKIE_SECURE=true
+APP_AUTH_COOKIE_SAME_SITE=Lax
+APP_AUTH_COOKIE_DOMAIN=.seudominio.com
+APP_AUTH_EXPOSE_RESET_PREVIEW=false
+APP_RESET_BASE_URL=https://app.seudominio.com
+```
 
 ## Configuracao de RabbitMQ
 
@@ -141,8 +177,41 @@ APP_RABBIT_AUTH_QUEUE=euprocuro.auth.events
 - `GET /api/interests`
 - `GET /api/interests/{id}`
 - `POST /api/interests`
+- `PUT /api/interests/{id}`
 - `GET /api/interests/{id}/offers`
 - `POST /api/interests/{id}/offers`
+- `GET /api/offers/{id}/conversation`
+- `GET /api/offers/{id}/messages`
+- `POST /api/offers/{id}/messages`
+
+## Testes e cobertura
+
+Na pasta `backend`:
+
+```bash
+mvn clean verify
+```
+
+Esse comando:
+
+- executa os testes unitarios
+- gera o relatorio JaCoCo em `backend/target/site/jacoco`
+- falha o build se a cobertura do core do backend ficar abaixo de `90%`
+
+## Pipeline GitHub
+
+O workflow esta em [.github/workflows/ci.yml](/C:/projetos/euprocuro/.github/workflows/ci.yml) e faz:
+
+- backend: `mvn -B clean verify`
+- frontend: `npm ci` + `npm run build`
+
+Ele roda em `push` e `pull_request`.
+
+## Deploy
+
+- Backend containerizado em [backend/Dockerfile](/C:/projetos/euprocuro/backend/Dockerfile)
+- Exemplo de blueprint do Render em [render.yaml](/C:/projetos/euprocuro/render.yaml)
+- Exemplo de variaveis em [.env.example](/C:/projetos/euprocuro/.env.example)
 
 ## IntelliJ
 

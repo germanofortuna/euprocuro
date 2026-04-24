@@ -21,6 +21,7 @@ spring:
 
 server:
   port: ${PORT:8080}
+  forward-headers-strategy: framework
 
 management:
   endpoints:
@@ -33,6 +34,12 @@ application:
     session-hours: ${APP_AUTH_SESSION_HOURS:168}
     password-reset-hours: ${APP_AUTH_PASSWORD_RESET_HOURS:2}
     reset-base-url: ${APP_RESET_BASE_URL:http://localhost:5173}
+    expose-reset-preview: ${APP_AUTH_EXPOSE_RESET_PREVIEW:true}
+    cookie:
+      name: ${APP_AUTH_COOKIE_NAME:EU_PROCURO_SESSION}
+      secure: ${APP_AUTH_COOKIE_SECURE:false}
+      same-site: ${APP_AUTH_COOKIE_SAME_SITE:Lax}
+      domain: ${APP_AUTH_COOKIE_DOMAIN:}
   email:
     from: ${APP_EMAIL_FROM:no-reply@euprocuro.local}
   messaging:
@@ -41,3 +48,9 @@ application:
       interest-created-queue: ${APP_RABBIT_INTEREST_CREATED_QUEUE:euprocuro.interest.created}
       offer-created-queue: ${APP_RABBIT_OFFER_CREATED_QUEUE:euprocuro.offer.created}
       auth-queue: ${APP_RABBIT_AUTH_QUEUE:euprocuro.auth.events}
+  security:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+    rate-limit:
+      enabled: ${APP_RATE_LIMIT_ENABLED:true}
+      window-seconds: ${APP_RATE_LIMIT_WINDOW_SECONDS:300}
+      max-requests: ${APP_RATE_LIMIT_MAX_REQUESTS:25}

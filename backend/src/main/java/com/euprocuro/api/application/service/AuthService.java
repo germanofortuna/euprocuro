@@ -54,6 +54,9 @@ public class AuthService implements AuthUseCase {
     @Value("${application.auth.reset-base-url:http://localhost:5173}")
     private String resetBaseUrl;
 
+    @Value("${application.auth.expose-reset-preview:true}")
+    private boolean exposeResetPreview;
+
     @Override
     public AuthenticatedSessionView register(RegisterUserCommand command) {
         validatePassword(command.getPassword());
@@ -159,8 +162,8 @@ public class AuthService implements AuthUseCase {
 
         return PasswordResetRequestView.builder()
                 .message("Se o e-mail existir, enviaremos as instrucoes de redefinicao.")
-                .previewResetLink(sent ? null : resetLink)
-                .previewToken(sent ? null : resetToken.getToken())
+                .previewResetLink(sent || !exposeResetPreview ? null : resetLink)
+                .previewToken(sent || !exposeResetPreview ? null : resetToken.getToken())
                 .build();
     }
 

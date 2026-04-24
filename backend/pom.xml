@@ -19,6 +19,7 @@
     <properties>
         <java.version>11</java.version>
         <maven.compiler.release>11</maven.compiler.release>
+        <jacoco.version>0.8.12</jacoco.version>
         <lombok.version>1.18.38</lombok.version>
     </properties>
 
@@ -84,6 +85,61 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <configuration>
+                    <excludes>
+                        <exclude>**/EuProcuroApplication.class</exclude>
+                        <exclude>**/application/command/**</exclude>
+                        <exclude>**/application/exception/**</exclude>
+                        <exclude>**/application/usecase/**</exclude>
+                        <exclude>**/application/view/**</exclude>
+                        <exclude>**/domain/**</exclude>
+                        <exclude>**/entrypoints/rest/controller/**</exclude>
+                        <exclude>**/entrypoints/rest/dto/**</exclude>
+                        <exclude>**/entrypoints/rest/handler/**</exclude>
+                        <exclude>**/entrypoints/rest/mapper/**</exclude>
+                        <exclude>**/entrypoints/rest/security/AuthTokenInterceptor.class</exclude>
+                        <exclude>**/entrypoints/rest/security/AuthCookieManager.class</exclude>
+                        <exclude>**/entrypoints/rest/security/CurrentUserContext.class</exclude>
+                        <exclude>**/entrypoints/rest/security/RateLimitInterceptor.class</exclude>
+                        <exclude>**/entrypoints/rest/security/SecurityHeadersFilter.class</exclude>
+                        <exclude>**/infrastructure/**</exclude>
+                        <exclude>**/shared/config/**</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report-and-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.90</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -20,6 +20,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final AuthUseCase authUseCase;
+    private final AuthCookieManager authCookieManager;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -27,16 +28,24 @@ public class AuthTokenInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        String header = request.getHeader("Authorization");
-        if (!StringUtils.hasText(header) || !header.startsWith(BEARER_PREFIX)) {
+        String token = resolveToken(request);
+        if (!StringUtils.hasText(token)) {
             throw new UnauthorizedException("Token de acesso nao informado.");
         }
 
-        String token = header.substring(BEARER_PREFIX.length()).trim();
         UserProfile user = authUseCase.requireAuthenticatedUser(token);
         request.setAttribute(CurrentUserContext.USER_ID_ATTRIBUTE, user.getId());
         request.setAttribute(CurrentUserContext.TOKEN_ATTRIBUTE, token);
         return true;
+    }
+
+    private String resolveToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (StringUtils.hasText(header) && header.startsWith(BEARER_PREFIX)) {
+            return header.substring(BEARER_PREFIX.length()).trim();
+        }
+
+        return authCookieManager.resolveToken(request).orElse(null);
     }
 
     private boolean isPublicRequest(HttpServletRequest request) {

@@ -1,6 +1,7 @@
 package com.euprocuro.api.entrypoints.rest.controller;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
 import org.springframework.http.HttpStatus;
@@ -19,6 +20,7 @@ import com.euprocuro.api.entrypoints.rest.dto.request.ResetPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.response.ActionMessageResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.AuthResponse;
 import com.euprocuro.api.entrypoints.rest.mapper.RestMapper;
+import com.euprocuro.api.entrypoints.rest.security.AuthCookieManager;
 import com.euprocuro.api.entrypoints.rest.security.CurrentUserContext;
 
 import lombok.RequiredArgsConstructor;
@@ -29,16 +31,17 @@ import lombok.RequiredArgsConstructor;
 public class AuthController {
 
     private final AuthUseCase authUseCase;
+    private final AuthCookieManager authCookieManager;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
-        return RestMapper.toResponse(authUseCase.register(RestMapper.toCommand(request)));
+    public AuthResponse register(@Valid @RequestBody RegisterRequest request, HttpServletResponse response) {
+        return toCookieAuthResponse(authUseCase.register(RestMapper.toCommand(request)), response);
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
-        return RestMapper.toResponse(authUseCase.login(RestMapper.toCommand(request)));
+    public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+        return toCookieAuthResponse(authUseCase.login(RestMapper.toCommand(request)), response);
     }
 
     @GetMapping("/me")
@@ -48,8 +51,9 @@ public class AuthController {
 
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void logout(HttpServletRequest request) {
+    public void logout(HttpServletRequest request, HttpServletResponse response) {
         authUseCase.logout(CurrentUserContext.token(request));
+        authCookieManager.clearSessionCookie(response);
     }
 
     @PostMapping("/forgot-password")
@@ -61,5 +65,18 @@ public class AuthController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authUseCase.resetPassword(RestMapper.toCommand(request));
+    }
+
+    private AuthResponse toCookieAuthResponse(
+            com.euprocuro.api.application.view.AuthenticatedSessionView session,
+            HttpServletResponse response
+    ) {
+        authCookieManager.writeSessionCookie(response, session.getToken(), session.getExpiresAt());
+
+        return AuthResponse.builder()
+                .token(null)
+                .expiresAt(session.getExpiresAt())
+                .user(RestMapper.toResponse(session.getUser()))
+                .build();
     }
 }

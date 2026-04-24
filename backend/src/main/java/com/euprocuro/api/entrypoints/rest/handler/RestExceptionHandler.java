@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
+import com.euprocuro.api.application.exception.TooManyRequestsException;
 import com.euprocuro.api.application.exception.UnauthorizedException;
 import com.euprocuro.api.entrypoints.rest.dto.response.ErrorResponse;
 
@@ -38,6 +39,11 @@ public class RestExceptionHandler {
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException exception) {
         return buildResponse(HttpStatus.FORBIDDEN, List.of(exception.getMessage()));
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ErrorResponse> handleTooManyRequests(TooManyRequestsException exception) {
+        return buildResponse(HttpStatus.TOO_MANY_REQUESTS, List.of(exception.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

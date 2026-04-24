@@ -374,7 +374,7 @@ export default function App() {
   }
 
   async function refreshPrivateData() {
-    if (!session?.token) {
+    if (!session) {
       return;
     }
 
@@ -383,7 +383,6 @@ export default function App() {
     try {
       const [me, dashboardData] = await Promise.all([fetchMe(), fetchDashboard()]);
       const nextSession = {
-        token: session.token,
         expiresAt: me.expiresAt,
         user: me.user
       };
@@ -415,6 +414,38 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (session) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    fetchMe()
+      .then((me) => {
+        if (isCancelled) {
+          return;
+        }
+
+        const nextSession = {
+          expiresAt: me.expiresAt,
+          user: me.user
+        };
+
+        storeSession(nextSession);
+        setSession(nextSession);
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setIsLoadingPrivate(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     refreshPublicData({
       query: deferredQuery,
       category: filters.category,
@@ -424,17 +455,17 @@ export default function App() {
   }, [deferredQuery, filters.category, filters.city, filters.maxBudget]);
 
   useEffect(() => {
-    if (!session?.token) {
+    if (!session) {
       setIsLoadingPrivate(false);
       setDashboard(null);
       return;
     }
 
     refreshPrivateData();
-  }, [session?.token]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
-    if (!session?.token || !selectedInterest || !isSelectedInterestMine) {
+    if (!session || !selectedInterest || !isSelectedInterestMine) {
       setOffers([]);
       return;
     }
@@ -445,7 +476,7 @@ export default function App() {
         setOffers([]);
         openFeedback("error", "Não foi possível carregar ofertas", requestError.message || "Tente novamente.");
       });
-  }, [session?.token, selectedInterest?.id, isSelectedInterestMine]);
+  }, [session, selectedInterest?.id, isSelectedInterestMine]);
 
   useEffect(() => {
     if (loggedSection === loggedSections.MY_INTERESTS && myInterests.length > 0 && !isSelectedInterestMine) {
@@ -454,7 +485,7 @@ export default function App() {
   }, [loggedSection, myInterests, isSelectedInterestMine]);
 
   useEffect(() => {
-    if (!session?.token || !currentUser?.id) {
+    if (!session || !currentUser?.id) {
       setHasUnreadMessages(false);
       setNotifications([]);
       return;
@@ -525,7 +556,7 @@ export default function App() {
     return () => {
       isCancelled = true;
     };
-  }, [session?.token, currentUser?.id, receivedOffers, sentOffers, messageSyncKey]);
+  }, [session, currentUser?.id, receivedOffers, sentOffers, messageSyncKey]);
 
   async function handleLoginSubmit(event) {
     event.preventDefault();
@@ -534,7 +565,6 @@ export default function App() {
     try {
       const authResponse = await login(loginForm);
       const nextSession = {
-        token: authResponse.token,
         expiresAt: authResponse.expiresAt,
         user: authResponse.user
       };
@@ -559,7 +589,6 @@ export default function App() {
     try {
       const authResponse = await register(registerForm);
       const nextSession = {
-        token: authResponse.token,
         expiresAt: authResponse.expiresAt,
         user: authResponse.user
       };
@@ -644,7 +673,7 @@ export default function App() {
   async function handleInterestSubmit(event) {
     event.preventDefault();
 
-    if (!session?.token) {
+    if (!session) {
       openAuthModal("register");
       return;
     }
@@ -683,7 +712,7 @@ export default function App() {
   async function handleOfferSubmit(event) {
     event.preventDefault();
 
-    if (!session?.token) {
+    if (!session) {
       openAuthModal("login");
       return;
     }
@@ -994,7 +1023,7 @@ export default function App() {
                   ))}
                 </div>
 
-                {session?.token ? (
+                {session ? (
                   isSelectedInterestMine ? (
                     <div className="cta-card">
                       <strong>Este interesse é seu</strong>
@@ -1577,7 +1606,7 @@ export default function App() {
           user={currentUser}
           currentSection={loggedSection}
           hasNotifications={hasUnreadMessages}
-          isLoggedIn={Boolean(session?.token)}
+          isLoggedIn={Boolean(session)}
           notificationButtonRef={notificationButtonRef}
           onLoginClick={() => openAuthModal("login")}
           onRegisterClick={() => openAuthModal("register")}
@@ -1593,11 +1622,11 @@ export default function App() {
           }}
         />
 
-        {isLoadingPrivate && session?.token ? (
+        {isLoadingPrivate && session ? (
           <section className="loading-card loading-card--full">Carregando sua área logada...</section>
         ) : null}
 
-        {!session?.token ? renderPublicHome(true) : renderLoggedArea()}
+        {!session ? renderPublicHome(true) : renderLoggedArea()}
       </main>
 
       <AuthModal

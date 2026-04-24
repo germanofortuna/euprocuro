@@ -35,6 +35,7 @@ async function request(path, options = {}) {
 
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
+    credentials: "include",
     headers
   });
 
@@ -59,7 +60,12 @@ export function getStoredSession() {
   }
 
   try {
-    return JSON.parse(rawValue);
+    const session = JSON.parse(rawValue);
+    if (session && typeof session === "object" && "token" in session) {
+      delete session.token;
+      window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+    }
+    return session;
   } catch (error) {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
     return null;
@@ -67,7 +73,16 @@ export function getStoredSession() {
 }
 
 export function storeSession(session) {
-  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  if (!session) {
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    return;
+  }
+
+  const sanitizedSession = {
+    expiresAt: session.expiresAt ?? null,
+    user: session.user ?? null
+  };
+  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sanitizedSession));
 }
 
 export function clearSession() {

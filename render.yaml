@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: eu-procuro-api
+    runtime: docker
+    rootDir: backend
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: APP_AUTH_COOKIE_SECURE
+        value: "true"
+      - key: APP_AUTH_EXPOSE_RESET_PREVIEW
+        value: "false"
