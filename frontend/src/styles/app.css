@@ -242,6 +242,15 @@ img {
     var(--surface);
 }
 
+.hero--private {
+  display: block;
+  padding: 18px;
+}
+
+.hero--private .hero__stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .hero__copy,
 .hero__stats,
 .stacked-form,
@@ -471,8 +480,8 @@ textarea:focus {
 .stat-card {
   display: grid;
   gap: 8px;
-  padding: 18px;
-  border-radius: 22px;
+  padding: 16px 18px;
+  border-radius: 18px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.94);
   text-align: left;
@@ -483,7 +492,7 @@ textarea:focus {
 }
 
 .stat-card strong {
-  font-size: 1.7rem;
+  font-size: 1.55rem;
 }
 
 .stat-card--button {
@@ -938,7 +947,8 @@ textarea:focus {
   .three-columns,
   .auth-tabs,
   .activity-grid,
-  .conversation-meta {
+  .conversation-meta,
+  .hero--private .hero__stats {
     grid-template-columns: 1fr;
   }
 

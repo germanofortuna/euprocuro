@@ -260,6 +260,10 @@ export default function App() {
   const myInterests = useMemo(() => (dashboard?.myInterests ?? []).slice().sort(byNewest), [dashboard?.myInterests]);
   const sentOffers = useMemo(() => (dashboard?.offersSent ?? []).slice().sort(byNewest), [dashboard?.offersSent]);
   const receivedOffers = useMemo(() => (dashboard?.offersReceived ?? []).slice().sort(byNewest), [dashboard?.offersReceived]);
+  const visibleHomeInterests = useMemo(
+    () => interests.filter((interest) => !currentUser?.id || interest.ownerId !== currentUser.id),
+    [interests, currentUser?.id]
+  );
   const isSelectedInterestMine = selectedInterest?.ownerId === currentUser?.id;
 
   function openFeedback(type, title, message) {
@@ -275,7 +279,9 @@ export default function App() {
     setLoggedSection(section);
 
     if (section === loggedSections.EXPLORE) {
-      setSelectedInterest((current) => interests.find((interest) => interest.id === current?.id) ?? interests[0] ?? null);
+      setSelectedInterest((current) =>
+        visibleHomeInterests.find((interest) => interest.id === current?.id) ?? visibleHomeInterests[0] ?? null
+      );
     }
 
     if (section === loggedSections.MY_INTERESTS) {
@@ -517,6 +523,20 @@ export default function App() {
       [selectedInterest.id]: true
     }));
   }, [selectedInterest?.id]);
+
+  useEffect(() => {
+    if (loggedSection !== loggedSections.EXPLORE) {
+      return;
+    }
+
+    setSelectedInterest((current) => {
+      if (current && visibleHomeInterests.some((interest) => interest.id === current.id)) {
+        return current;
+      }
+
+      return visibleHomeInterests[0] ?? null;
+    });
+  }, [loggedSection, visibleHomeInterests]);
 
   useEffect(() => {
     if (!session || !currentUser?.id) {
@@ -985,14 +1005,18 @@ export default function App() {
 
             {isLoadingPublic ? (
               <div className="loading-card">Carregando interesses publicados...</div>
-            ) : interests.length === 0 ? (
+            ) : visibleHomeInterests.length === 0 ? (
               <EmptyState
-                title="Nada publicado ainda"
-                description="Quando os primeiros interesses forem cadastrados, eles aparecerão aqui."
+                title={session ? "Nenhum interesse de outros usuários" : "Nada publicado ainda"}
+                description={
+                  session
+                    ? "Quando outros usuários publicarem interesses, eles aparecerão aqui."
+                    : "Quando os primeiros interesses forem cadastrados, eles aparecerão aqui."
+                }
               />
             ) : (
               <div className="interest-list">
-                {interests.map((interest) => (
+                {visibleHomeInterests.map((interest) => (
                   <InterestCard
                     key={interest.id}
                     interest={interest}
@@ -1295,15 +1319,6 @@ export default function App() {
     return (
       <>
         <section className="hero hero--private">
-          <div className="hero__copy">
-            <span className="eyebrow">Área logada</span>
-            <h1>Anuncie seus interesses e aguarde por uma proposta!</h1>
-            <p>
-              Explore o que está publicado na home ou navegue pelas páginas de interesses ativos,
-              ofertas enviadas e ofertas recebidas.
-            </p>
-          </div>
-
           <div className="hero__stats hero__stats--actions">
             {statCards.map((card) => (
               <StatCard
