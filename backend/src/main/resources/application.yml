@@ -1,0 +1,43 @@
+spring:
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/euprocuro}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:true}
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+application:
+  auth:
+    session-hours: ${APP_AUTH_SESSION_HOURS:168}
+    password-reset-hours: ${APP_AUTH_PASSWORD_RESET_HOURS:2}
+    reset-base-url: ${APP_RESET_BASE_URL:http://localhost:5173}
+  email:
+    from: ${APP_EMAIL_FROM:no-reply@euprocuro.local}
+  messaging:
+    rabbit:
+      exchange: ${APP_RABBIT_EXCHANGE:euprocuro.exchange}
+      interest-created-queue: ${APP_RABBIT_INTEREST_CREATED_QUEUE:euprocuro.interest.created}
+      offer-created-queue: ${APP_RABBIT_OFFER_CREATED_QUEUE:euprocuro.offer.created}
+      auth-queue: ${APP_RABBIT_AUTH_QUEUE:euprocuro.auth.events}

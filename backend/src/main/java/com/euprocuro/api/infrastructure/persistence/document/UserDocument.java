@@ -1,0 +1,27 @@
+package com.euprocuro.api.infrastructure.persistence.document;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder(toBuilder = true)
+@NoArgsConstructor
+@AllArgsConstructor
+@Document("users")
+public class UserDocument {
+    @Id
+    private String id;
+    private String name;
+    private String email;
+    private String passwordHash;
+    private String city;
+    private String state;
+    private String bio;
+    private double buyerRating;
+    private double sellerRating;
+}
