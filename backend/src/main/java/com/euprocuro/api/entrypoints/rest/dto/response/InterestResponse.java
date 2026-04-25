@@ -27,6 +27,7 @@ public class InterestResponse {
     Integer desiredRadiusKm;
     boolean acceptsNationwideOffers;
     boolean boostEnabled;
+    Instant boostedUntil;
     String preferredCondition;
     String preferredContactMode;
     InterestStatus status;

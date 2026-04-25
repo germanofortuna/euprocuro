@@ -32,4 +32,16 @@ public class ConversationMessageGatewayAdapter implements ConversationMessageGat
                 .map(ConversationMessagePersistenceMapper::toDomain)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public List<ConversationMessage> findByOfferIdInOrderByCreatedAtAsc(List<String> offerIds) {
+        if (offerIds == null || offerIds.isEmpty()) {
+            return List.of();
+        }
+
+        return repository.findByOfferIdInOrderByCreatedAtAsc(offerIds)
+                .stream()
+                .map(ConversationMessagePersistenceMapper::toDomain)
+                .collect(Collectors.toList());
+    }
 }

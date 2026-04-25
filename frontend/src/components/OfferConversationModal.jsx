@@ -50,7 +50,7 @@ export default function OfferConversationModal({ modal, currentUserId, onClose, 
             onClick={onClose}
             aria-label="Fechar modal"
           >
-            ×
+            X
           </button>
         </div>
 

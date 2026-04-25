@@ -8,4 +8,6 @@ public interface ConversationMessageGateway {
     ConversationMessage save(ConversationMessage message);
 
     List<ConversationMessage> findByOfferIdOrderByCreatedAtAsc(String offerId);
+
+    List<ConversationMessage> findByOfferIdInOrderByCreatedAtAsc(List<String> offerIds);
 }

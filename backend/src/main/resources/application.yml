@@ -35,6 +35,7 @@ application:
     password-reset-hours: ${APP_AUTH_PASSWORD_RESET_HOURS:2}
     reset-base-url: ${APP_RESET_BASE_URL:http://localhost:5173}
     expose-reset-preview: ${APP_AUTH_EXPOSE_RESET_PREVIEW:true}
+    expose-session-token: ${APP_AUTH_EXPOSE_SESSION_TOKEN:true}
     cookie:
       name: ${APP_AUTH_COOKIE_NAME:EU_PROCURO_SESSION}
       secure: ${APP_AUTH_COOKIE_SECURE:false}
@@ -42,6 +43,8 @@ application:
       domain: ${APP_AUTH_COOKIE_DOMAIN:}
   email:
     from: ${APP_EMAIL_FROM:no-reply@euprocuro.local}
+  monetization:
+    provider: ${APP_MONETIZATION_PROVIDER:LOCAL_MOCK}
   messaging:
     rabbit:
       exchange: ${APP_RABBIT_EXCHANGE:euprocuro.exchange}

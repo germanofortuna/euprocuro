@@ -22,6 +22,7 @@ import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.usecase.MarketplaceUseCase;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
+import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
@@ -42,6 +43,7 @@ public class MarketplaceService implements MarketplaceUseCase {
     private final InterestGateway interestGateway;
     private final OfferGateway offerGateway;
     private final EventPublisherGateway eventPublisherGateway;
+    private final EmailGateway emailGateway;
 
     @Override
     public InterestPost createInterest(String currentUserId, CreateInterestCommand command) {
@@ -140,7 +142,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                         || containsIgnoreCase(post, filter.getQuery()))
                 .filter(post -> !filter.isOpenOnly() || post.getStatus() == InterestStatus.OPEN)
                 .sorted(Comparator
-                        .comparing(InterestPost::isBoostEnabled).reversed()
+                        .comparing(this::isBoostActive).reversed()
                         .thenComparing(InterestPost::getCreatedAt, Comparator.reverseOrder()))
                 .collect(Collectors.toList());
     }
@@ -165,6 +167,18 @@ public class MarketplaceService implements MarketplaceUseCase {
             throw new BusinessException("O mesmo usuario nao pode ofertar para si.");
         }
 
+        boolean hasActivePlan = seller.getSubscriptionActiveUntil() != null
+                && seller.getSubscriptionActiveUntil().isAfter(Instant.now());
+        if (!hasActivePlan) {
+            int availableCredits = seller.getSellerCredits() == null ? 0 : seller.getSellerCredits();
+            if (availableCredits <= 0) {
+                throw new BusinessException("Voce precisa de creditos ou de um plano ativo para enviar propostas.");
+            }
+            seller = userGateway.save(seller.toBuilder()
+                    .sellerCredits(availableCredits - 1)
+                    .build());
+        }
+
         Offer offer = Offer.builder()
                 .interestPostId(interestId)
                 .sellerId(seller.getId())
@@ -180,6 +194,9 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         Offer saved = offerGateway.save(offer);
+        String sellerName = seller.getName();
+        userGateway.findById(interestPost.getOwnerId())
+                .ifPresent(owner -> emailGateway.sendOfferReceivedEmail(owner, interestPost.getTitle(), sellerName));
         eventPublisherGateway.publish("offer.created", Map.of(
                 "offerId", saved.getId(),
                 "interestId", interestId,
@@ -214,6 +231,12 @@ public class MarketplaceService implements MarketplaceUseCase {
                 || safe(post.getOwnerName()).contains(normalizedQuery)
                 || safe(post.getLocation() == null ? null : post.getLocation().getCity()).contains(normalizedQuery)
                 || tags.stream().map(this::safe).anyMatch(tag -> tag.contains(normalizedQuery));
+    }
+
+    private boolean isBoostActive(InterestPost post) {
+        return post.isBoostEnabled()
+                && post.getBoostedUntil() != null
+                && post.getBoostedUntil().isAfter(Instant.now());
     }
 
     private String normalizeReferenceImage(String referenceImageUrl) {

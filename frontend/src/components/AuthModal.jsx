@@ -52,7 +52,7 @@ export default function AuthModal({
             onClick={onClose}
             aria-label="Fechar modal"
           >
-            ×
+            X
           </button>
         </div>
 

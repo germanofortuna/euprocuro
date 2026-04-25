@@ -18,9 +18,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.view.PersonalDashboardView;
+import com.euprocuro.api.domain.gateway.ConversationMessageGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
+import com.euprocuro.api.domain.model.ConversationMessage;
 import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestStatus;
@@ -38,6 +40,8 @@ class DashboardServiceTest {
     private InterestGateway interestGateway;
     @Mock
     private OfferGateway offerGateway;
+    @Mock
+    private ConversationMessageGateway conversationMessageGateway;
 
     @InjectMocks
     private DashboardService dashboardService;
@@ -85,6 +89,13 @@ class DashboardServiceTest {
         when(interestGateway.findByOwnerIdOrderByCreatedAtDesc("buyer-1")).thenReturn(List.of(myInterest));
         when(offerGateway.findByInterestPostIdInOrderByCreatedAtDesc(List.of("interest-1"))).thenReturn(List.of(receivedOffer));
         when(offerGateway.findBySellerIdOrderByCreatedAtDesc("buyer-1")).thenReturn(List.of(sentOffer));
+        when(conversationMessageGateway.findByOfferIdInOrderByCreatedAtAsc(List.of("offer-r1", "offer-s1")))
+                .thenReturn(List.of(ConversationMessage.builder()
+                        .offerId("offer-r1")
+                        .senderId("seller-1")
+                        .content("Ainda disponivel")
+                        .createdAt(Instant.now())
+                        .build()));
         when(interestGateway.findAll()).thenReturn(List.of(myInterest));
 
         PersonalDashboardView result = dashboardService.getDashboard("buyer-1");
@@ -94,6 +105,7 @@ class DashboardServiceTest {
         assertThat(result.getTotalOffersSent()).isEqualTo(1);
         assertThat(result.getOffersReceived()).hasSize(1);
         assertThat(result.getOffersReceived().get(0).getReferenceImageUrl()).isEqualTo("data:image/png;base64,abc");
+        assertThat(result.getOffersReceived().get(0).getLatestMessage()).isEqualTo("Ainda disponivel");
         assertThat(result.getOffersSent()).extracting("interestTitle").containsExactly("Interesse removido");
     }
 

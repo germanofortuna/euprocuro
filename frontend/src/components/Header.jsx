@@ -2,6 +2,7 @@ import logo from "../assets/eu-procuro-logo.png";
 
 const loggedSections = {
   EXPLORE: "EXPLORE",
+  CREDITS: "CREDITS",
   NEW_INTEREST: "NEW_INTEREST"
 };
 
@@ -10,8 +11,11 @@ export default function Header({
   isLoggedIn,
   currentSection,
   hasNotifications,
+  sellerCredits,
+  subscriptionActive,
   notificationButtonRef,
   onNavigate,
+  onCreditsClick,
   onNotificationClick,
   onLoginClick,
   onRegisterClick,
@@ -48,6 +52,16 @@ export default function Header({
               Novo interesse
             </button>
           </nav>
+
+          <button
+            type="button"
+            className="credits-badge"
+            onClick={onCreditsClick}
+            title="Ver créditos e pagamentos"
+          >
+            <strong>{subscriptionActive ? "Pro" : (sellerCredits ?? 0)}</strong>
+            <span>{subscriptionActive ? "plano ativo" : "créditos"}</span>
+          </button>
 
           <button
             ref={notificationButtonRef}

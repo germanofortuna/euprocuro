@@ -28,6 +28,7 @@ public class InterestPost {
     private Integer desiredRadiusKm;
     private boolean acceptsNationwideOffers;
     private boolean boostEnabled;
+    private Instant boostedUntil;
     private String preferredCondition;
     private String preferredContactMode;
     private InterestStatus status;

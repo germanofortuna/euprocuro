@@ -74,6 +74,8 @@ public class AuthService implements AuthUseCase {
                 .bio(Optional.ofNullable(command.getBio()).orElse(""))
                 .buyerRating(4.8)
                 .sellerRating(4.8)
+                .sellerCredits(3)
+                .purchasedCreditsTotal(0)
                 .build());
 
         eventPublisherGateway.publish("user.registered", Map.of(

@@ -17,7 +17,13 @@ export default function InterestCard({ interest, selected, onClick }) {
       onClick={() => onClick(interest)}
     >
       {interest.referenceImageUrl ? (
-        <img className="interest-card__image" src={interest.referenceImageUrl} alt={interest.title} />
+        <img
+          className="interest-card__image"
+          src={interest.referenceImageUrl}
+          alt={interest.title}
+          loading="lazy"
+          decoding="async"
+        />
       ) : null}
 
       <div className="interest-card__head">

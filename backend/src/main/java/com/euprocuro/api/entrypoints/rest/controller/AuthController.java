@@ -4,6 +4,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,6 +33,9 @@ public class AuthController {
 
     private final AuthUseCase authUseCase;
     private final AuthCookieManager authCookieManager;
+
+    @Value("${application.auth.expose-session-token:true}")
+    private boolean exposeSessionToken;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
@@ -74,7 +78,7 @@ public class AuthController {
         authCookieManager.writeSessionCookie(response, session.getToken(), session.getExpiresAt());
 
         return AuthResponse.builder()
-                .token(null)
+                .token(exposeSessionToken ? session.getToken() : null)
                 .expiresAt(session.getExpiresAt())
                 .user(RestMapper.toResponse(session.getUser()))
                 .build();

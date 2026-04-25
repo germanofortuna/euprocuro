@@ -22,6 +22,7 @@ import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.view.ConversationMessageView;
 import com.euprocuro.api.application.view.OfferConversationView;
 import com.euprocuro.api.domain.gateway.ConversationMessageGateway;
+import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
@@ -44,6 +45,8 @@ class ConversationServiceTest {
     private UserGateway userGateway;
     @Mock
     private ConversationMessageGateway conversationMessageGateway;
+    @Mock
+    private EmailGateway emailGateway;
 
     @InjectMocks
     private ConversationService conversationService;

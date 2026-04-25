@@ -23,6 +23,10 @@ public final class UserPersistenceMapper {
                 .bio(document.getBio())
                 .buyerRating(document.getBuyerRating())
                 .sellerRating(document.getSellerRating())
+                .sellerCredits(document.getSellerCredits())
+                .purchasedCreditsTotal(document.getPurchasedCreditsTotal())
+                .subscriptionPlan(document.getSubscriptionPlan())
+                .subscriptionActiveUntil(document.getSubscriptionActiveUntil())
                 .build();
     }
 
@@ -41,6 +45,10 @@ public final class UserPersistenceMapper {
                 .bio(domain.getBio())
                 .buyerRating(domain.getBuyerRating())
                 .sellerRating(domain.getSellerRating())
+                .sellerCredits(domain.getSellerCredits())
+                .purchasedCreditsTotal(domain.getPurchasedCreditsTotal())
+                .subscriptionPlan(domain.getSubscriptionPlan())
+                .subscriptionActiveUntil(domain.getSubscriptionActiveUntil())
                 .build();
     }
 }

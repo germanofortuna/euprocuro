@@ -1,5 +1,7 @@
 package com.euprocuro.api.infrastructure.persistence.document;
 
+import java.time.Instant;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -24,4 +26,8 @@ public class UserDocument {
     private String bio;
     private double buyerRating;
     private double sellerRating;
+    private Integer sellerCredits;
+    private Integer purchasedCreditsTotal;
+    private String subscriptionPlan;
+    private Instant subscriptionActiveUntil;
 }

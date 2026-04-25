@@ -60,12 +60,7 @@ export function getStoredSession() {
   }
 
   try {
-    const session = JSON.parse(rawValue);
-    if (session && typeof session === "object" && "token" in session) {
-      delete session.token;
-      window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-    }
-    return session;
+    return JSON.parse(rawValue);
   } catch (error) {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
     return null;
@@ -80,6 +75,7 @@ export function storeSession(session) {
 
   const sanitizedSession = {
     expiresAt: session.expiresAt ?? null,
+    token: session.token ?? null,
     user: session.user ?? null
   };
   window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sanitizedSession));
@@ -129,6 +125,24 @@ export async function resetPassword(payload) {
 
 export async function fetchDashboard() {
   return request("/dashboard");
+}
+
+export async function fetchMonetizationAccount() {
+  return request("/monetization/account");
+}
+
+export async function purchaseProduct(payload) {
+  return request("/monetization/purchase", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function boostInterest(interestId, payload) {
+  return request(`/monetization/interests/${interestId}/boost`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function fetchCategories() {

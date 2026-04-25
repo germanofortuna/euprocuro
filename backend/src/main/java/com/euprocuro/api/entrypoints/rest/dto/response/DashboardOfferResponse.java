@@ -27,4 +27,7 @@ public class DashboardOfferResponse {
     List<String> highlights;
     OfferStatus status;
     Instant createdAt;
+    String latestMessage;
+    String latestMessageSenderId;
+    Instant latestMessageAt;
 }

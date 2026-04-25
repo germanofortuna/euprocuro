@@ -215,6 +215,31 @@ img {
   color: var(--ink);
 }
 
+.credits-badge {
+  display: grid;
+  gap: 2px;
+  min-width: 92px;
+  padding: 9px 14px;
+  border: 1px solid rgba(27, 156, 87, 0.24);
+  border-radius: 16px;
+  background: rgba(232, 255, 242, 0.95);
+  color: #137245;
+  text-align: left;
+  box-shadow: 0 10px 24px rgba(27, 156, 87, 0.08);
+}
+
+.credits-badge strong {
+  font-size: 1.1rem;
+  color: #0d8a4a;
+}
+
+.credits-badge span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .eyebrow {
   display: inline-flex;
   font-size: 0.75rem;
@@ -428,6 +453,202 @@ textarea:focus {
   display: flex;
   gap: 14px;
   margin-top: 18px;
+}
+
+.monetization-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 34px rgba(15, 41, 84, 0.08);
+}
+
+.monetization-panel__summary {
+  display: grid;
+  gap: 4px;
+}
+
+.monetization-panel__summary span {
+  color: var(--muted);
+}
+
+.monetization-products,
+.boost-box__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.product-chip {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(11, 79, 187, 0.16);
+  border-radius: 16px;
+  background: rgba(237, 245, 255, 0.94);
+  color: var(--ink);
+  padding: 11px 14px;
+}
+
+.product-chip > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.product-chip span {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.product-chip__actions {
+  display: flex;
+  gap: 12px;
+}
+
+.product-chip--boost {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.credits-page {
+  display: grid;
+  gap: 20px;
+}
+
+.credits-summary {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.35fr) 1fr;
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+  border: 1px solid rgba(27, 156, 87, 0.18);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(232, 255, 242, 0.94), rgba(255, 255, 255, 0.92));
+}
+
+.credits-summary span {
+  color: var(--muted);
+}
+
+.credits-summary strong {
+  display: block;
+  margin-top: 4px;
+  color: #0d8a4a;
+  font-size: 1.8rem;
+}
+
+.purchase-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 18px;
+}
+
+.purchase-column {
+  display: grid;
+  gap: 12px;
+}
+
+.monetization-products--page {
+  display: grid;
+}
+
+.product-chip--large {
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.product-chip--large p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.payment-tracker {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(30, 111, 242, 0.16);
+  border-radius: 22px;
+  background: rgba(237, 245, 255, 0.92);
+}
+
+.payment-tracker--empty {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.payment-tracker--failed {
+  border-color: rgba(210, 64, 64, 0.28);
+  background: rgba(255, 239, 239, 0.92);
+}
+
+.payment-tracker__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.payment-tracker__header h3,
+.purchase-column h3 {
+  margin: 4px 0 0;
+}
+
+.payment-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  position: relative;
+}
+
+.payment-step {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--muted);
+}
+
+.payment-step span {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(30, 111, 242, 0.12);
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.payment-step.done {
+  color: var(--ink);
+  border: 1px solid rgba(27, 156, 87, 0.18);
+}
+
+.payment-step.done span {
+  background: #0d8a4a;
+  color: white;
+}
+
+.payment-step.active {
+  box-shadow: 0 12px 28px rgba(30, 111, 242, 0.12);
+}
+
+.boost-box {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(11, 79, 187, 0.12);
+  background: rgba(237, 245, 255, 0.92);
+}
+
+.boost-box p {
+  margin: 6px 0 0;
+  color: var(--muted);
 }
 
 .modal-close-button {
@@ -945,6 +1166,9 @@ textarea:focus {
   .filters,
   .two-columns,
   .three-columns,
+  .credits-summary,
+  .purchase-grid,
+  .payment-steps,
   .auth-tabs,
   .activity-grid,
   .conversation-meta,
@@ -958,7 +1182,8 @@ textarea:focus {
   .panel__header,
   .hero__actions,
   .hero__aside,
-  .section-nav {
+  .section-nav,
+  .monetization-panel {
     flex-direction: column;
     align-items: stretch;
   }

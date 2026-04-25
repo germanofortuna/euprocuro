@@ -16,6 +16,7 @@ import com.euprocuro.api.application.usecase.ConversationUseCase;
 import com.euprocuro.api.application.view.ConversationMessageView;
 import com.euprocuro.api.application.view.OfferConversationView;
 import com.euprocuro.api.domain.gateway.ConversationMessageGateway;
+import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
@@ -34,6 +35,7 @@ public class ConversationService implements ConversationUseCase {
     private final InterestGateway interestGateway;
     private final UserGateway userGateway;
     private final ConversationMessageGateway conversationMessageGateway;
+    private final EmailGateway emailGateway;
 
     @Override
     public OfferConversationView getOfferConversation(String currentUserId, String offerId) {
@@ -82,6 +84,13 @@ public class ConversationService implements ConversationUseCase {
                 .content(command.getContent().trim())
                 .createdAt(Instant.now())
                 .build());
+
+        emailGateway.sendConversationMessageEmail(
+                recipient,
+                sender.getName(),
+                interest.getTitle(),
+                command.getContent().trim()
+        );
 
         return toView(message);
     }

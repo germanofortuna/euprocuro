@@ -1,8 +1,11 @@
 package com.euprocuro.api.application.service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -11,9 +14,11 @@ import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.usecase.DashboardUseCase;
 import com.euprocuro.api.application.view.DashboardOfferView;
 import com.euprocuro.api.application.view.PersonalDashboardView;
+import com.euprocuro.api.domain.gateway.ConversationMessageGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
+import com.euprocuro.api.domain.model.ConversationMessage;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.Offer;
@@ -28,6 +33,7 @@ public class DashboardService implements DashboardUseCase {
     private final UserGateway userGateway;
     private final InterestGateway interestGateway;
     private final OfferGateway offerGateway;
+    private final ConversationMessageGateway conversationMessageGateway;
 
     @Override
     public PersonalDashboardView getDashboard(String userId) {
@@ -45,6 +51,7 @@ public class DashboardService implements DashboardUseCase {
                 );
 
         List<Offer> offersSent = offerGateway.findBySellerIdOrderByCreatedAtDesc(userId);
+        Map<String, ConversationMessage> latestMessagesByOfferId = latestMessagesByOfferId(offersReceived, offersSent);
         Map<String, InterestPost> referencedInterests = interestGateway.findAll()
                 .stream()
                 .collect(Collectors.toMap(InterestPost::getId, Function.identity()));
@@ -56,15 +63,37 @@ public class DashboardService implements DashboardUseCase {
                 .totalOffersReceived(offersReceived.size())
                 .myInterests(myInterests)
                 .offersSent(offersSent.stream()
-                        .map(offer -> toView(offer, referencedInterests.get(offer.getInterestPostId())))
+                        .map(offer -> toView(offer, referencedInterests.get(offer.getInterestPostId()),
+                                latestMessagesByOfferId.get(offer.getId())))
                         .collect(Collectors.toList()))
                 .offersReceived(offersReceived.stream()
-                        .map(offer -> toView(offer, interestsById.get(offer.getInterestPostId())))
+                        .map(offer -> toView(offer, interestsById.get(offer.getInterestPostId()),
+                                latestMessagesByOfferId.get(offer.getId())))
                         .collect(Collectors.toList()))
                 .build();
     }
 
-    private DashboardOfferView toView(Offer offer, InterestPost interest) {
+    private Map<String, ConversationMessage> latestMessagesByOfferId(List<Offer> offersReceived, List<Offer> offersSent) {
+        List<String> offerIds = Stream.concat(offersReceived.stream(), offersSent.stream())
+                .map(Offer::getId)
+                .collect(Collectors.toList());
+        if (offerIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return conversationMessageGateway.findByOfferIdInOrderByCreatedAtAsc(offerIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        ConversationMessage::getOfferId,
+                        Function.identity(),
+                        (current, next) -> Optional.ofNullable(next.getCreatedAt()).orElse(Instant.EPOCH)
+                                .isAfter(Optional.ofNullable(current.getCreatedAt()).orElse(Instant.EPOCH))
+                                ? next
+                                : current
+                ));
+    }
+
+    private DashboardOfferView toView(Offer offer, InterestPost interest, ConversationMessage latestMessage) {
         return DashboardOfferView.builder()
                 .id(offer.getId())
                 .interestPostId(offer.getInterestPostId())
@@ -81,6 +110,9 @@ public class DashboardService implements DashboardUseCase {
                 .highlights(offer.getHighlights())
                 .status(offer.getStatus())
                 .createdAt(offer.getCreatedAt())
+                .latestMessage(latestMessage == null ? null : latestMessage.getContent())
+                .latestMessageSenderId(latestMessage == null ? null : latestMessage.getSenderId())
+                .latestMessageAt(latestMessage == null ? null : latestMessage.getCreatedAt())
                 .build();
     }
 }

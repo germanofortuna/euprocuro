@@ -8,4 +8,6 @@ import com.euprocuro.api.infrastructure.persistence.document.ConversationMessage
 
 public interface SpringDataConversationMessageRepository extends MongoRepository<ConversationMessageDocument, String> {
     List<ConversationMessageDocument> findByOfferIdOrderByCreatedAtAsc(String offerId);
+
+    List<ConversationMessageDocument> findByOfferIdInOrderByCreatedAtAsc(List<String> offerIds);
 }

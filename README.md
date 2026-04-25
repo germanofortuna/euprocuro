@@ -38,6 +38,10 @@ O backend segue uma separacao clara entre camadas:
   - ofertas recebidas
   - cadastro de novo interesse
 - Publicacao de interesses com imagem de referencia
+- Busca publica por texto, categoria, cidade e teto de orcamento
+- Monetizacao MVP com creditos para vendedores, plano Pro e boost de interesses
+- Checkout local simulado preparado para trocar por gateway real via webhook
+- E-mails transacionais para reset de senha, nova oferta, mensagem, compra e boost
 - Modais de feedback para mensagens de sucesso ou erro
 - RabbitMQ configurado para eventos de autenticacao, criacao de interesse e criacao de oferta
 - Headers basicos de seguranca, CORS por ambiente e rate limit nas rotas sensiveis
@@ -123,6 +127,40 @@ APP_RESET_BASE_URL=http://localhost:5173
 Sem SMTP configurado, a API responde com um `previewResetLink` para facilitar o teste local do fluxo.
 No profile `prod`, esse preview fica desabilitado por padrao.
 
+Eventos que ja disparam e-mail:
+
+- link de redefinicao de senha
+- nova oferta recebida em um interesse
+- nova mensagem na conversa
+- confirmacao de compra de creditos ou plano
+- confirmacao de boost ativado
+
+## Monetizacao e pagamentos
+
+O MVP ja possui produtos de monetizacao em [MonetizationCatalog.java](/C:/projetos/euprocuro/backend/src/main/java/com/euprocuro/api/application/service/MonetizationCatalog.java):
+
+- pacotes de creditos para vendedores enviarem propostas
+- plano vendedor Pro com propostas liberadas enquanto estiver ativo
+- boost de 3 ou 7 dias para destacar interesses na busca e na home
+
+Hoje o pagamento usa o provedor `LOCAL_MOCK`: a API simula aprovacao imediata para permitir testar produto, tela e regras de negocio sem dinheiro real. Para producao, o fluxo esperado e:
+
+1. O usuario escolhe Pix ou cartao no frontend.
+2. O backend cria a cobranca/assinatura no gateway.
+3. O usuario paga no gateway.
+4. O gateway chama um webhook seguro no backend.
+5. Somente apos validar o webhook, a API libera creditos, plano ou boost.
+
+Variaveis planejadas para trocar o mock por gateway real:
+
+```bash
+APP_MONETIZATION_PROVIDER=ASAAS
+PAYMENT_GATEWAY_API_KEY=sua-chave
+PAYMENT_WEBHOOK_SECRET=segredo-do-webhook
+```
+
+Para o Brasil, a opcao mais simples para este MVP tende a ser o Asaas, porque trabalha com Pix, cartao, cobrancas recorrentes, API, webhooks e ambiente de sandbox. Mercado Pago tambem e uma boa alternativa, especialmente se voce preferir Checkout Pro/Bricks, mas a modelagem de assinatura + creditos costuma ficar um pouco mais trabalhosa.
+
 ## Seguranca para producao
 
 - Cookies de sessao HTTP-only com configuracao por ambiente
@@ -140,6 +178,7 @@ APP_AUTH_COOKIE_SECURE=true
 APP_AUTH_COOKIE_SAME_SITE=Lax
 APP_AUTH_COOKIE_DOMAIN=.seudominio.com
 APP_AUTH_EXPOSE_RESET_PREVIEW=false
+APP_AUTH_EXPOSE_SESSION_TOKEN=false
 APP_RESET_BASE_URL=https://app.seudominio.com
 ```
 
@@ -153,7 +192,10 @@ O backend ja sobe com publisher pronto para RabbitMQ. Os principais eventos publ
 - `auth.password-reset-requested`
 - `auth.password-reset-completed`
 - `interest.created`
+- `interest.updated`
+- `interest.boosted`
 - `offer.created`
+- `monetization.purchase.completed`
 
 Exchange e filas podem ser ajustadas por ambiente:
 
@@ -183,6 +225,10 @@ APP_RABBIT_AUTH_QUEUE=euprocuro.auth.events
 - `GET /api/offers/{id}/conversation`
 - `GET /api/offers/{id}/messages`
 - `POST /api/offers/{id}/messages`
+- `GET /api/monetization/products`
+- `GET /api/monetization/account`
+- `POST /api/monetization/purchase`
+- `POST /api/monetization/interests/{interestId}/boost`
 
 ## Testes e cobertura
 

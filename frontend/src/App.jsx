@@ -2,18 +2,21 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   clearSession,
+  boostInterest,
   createInterest,
   createOffer,
   fetchCategories,
   fetchDashboard,
   fetchInterests,
   fetchMe,
+  fetchMonetizationAccount,
   fetchOfferConversation,
   fetchOffers,
   forgotPassword,
   getStoredSession,
   login,
   logout,
+  purchaseProduct,
   register,
   resetPassword,
   sendOfferMessage,
@@ -79,10 +82,13 @@ const loggedSections = {
   MY_INTERESTS: "MY_INTERESTS",
   SENT_OFFERS: "SENT_OFFERS",
   RECEIVED_OFFERS: "RECEIVED_OFFERS",
+  CREDITS: "CREDITS",
   NEW_INTEREST: "NEW_INTEREST"
 };
 
 const MESSAGE_SEEN_STORAGE_KEY = "eu-procuro-message-seen";
+const MAX_REFERENCE_IMAGE_SIZE = 1200;
+const REFERENCE_IMAGE_QUALITY = 0.78;
 
 function currency(value) {
   if (value === null || value === undefined || value === "") {
@@ -116,10 +122,32 @@ function createResetStateFromLocation() {
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(new Error("Não foi possível ler a imagem."));
-    reader.readAsDataURL(file);
+    if (!file.type.startsWith("image/")) {
+      reject(new Error("Selecione uma imagem valida."));
+      return;
+    }
+
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      const scale = Math.min(1, MAX_REFERENCE_IMAGE_SIZE / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(objectUrl);
+      resolve(canvas.toDataURL("image/jpeg", REFERENCE_IMAGE_QUALITY));
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Nao foi possivel ler a imagem."));
+    };
+
+    image.src = objectUrl;
   });
 }
 
@@ -200,15 +228,28 @@ function latestIncomingMessageTimestamp(conversation, currentUserId) {
     }, 0);
 }
 
+function useDebouncedValue(value, delayMs) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [value, delayMs]);
+
+  return debouncedValue;
+}
+
 export default function App() {
   const initialResetState = useMemo(() => createResetStateFromLocation(), []);
   const notificationButtonRef = useRef(null);
+  const publicRequestSeq = useRef(0);
   const myInterestsSectionRef = useRef(null);
   const sentOffersSectionRef = useRef(null);
   const receivedOffersSectionRef = useRef(null);
   const newInterestSectionRef = useRef(null);
   const [session, setSession] = useState(() => getStoredSession());
   const [dashboard, setDashboard] = useState(null);
+  const [monetizationAccount, setMonetizationAccount] = useState(null);
   const [categories, setCategories] = useState([]);
   const [interests, setInterests] = useState([]);
   const [selectedInterest, setSelectedInterest] = useState(null);
@@ -241,6 +282,8 @@ export default function App() {
   const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
   const [isSubmittingInterest, setIsSubmittingInterest] = useState(false);
   const [isSubmittingOffer, setIsSubmittingOffer] = useState(false);
+  const [isProcessingPurchase, setIsProcessingPurchase] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState(null);
   const [feedbackModal, setFeedbackModal] = useState(null);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -255,11 +298,24 @@ export default function App() {
     data: null
   });
 
-  const deferredQuery = useDeferredValue(filters.query);
+  const debouncedQuery = useDebouncedValue(filters.query, 350);
+  const deferredQuery = useDeferredValue(debouncedQuery);
   const currentUser = session?.user ?? null;
   const myInterests = useMemo(() => (dashboard?.myInterests ?? []).slice().sort(byNewest), [dashboard?.myInterests]);
   const sentOffers = useMemo(() => (dashboard?.offersSent ?? []).slice().sort(byNewest), [dashboard?.offersSent]);
   const receivedOffers = useMemo(() => (dashboard?.offersReceived ?? []).slice().sort(byNewest), [dashboard?.offersReceived]);
+  const creditProducts = useMemo(
+    () => (monetizationAccount?.products ?? []).filter((product) => product.type === "CREDIT_PACK"),
+    [monetizationAccount?.products]
+  );
+  const subscriptionProducts = useMemo(
+    () => (monetizationAccount?.products ?? []).filter((product) => product.type === "SUBSCRIPTION"),
+    [monetizationAccount?.products]
+  );
+  const boostProducts = useMemo(
+    () => (monetizationAccount?.products ?? []).filter((product) => product.type === "BOOST"),
+    [monetizationAccount?.products]
+  );
   const visibleHomeInterests = useMemo(
     () => interests.filter((interest) => !currentUser?.id || interest.ownerId !== currentUser.id),
     [interests, currentUser?.id]
@@ -367,20 +423,22 @@ export default function App() {
   }
 
   async function refreshPublicData(nextFilters = filters, preserveSelection = true) {
+    const requestId = publicRequestSeq.current + 1;
+    publicRequestSeq.current = requestId;
     setIsLoadingPublic(true);
 
     try {
-      const [categoryData, interestData] = await Promise.all([
-        fetchCategories(),
-        fetchInterests({
-          query: nextFilters.query,
-          category: nextFilters.category,
-          city: nextFilters.city,
-          maxBudget: nextFilters.maxBudget || undefined
-        })
-      ]);
+      const interestData = await fetchInterests({
+        query: nextFilters.query,
+        category: nextFilters.category,
+        city: nextFilters.city,
+        maxBudget: nextFilters.maxBudget || undefined
+      });
 
-      setCategories(categoryData);
+      if (requestId !== publicRequestSeq.current) {
+        return;
+      }
+
       setInterests(interestData);
       setSelectedInterest((currentSelected) => {
         if (preserveSelection && currentSelected) {
@@ -390,9 +448,21 @@ export default function App() {
         return interestData[0] ?? null;
       });
     } catch (requestError) {
-      openFeedback("error", "Falha ao carregar", requestError.message || "Não foi possível carregar a plataforma.");
+      if (requestId === publicRequestSeq.current) {
+        openFeedback("error", "Falha ao carregar", requestError.message || "Não foi possível carregar a plataforma.");
+      }
     } finally {
-      setIsLoadingPublic(false);
+      if (requestId === publicRequestSeq.current) {
+        setIsLoadingPublic(false);
+      }
+    }
+  }
+
+  async function refreshCategories() {
+    try {
+      setCategories(await fetchCategories());
+    } catch (requestError) {
+      openFeedback("error", "Falha ao carregar categorias", requestError.message || "Tente novamente.");
     }
   }
 
@@ -404,7 +474,11 @@ export default function App() {
     setIsLoadingPrivate(true);
 
     try {
-      const [me, dashboardData] = await Promise.all([fetchMe(), fetchDashboard()]);
+      const [me, dashboardData, monetizationData] = await Promise.all([
+        fetchMe(),
+        fetchDashboard(),
+        fetchMonetizationAccount()
+      ]);
       const nextSession = {
         expiresAt: me.expiresAt,
         user: me.user
@@ -413,10 +487,12 @@ export default function App() {
       setSession(nextSession);
       storeSession(nextSession);
       setDashboard(dashboardData);
+      setMonetizationAccount(monetizationData);
     } catch (requestError) {
       clearSession();
       setSession(null);
       setDashboard(null);
+      setMonetizationAccount(null);
       setLoggedSection(loggedSections.EXPLORE);
       openFeedback("error", "Sessão encerrada", requestError.message || "Entre novamente para continuar.");
     } finally {
@@ -425,15 +501,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    refreshPublicData(
-      {
-        query: deferredQuery,
-        category: filters.category,
-        city: filters.city,
-        maxBudget: filters.maxBudget
-      },
-      true
-    );
+    refreshCategories();
   }, []);
 
   useEffect(() => {
@@ -545,7 +613,6 @@ export default function App() {
       return;
     }
 
-    const receivedIds = new Set(receivedOffers.map((offer) => offer.id));
     const allOffers = [...receivedOffers, ...sentOffers];
     if (allOffers.length === 0) {
       setHasUnreadMessages(false);
@@ -553,63 +620,33 @@ export default function App() {
       return;
     }
 
-    let isCancelled = false;
-
-    Promise.all(
-      allOffers.map(async (offer) => ({
-        offerId: offer.id,
-        section: receivedIds.has(offer.id) ? loggedSections.RECEIVED_OFFERS : loggedSections.SENT_OFFERS,
-        conversation: await fetchOfferConversation(offer.id)
-      }))
-    )
-      .then((results) => {
-        if (isCancelled) {
-          return;
+    const receivedIds = new Set(receivedOffers.map((offer) => offer.id));
+    const seenMap = readSeenMessages(currentUser.id);
+    const unreadEntries = allOffers
+      .map((offer) => {
+        if (!offer.latestMessageAt || offer.latestMessageSenderId === currentUser.id) {
+          return null;
         }
 
-        const seenMap = readSeenMessages(currentUser.id);
-        const unreadEntries = results
-          .map((result) => {
-            const messages = result.conversation?.messages ?? [];
-            const incomingMessages = messages
-              .filter((message) => message.senderId !== currentUser.id)
-              .sort((left, right) => new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime());
-            const latestMessage = incomingMessages[0];
-            if (!latestMessage) {
-              return null;
-            }
+        const latestIncoming = new Date(offer.latestMessageAt).getTime();
+        const lastSeen = Number(seenMap[offer.id] ?? 0);
+        if (latestIncoming <= lastSeen) {
+          return null;
+        }
 
-            const latestIncoming = new Date(latestMessage.createdAt ?? 0).getTime();
-            const lastSeen = Number(seenMap[result.offerId] ?? 0);
-            if (latestIncoming <= lastSeen) {
-              return null;
-            }
-
-            return {
-              offerId: result.offerId,
-              section: result.section,
-              title: result.conversation?.interestTitle ?? "Nova mensagem",
-              message: latestMessage.content,
-              createdAt: latestMessage.createdAt
-            };
-          })
-          .filter(Boolean)
-          .sort((left, right) => new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime());
-
-        const unreadEntry = unreadEntries[0];
-        setNotifications(unreadEntries);
-        setHasUnreadMessages(unreadEntries.length > 0);
+        return {
+          offerId: offer.id,
+          section: receivedIds.has(offer.id) ? loggedSections.RECEIVED_OFFERS : loggedSections.SENT_OFFERS,
+          title: offer.interestTitle ?? "Nova mensagem",
+          message: offer.latestMessage ?? "Você recebeu uma nova mensagem.",
+          createdAt: offer.latestMessageAt
+        };
       })
-      .catch(() => {
-        if (!isCancelled) {
-          setHasUnreadMessages(false);
-          setNotifications([]);
-        }
-      });
+      .filter(Boolean)
+      .sort((left, right) => new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime());
 
-    return () => {
-      isCancelled = true;
-    };
+    setNotifications(unreadEntries);
+    setHasUnreadMessages(unreadEntries.length > 0);
   }, [session, currentUser?.id, receivedOffers, sentOffers, messageSyncKey]);
 
   async function handleLoginSubmit(event) {
@@ -702,6 +739,7 @@ export default function App() {
       clearSession();
       setSession(null);
       setDashboard(null);
+      setMonetizationAccount(null);
       setLoggedSection(loggedSections.EXPLORE);
       setOffers([]);
       setConversationModal((current) => ({ ...current, visible: false, data: null, draftMessage: "" }));
@@ -797,6 +835,68 @@ export default function App() {
       openFeedback("error", "Não foi possível enviar", requestError.message || "Tente novamente.");
     } finally {
       setIsSubmittingOffer(false);
+    }
+  }
+
+  async function handlePurchaseProduct(productCode, paymentMethod = "PIX") {
+    if (!session) {
+      openAuthModal("login");
+      return;
+    }
+
+    const product = (monetizationAccount?.products ?? []).find((item) => item.code === productCode);
+    setPaymentStatus({
+      productCode,
+      productName: product?.name ?? "Produto",
+      paymentMethod,
+      provider: "LOCAL_MOCK",
+      step: "PAYMENT",
+      message: "Pedido criado. Aguardando confirmação do pagamento."
+    });
+    navigateTo(loggedSections.CREDITS);
+    setIsProcessingPurchase(true);
+    try {
+      const checkout = await purchaseProduct({ productCode, paymentMethod });
+      await refreshPrivateData();
+      setPaymentStatus({
+        productCode,
+        productName: product?.name ?? productCode,
+        paymentMethod: checkout.paymentMethod ?? paymentMethod,
+        provider: checkout.provider ?? "LOCAL_MOCK",
+        step: "COMPLETED",
+        message: checkout.message || "Pagamento aprovado e créditos liberados."
+      });
+      openFeedback("success", "Pagamento aprovado", checkout.message || "Seu saldo foi atualizado.");
+    } catch (requestError) {
+      setPaymentStatus((current) => ({
+        ...(current ?? {
+          productCode,
+          productName: product?.name ?? productCode,
+          paymentMethod
+        }),
+        step: "FAILED",
+        message: requestError.message || "Tente novamente."
+      }));
+      openFeedback("error", "Compra não concluída", requestError.message || "Tente novamente.");
+    } finally {
+      setIsProcessingPurchase(false);
+    }
+  }
+
+  async function handleBoostInterest(boostCode, interestId = selectedInterest?.id, paymentMethod = "PIX") {
+    if (!interestId) {
+      return;
+    }
+
+    setIsProcessingPurchase(true);
+    try {
+      await boostInterest(interestId, { boostCode, paymentMethod });
+      await Promise.all([refreshPrivateData(), refreshPublicData()]);
+      openFeedback("success", "Boost ativado", "Seu interesse foi impulsionado com sucesso.");
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível impulsionar", requestError.message || "Tente novamente.");
+    } finally {
+      setIsProcessingPurchase(false);
     }
   }
 
@@ -1043,6 +1143,7 @@ export default function App() {
                     className="detail-image"
                     src={selectedInterest.referenceImageUrl}
                     alt={selectedInterest.title}
+                    decoding="async"
                   />
                 ) : null}
 
@@ -1208,6 +1309,8 @@ export default function App() {
                 className="accordion-card__thumb"
                 src={interest.referenceImageUrl}
                 alt={interest.title}
+                loading="lazy"
+                decoding="async"
               />
             ) : (
               <div className="accordion-card__thumb accordion-card__thumb--placeholder">
@@ -1256,7 +1359,13 @@ export default function App() {
         >
           <div className="accordion-card__leading">
             {resolvedImageUrl ? (
-              <img className="accordion-card__thumb" src={resolvedImageUrl} alt={offer.interestTitle} />
+              <img
+                className="accordion-card__thumb"
+                src={resolvedImageUrl}
+                alt={offer.interestTitle}
+                loading="lazy"
+                decoding="async"
+              />
             ) : (
               <div className="accordion-card__thumb accordion-card__thumb--placeholder">
                 {(primaryLabel ?? "O").charAt(0)}
@@ -1294,6 +1403,160 @@ export default function App() {
     );
   }
 
+  function renderPaymentTracker() {
+    if (!paymentStatus) {
+      return (
+        <div className="payment-tracker payment-tracker--empty">
+          <strong>Nenhum pagamento em andamento</strong>
+          <p>Quando você comprar créditos, o acompanhamento do pedido aparecerá aqui.</p>
+        </div>
+      );
+    }
+
+    const steps = [
+      { key: "ORDER", label: "Pedido criado" },
+      { key: "PAYMENT", label: "Pagamento" },
+      { key: "COMPLETED", label: "Créditos liberados" }
+    ];
+    const currentIndex = paymentStatus.step === "FAILED"
+      ? 1
+      : steps.findIndex((step) => step.key === paymentStatus.step);
+
+    return (
+      <div className={`payment-tracker ${paymentStatus.step === "FAILED" ? "payment-tracker--failed" : ""}`}>
+        <div className="payment-tracker__header">
+          <div>
+            <span className="eyebrow">Status do pagamento</span>
+            <h3>{paymentStatus.productName}</h3>
+          </div>
+          <span>{paymentStatus.paymentMethod === "CREDIT_CARD" ? "Cartão" : "Pix"}</span>
+        </div>
+
+        <div className="payment-steps">
+          {steps.map((step, index) => {
+            const isDone = paymentStatus.step !== "FAILED" && index <= currentIndex;
+            const isActive = index === currentIndex;
+            return (
+              <div
+                key={step.key}
+                className={`payment-step ${isDone ? "done" : ""} ${isActive ? "active" : ""}`}
+              >
+                <span>{index + 1}</span>
+                <strong>{step.label}</strong>
+              </div>
+            );
+          })}
+        </div>
+
+        <p>{paymentStatus.message}</p>
+      </div>
+    );
+  }
+
+  function renderCreditsPage() {
+    const sellerCredits = monetizationAccount?.sellerCredits ?? 0;
+    const purchasedCreditsTotal = monetizationAccount?.purchasedCreditsTotal ?? 0;
+    const hasPurchasedCredits = purchasedCreditsTotal > 0;
+
+    return (
+      <section className="panel panel--spaced credits-page">
+        <div className="panel__header">
+          <div>
+            <span className="eyebrow">Página</span>
+            <h2>Comprar créditos</h2>
+          </div>
+          <button type="button" className="ghost-button" onClick={() => navigateTo(loggedSections.EXPLORE)}>
+            Voltar para home
+          </button>
+        </div>
+
+        <div className="credits-summary">
+          <div>
+            <span>Saldo atual</span>
+            <strong>{monetizationAccount?.subscriptionActive ? "Plano Pro ativo" : `${sellerCredits} créditos`}</strong>
+          </div>
+          <p>
+            {hasPurchasedCredits
+              ? `Você já comprou ${purchasedCreditsTotal} créditos. Seu saldo atual considera créditos usados e disponíveis.`
+              : `Você ainda não comprou créditos. Créditos grátis restantes: ${sellerCredits}.`}
+          </p>
+        </div>
+
+        {renderPaymentTracker()}
+
+        <div className="purchase-grid">
+          <article className="purchase-column">
+            <span className="eyebrow">Pacotes</span>
+            <h3>Créditos para enviar propostas</h3>
+            <div className="monetization-products monetization-products--page">
+              {creditProducts.map((product) => (
+                <article key={product.code} className="product-chip product-chip--large">
+                  <div>
+                    <strong>{product.name}</strong>
+                    <span>{currency(product.price)}</span>
+                  </div>
+                  <p>{product.credits} propostas para responder interesses de compradores.</p>
+                  <div className="product-chip__actions">
+                    <button
+                      type="button"
+                      className="primary-button primary-button--compact"
+                      disabled={isProcessingPurchase}
+                      onClick={() => handlePurchaseProduct(product.code, "PIX")}
+                    >
+                      Pagar com Pix
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      disabled={isProcessingPurchase}
+                      onClick={() => handlePurchaseProduct(product.code, "CREDIT_CARD")}
+                    >
+                      Cartão
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </article>
+
+          <article className="purchase-column">
+            <span className="eyebrow">Plano</span>
+            <h3>Propostas sem consumir créditos</h3>
+            <div className="monetization-products monetization-products--page">
+              {subscriptionProducts.map((product) => (
+                <article key={product.code} className="product-chip product-chip--large">
+                  <div>
+                    <strong>{product.name}</strong>
+                    <span>{currency(product.price)}</span>
+                  </div>
+                  <p>Plano ativo por {product.durationDays} dias para vendedores frequentes.</p>
+                  <div className="product-chip__actions">
+                    <button
+                      type="button"
+                      className="primary-button primary-button--compact"
+                      disabled={isProcessingPurchase}
+                      onClick={() => handlePurchaseProduct(product.code, "PIX")}
+                    >
+                      Pagar com Pix
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      disabled={isProcessingPurchase}
+                      onClick={() => handlePurchaseProduct(product.code, "CREDIT_CARD")}
+                    >
+                      Cartão
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </article>
+        </div>
+      </section>
+    );
+  }
+
   function renderLoggedArea() {
     const statCards = [
       {
@@ -1313,7 +1576,7 @@ export default function App() {
         label: "Ofertas Recebidas",
         value: dashboard?.totalOffersReceived ?? "...",
         accent: loggedSection === loggedSections.RECEIVED_OFFERS
-      }
+      },
     ];
 
     return (
@@ -1364,6 +1627,13 @@ export default function App() {
           </button>
           <button
             type="button"
+            className={loggedSection === loggedSections.CREDITS ? "active" : ""}
+            onClick={() => navigateTo(loggedSections.CREDITS)}
+          >
+            Comprar créditos
+          </button>
+          <button
+            type="button"
             className={loggedSection === loggedSections.NEW_INTEREST ? "active" : ""}
             onClick={openNewInterestForm}
           >
@@ -1372,6 +1642,8 @@ export default function App() {
         </section>
 
         {loggedSection === loggedSections.EXPLORE ? renderPublicHome(false) : null}
+
+        {loggedSection === loggedSections.CREDITS ? renderCreditsPage() : null}
 
         {loggedSection === loggedSections.MY_INTERESTS ? (
           <section ref={myInterestsSectionRef} className="workspace-grid">
@@ -1408,6 +1680,7 @@ export default function App() {
                       className="detail-image"
                       src={selectedInterest.referenceImageUrl}
                       alt={selectedInterest.title}
+                      decoding="async"
                     />
                   ) : null}
 
@@ -1420,6 +1693,45 @@ export default function App() {
                   >
                     Editar anúncio
                   </button>
+
+                  <div className="boost-box">
+                    <div>
+                      <strong>Impulsionar interesse</strong>
+                      <p>
+                        {selectedInterest.boostedUntil
+                          ? `Destaque ativo até ${formatTimestamp(selectedInterest.boostedUntil)}`
+                          : "Apareça com prioridade na busca e na home."}
+                      </p>
+                    </div>
+                    <div className="boost-box__actions">
+                      {boostProducts.map((product) => (
+                        <article key={product.code} className="product-chip product-chip--boost">
+                          <div>
+                            <strong>{product.name}</strong>
+                            <span>{currency(product.price)}</span>
+                          </div>
+                          <div className="product-chip__actions">
+                            <button
+                              type="button"
+                              className="text-button"
+                              disabled={isProcessingPurchase}
+                              onClick={() => handleBoostInterest(product.code, selectedInterest.id, "PIX")}
+                            >
+                              Pix
+                            </button>
+                            <button
+                              type="button"
+                              className="text-button"
+                              disabled={isProcessingPurchase}
+                              onClick={() => handleBoostInterest(product.code, selectedInterest.id, "CREDIT_CARD")}
+                            >
+                              Cartão
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
 
                   <div className="offers">
                     <div className="offers__header">
@@ -1643,6 +1955,7 @@ export default function App() {
                     className="interest-upload-preview"
                     src={interestForm.referenceImageUrl}
                     alt="Prévia do interesse"
+                    decoding="async"
                   />
                 ) : null}
               </div>
@@ -1704,10 +2017,13 @@ export default function App() {
           user={currentUser}
           currentSection={loggedSection}
           hasNotifications={hasUnreadMessages}
+          sellerCredits={monetizationAccount?.sellerCredits}
+          subscriptionActive={monetizationAccount?.subscriptionActive}
           isLoggedIn={Boolean(session)}
           notificationButtonRef={notificationButtonRef}
           onLoginClick={() => openAuthModal("login")}
           onRegisterClick={() => openAuthModal("register")}
+          onCreditsClick={() => navigateTo(loggedSections.CREDITS)}
           onNotificationClick={openNotificationModal}
           onLogout={handleLogout}
           onNavigate={(section) => {

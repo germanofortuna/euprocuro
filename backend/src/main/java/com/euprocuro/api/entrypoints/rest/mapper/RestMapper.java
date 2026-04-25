@@ -6,15 +6,20 @@ import java.util.stream.Collectors;
 
 import com.euprocuro.api.application.command.CreateInterestCommand;
 import com.euprocuro.api.application.command.CreateOfferCommand;
+import com.euprocuro.api.application.command.BoostInterestCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.LoginCommand;
+import com.euprocuro.api.application.command.PurchaseProductCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
 import com.euprocuro.api.application.command.SendConversationMessageCommand;
 import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
+import com.euprocuro.api.application.view.CheckoutView;
 import com.euprocuro.api.application.view.ConversationMessageView;
 import com.euprocuro.api.application.view.DashboardOfferView;
+import com.euprocuro.api.application.view.MonetizationAccountView;
+import com.euprocuro.api.application.view.MonetizationProductView;
 import com.euprocuro.api.application.view.OfferConversationView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.PersonalDashboardView;
@@ -25,8 +30,10 @@ import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.UserProfile;
 import com.euprocuro.api.entrypoints.rest.dto.request.CreateInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.CreateOfferRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.BoostInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ForgotPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.LoginRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.PurchaseProductRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.RegisterRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ResetPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.SendConversationMessageRequest;
@@ -34,10 +41,13 @@ import com.euprocuro.api.entrypoints.rest.dto.request.UpdateInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.response.ActionMessageResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.AuthResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.CategoryOptionResponse;
+import com.euprocuro.api.entrypoints.rest.dto.response.CheckoutResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.ConversationMessageResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.DashboardOfferResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.InterestResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.LocationResponse;
+import com.euprocuro.api.entrypoints.rest.dto.response.MonetizationAccountResponse;
+import com.euprocuro.api.entrypoints.rest.dto.response.MonetizationProductResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.OfferConversationResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.OfferResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.PersonalDashboardResponse;
@@ -83,6 +93,20 @@ public final class RestMapper {
     public static SendConversationMessageCommand toCommand(SendConversationMessageRequest request) {
         return SendConversationMessageCommand.builder()
                 .content(request.getContent())
+                .build();
+    }
+
+    public static PurchaseProductCommand toCommand(PurchaseProductRequest request) {
+        return PurchaseProductCommand.builder()
+                .productCode(request.getProductCode())
+                .paymentMethod(request.getPaymentMethod())
+                .build();
+    }
+
+    public static BoostInterestCommand toCommand(BoostInterestRequest request) {
+        return BoostInterestCommand.builder()
+                .boostCode(request.getBoostCode())
+                .paymentMethod(request.getPaymentMethod())
                 .build();
     }
 
@@ -152,6 +176,39 @@ public final class RestMapper {
                 .build();
     }
 
+    public static CheckoutResponse toResponse(CheckoutView view) {
+        return CheckoutResponse.builder()
+                .provider(view.getProvider())
+                .paymentMethod(view.getPaymentMethod())
+                .productCode(view.getProductCode())
+                .checkoutUrl(view.getCheckoutUrl())
+                .message(view.getMessage())
+                .build();
+    }
+
+    public static MonetizationAccountResponse toResponse(MonetizationAccountView view) {
+        return MonetizationAccountResponse.builder()
+                .sellerCredits(view.getSellerCredits())
+                .purchasedCreditsTotal(view.getPurchasedCreditsTotal())
+                .subscriptionPlan(view.getSubscriptionPlan())
+                .subscriptionActiveUntil(view.getSubscriptionActiveUntil())
+                .subscriptionActive(view.isSubscriptionActive())
+                .products(view.getProducts().stream().map(RestMapper::toResponse).collect(Collectors.toList()))
+                .build();
+    }
+
+    public static MonetizationProductResponse toResponse(MonetizationProductView view) {
+        return MonetizationProductResponse.builder()
+                .code(view.getCode())
+                .name(view.getName())
+                .description(view.getDescription())
+                .type(view.getType())
+                .price(view.getPrice())
+                .credits(view.getCredits())
+                .durationDays(view.getDurationDays())
+                .build();
+    }
+
     public static UserResponse toResponse(UserProfile domain) {
         return UserResponse.builder()
                 .id(domain.getId())
@@ -162,6 +219,10 @@ public final class RestMapper {
                 .bio(domain.getBio())
                 .buyerRating(domain.getBuyerRating())
                 .sellerRating(domain.getSellerRating())
+                .sellerCredits(domain.getSellerCredits())
+                .purchasedCreditsTotal(domain.getPurchasedCreditsTotal())
+                .subscriptionPlan(domain.getSubscriptionPlan())
+                .subscriptionActiveUntil(domain.getSubscriptionActiveUntil())
                 .build();
     }
 
@@ -181,6 +242,7 @@ public final class RestMapper {
                 .desiredRadiusKm(domain.getDesiredRadiusKm())
                 .acceptsNationwideOffers(domain.isAcceptsNationwideOffers())
                 .boostEnabled(domain.isBoostEnabled())
+                .boostedUntil(domain.getBoostedUntil())
                 .preferredCondition(domain.getPreferredCondition())
                 .preferredContactMode(domain.getPreferredContactMode())
                 .status(domain.getStatus())
@@ -235,6 +297,9 @@ public final class RestMapper {
                 .highlights(Optional.ofNullable(view.getHighlights()).orElse(List.of()))
                 .status(view.getStatus())
                 .createdAt(view.getCreatedAt())
+                .latestMessage(view.getLatestMessage())
+                .latestMessageSenderId(view.getLatestMessageSenderId())
+                .latestMessageAt(view.getLatestMessageAt())
                 .build();
     }
 

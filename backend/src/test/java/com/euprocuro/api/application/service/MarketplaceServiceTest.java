@@ -27,6 +27,7 @@ import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
+import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
@@ -49,6 +50,8 @@ class MarketplaceServiceTest {
     private OfferGateway offerGateway;
     @Mock
     private EventPublisherGateway eventPublisherGateway;
+    @Mock
+    private EmailGateway emailGateway;
 
     @InjectMocks
     private MarketplaceService marketplaceService;
@@ -148,6 +151,7 @@ class MarketplaceServiceTest {
         InterestPost boosted = baseInterest();
         boosted.setId("1");
         boosted.setBoostEnabled(true);
+        boosted.setBoostedUntil(Instant.now().plus(1, ChronoUnit.DAYS));
         boosted.setCreatedAt(Instant.now().minus(2, ChronoUnit.HOURS));
 
         InterestPost newest = baseInterest();
@@ -202,16 +206,67 @@ class MarketplaceServiceTest {
     }
 
     @Test
+    void createOfferShouldRejectSellerWithoutCreditsOrPlan() {
+        UserProfile seller = UserProfile.builder()
+                .id("seller-1")
+                .name("Carlos")
+                .email("carlos@teste.com")
+                .sellerCredits(0)
+                .build();
+
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
+
+        assertThatThrownBy(() -> marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
+                .message("Tenho um item")
+                .offeredPrice(new BigDecimal("400"))
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("creditos");
+    }
+
+    @Test
+    void createOfferShouldAllowActivePlanWithoutCredits() {
+        InterestPost interest = baseInterest();
+        UserProfile seller = UserProfile.builder()
+                .id("seller-1")
+                .name("Carlos")
+                .email("carlos@teste.com")
+                .sellerCredits(0)
+                .subscriptionActiveUntil(Instant.now().plus(3, ChronoUnit.DAYS))
+                .build();
+
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(offerGateway.save(any(Offer.class))).thenAnswer(invocation -> {
+            Offer offer = invocation.getArgument(0);
+            offer.setId("offer-1");
+            return offer;
+        });
+
+        Offer result = marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
+                .message("Tenho um item")
+                .offeredPrice(new BigDecimal("400"))
+                .build());
+
+        assertThat(result.getSellerId()).isEqualTo("seller-1");
+    }
+
+    @Test
     void createOfferShouldPersistOfferAndPublishEvent() {
         InterestPost interest = baseInterest();
         UserProfile seller = UserProfile.builder()
                 .id("seller-1")
                 .name("Carlos")
                 .email("carlos@teste.com")
+                .sellerCredits(5)
                 .build();
 
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
         when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(offerGateway.save(any(Offer.class))).thenAnswer(invocation -> {
             Offer offer = invocation.getArgument(0);
             offer.setId("offer-1");
