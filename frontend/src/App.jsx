@@ -2324,25 +2324,24 @@ export default function App() {
 
                   <p className="detail-description">{selectedInterest.description}</p>
 
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={() => startEditingInterest(selectedInterest)}
-                  >
-                    Editar anúncio
-                  </button>
-
-                  <div className="inline-actions">
+                  <div className="inline-actions inline-actions--interest-actions">
                     <button
                       type="button"
-                      className="ghost-button"
+                      className="ghost-button action-button--compact"
+                      onClick={() => startEditingInterest(selectedInterest)}
+                    >
+                      Editar anúncio
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button action-button--compact"
                       onClick={() => handleCloseInterest(selectedInterest.id)}
                     >
                       Desativar anúncio
                     </button>
                     <button
                       type="button"
-                      className="danger-button"
+                      className="danger-button action-button--compact"
                       onClick={() => handleDeleteInterest(selectedInterest.id)}
                     >
                       Excluir anúncio

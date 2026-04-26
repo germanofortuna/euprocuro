@@ -1034,6 +1034,28 @@ textarea:focus {
   gap: 10px;
 }
 
+.inline-actions--interest-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
+
+.inline-actions--interest-actions .ghost-button,
+.inline-actions--interest-actions .danger-button {
+  margin-bottom: 0;
+}
+
+.inline-actions--interest-actions .action-button--compact {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 8px;
+  border-radius: 14px;
+  font-size: clamp(0.78rem, 1.2vw, 0.9rem);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 .danger-button {
   border: 1px solid rgba(179, 38, 30, 0.18);
   border-radius: 16px;
