@@ -33,7 +33,7 @@ export default function NotificationModal({
         <div className="feedback-modal__header">
           <div>
             <span className="eyebrow">Notificações</span>
-            <h2>Mensagens novas</h2>
+            <h2>Novidades</h2>
           </div>
           <button
             type="button"
@@ -53,7 +53,7 @@ export default function NotificationModal({
             <div className="notification-list">
               {notifications.map((notification) => (
                 <button
-                  key={notification.offerId}
+                  key={notification.id ?? notification.offerId}
                   type="button"
                   className="notification-item"
                   onClick={() => onSelect(notification)}
@@ -68,7 +68,7 @@ export default function NotificationModal({
         ) : (
           <div className="empty-state empty-state--compact">
             <h3>Nada novo por aqui</h3>
-            <p>Quando chegar uma nova mensagem, ela vai aparecer neste painel.</p>
+            <p>Quando chegar uma mensagem ou um interesse compatível, ele vai aparecer neste painel.</p>
           </div>
         )}
       </div>

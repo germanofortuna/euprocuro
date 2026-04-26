@@ -17,6 +17,8 @@ public interface InterestGateway {
 
     Optional<InterestPost> findById(String id);
 
+    void deleteById(String id);
+
     long countByStatus(InterestStatus status);
 
     long count();

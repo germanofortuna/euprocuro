@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 import com.euprocuro.api.application.command.CreateInterestCommand;
 import com.euprocuro.api.application.command.CreateOfferCommand;
+import com.euprocuro.api.application.command.CreateSellerItemCommand;
 import com.euprocuro.api.application.command.BoostInterestCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.LoginCommand;
@@ -13,7 +14,9 @@ import com.euprocuro.api.application.command.PurchaseProductCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
 import com.euprocuro.api.application.command.SendConversationMessageCommand;
+import com.euprocuro.api.application.command.ShareSellerItemCommand;
 import com.euprocuro.api.application.command.UpdateInterestCommand;
+import com.euprocuro.api.application.command.UpdateSellerItemCommand;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
 import com.euprocuro.api.application.view.CheckoutView;
 import com.euprocuro.api.application.view.ConversationMessageView;
@@ -23,13 +26,16 @@ import com.euprocuro.api.application.view.MonetizationProductView;
 import com.euprocuro.api.application.view.OfferConversationView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.PersonalDashboardView;
+import com.euprocuro.api.application.view.SellerItemMatchesView;
 import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.Offer;
+import com.euprocuro.api.domain.model.SellerItem;
 import com.euprocuro.api.domain.model.UserProfile;
 import com.euprocuro.api.entrypoints.rest.dto.request.CreateInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.CreateOfferRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.CreateSellerItemRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.BoostInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ForgotPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.LoginRequest;
@@ -37,7 +43,9 @@ import com.euprocuro.api.entrypoints.rest.dto.request.PurchaseProductRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.RegisterRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ResetPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.SendConversationMessageRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.ShareSellerItemRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.UpdateInterestRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.UpdateSellerItemRequest;
 import com.euprocuro.api.entrypoints.rest.dto.response.ActionMessageResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.AuthResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.CategoryOptionResponse;
@@ -51,6 +59,8 @@ import com.euprocuro.api.entrypoints.rest.dto.response.MonetizationProductRespon
 import com.euprocuro.api.entrypoints.rest.dto.response.OfferConversationResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.OfferResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.PersonalDashboardResponse;
+import com.euprocuro.api.entrypoints.rest.dto.response.SellerItemMatchesResponse;
+import com.euprocuro.api.entrypoints.rest.dto.response.SellerItemResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.UserResponse;
 
 public final class RestMapper {
@@ -123,6 +133,8 @@ public final class RestMapper {
                 .neighborhood(request.getNeighborhood())
                 .desiredRadiusKm(request.getDesiredRadiusKm())
                 .acceptsNationwideOffers(request.isAcceptsNationwideOffers())
+                .allowsWhatsappContact(request.isAllowsWhatsappContact())
+                .whatsappContact(request.getWhatsappContact())
                 .boostEnabled(request.isBoostEnabled())
                 .preferredCondition(request.getPreferredCondition())
                 .preferredContactMode(request.getPreferredContactMode())
@@ -143,6 +155,8 @@ public final class RestMapper {
                 .neighborhood(request.getNeighborhood())
                 .desiredRadiusKm(request.getDesiredRadiusKm())
                 .acceptsNationwideOffers(request.isAcceptsNationwideOffers())
+                .allowsWhatsappContact(request.isAllowsWhatsappContact())
+                .whatsappContact(request.getWhatsappContact())
                 .boostEnabled(request.isBoostEnabled())
                 .preferredCondition(request.getPreferredCondition())
                 .preferredContactMode(request.getPreferredContactMode())
@@ -157,6 +171,43 @@ public final class RestMapper {
                 .message(request.getMessage())
                 .includesDelivery(request.isIncludesDelivery())
                 .highlights(request.getHighlights())
+                .build();
+    }
+
+    public static CreateSellerItemCommand toCommand(CreateSellerItemRequest request) {
+        return CreateSellerItemCommand.builder()
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .referenceImageUrl(request.getReferenceImageUrl())
+                .category(request.getCategory())
+                .desiredPrice(request.getDesiredPrice())
+                .city(request.getCity())
+                .state(request.getState())
+                .neighborhood(request.getNeighborhood())
+                .tags(Optional.ofNullable(request.getTags()).orElse(List.of()))
+                .build();
+    }
+
+    public static ShareSellerItemCommand toCommand(ShareSellerItemRequest request) {
+        return ShareSellerItemCommand.builder()
+                .offeredPrice(request.getOfferedPrice())
+                .sellerPhone(request.getSellerPhone())
+                .message(request.getMessage())
+                .includesDelivery(request.isIncludesDelivery())
+                .build();
+    }
+
+    public static UpdateSellerItemCommand toCommand(UpdateSellerItemRequest request) {
+        return UpdateSellerItemCommand.builder()
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .referenceImageUrl(request.getReferenceImageUrl())
+                .category(request.getCategory())
+                .desiredPrice(request.getDesiredPrice())
+                .city(request.getCity())
+                .state(request.getState())
+                .neighborhood(request.getNeighborhood())
+                .tags(Optional.ofNullable(request.getTags()).orElse(List.of()))
                 .build();
     }
 
@@ -241,6 +292,8 @@ public final class RestMapper {
                 .tags(Optional.ofNullable(domain.getTags()).orElse(List.of()))
                 .desiredRadiusKm(domain.getDesiredRadiusKm())
                 .acceptsNationwideOffers(domain.isAcceptsNationwideOffers())
+                .allowsWhatsappContact(domain.isAllowsWhatsappContact())
+                .whatsappContact(domain.isAllowsWhatsappContact() ? domain.getWhatsappContact() : null)
                 .boostEnabled(domain.isBoostEnabled())
                 .boostedUntil(domain.getBoostedUntil())
                 .preferredCondition(domain.getPreferredCondition())
@@ -265,6 +318,33 @@ public final class RestMapper {
                 .highlights(Optional.ofNullable(domain.getHighlights()).orElse(List.of()))
                 .status(domain.getStatus())
                 .createdAt(domain.getCreatedAt())
+                .build();
+    }
+
+    public static SellerItemResponse toResponse(SellerItem domain) {
+        return SellerItemResponse.builder()
+                .id(domain.getId())
+                .ownerId(domain.getOwnerId())
+                .ownerName(domain.getOwnerName())
+                .title(domain.getTitle())
+                .description(domain.getDescription())
+                .referenceImageUrl(domain.getReferenceImageUrl())
+                .category(domain.getCategory())
+                .desiredPrice(domain.getDesiredPrice())
+                .location(toResponse(domain.getLocation()))
+                .tags(Optional.ofNullable(domain.getTags()).orElse(List.of()))
+                .active(domain.isActive())
+                .createdAt(domain.getCreatedAt())
+                .updatedAt(domain.getUpdatedAt())
+                .build();
+    }
+
+    public static SellerItemMatchesResponse toResponse(SellerItemMatchesView view) {
+        List<InterestPost> matchingInterests = Optional.ofNullable(view.getMatchingInterests()).orElse(List.of());
+        return SellerItemMatchesResponse.builder()
+                .item(toResponse(view.getItem()))
+                .matchingInterests(matchingInterests.stream().map(RestMapper::toResponse).collect(Collectors.toList()))
+                .matchCount(matchingInterests.size())
                 .build();
     }
 

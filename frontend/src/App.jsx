@@ -3,8 +3,12 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   clearSession,
   boostInterest,
+  closeInterest,
   createInterest,
   createOffer,
+  createSellerItem,
+  deactivateSellerItem,
+  deleteInterest,
   fetchCategories,
   fetchDashboard,
   fetchInterests,
@@ -12,6 +16,7 @@ import {
   fetchMonetizationAccount,
   fetchOfferConversation,
   fetchOffers,
+  fetchSellerItems,
   forgotPassword,
   getStoredSession,
   login,
@@ -20,7 +25,9 @@ import {
   register,
   resetPassword,
   sendOfferMessage,
+  shareSellerItemOffer,
   updateInterest,
+  updateSellerItem,
   storeSession
 } from "./api";
 import logo from "./assets/eu-procuro-logo.png";
@@ -45,6 +52,8 @@ const initialInterestForm = {
   neighborhood: "",
   desiredRadiusKm: "30",
   acceptsNationwideOffers: true,
+  allowsWhatsappContact: false,
+  whatsappContact: "",
   boostEnabled: false,
   preferredCondition: "",
   preferredContactMode: "Chat",
@@ -57,6 +66,24 @@ const initialOfferForm = {
   message: "",
   includesDelivery: false,
   highlights: ""
+};
+
+const initialSellerItemForm = {
+  title: "",
+  description: "",
+  referenceImageUrl: "",
+  category: "SERVICOS",
+  desiredPrice: "",
+  city: "",
+  state: "",
+  neighborhood: "",
+  tags: ""
+};
+
+const initialSellerItemShareForm = {
+  sellerPhone: "",
+  message: "",
+  includesDelivery: false
 };
 
 const initialLoginForm = {
@@ -82,6 +109,7 @@ const loggedSections = {
   MY_INTERESTS: "MY_INTERESTS",
   SENT_OFFERS: "SENT_OFFERS",
   RECEIVED_OFFERS: "RECEIVED_OFFERS",
+  SELLER_ITEMS: "SELLER_ITEMS",
   CREDITS: "CREDITS",
   NEW_INTEREST: "NEW_INTEREST"
 };
@@ -168,6 +196,8 @@ function mapInterestToForm(interest) {
     neighborhood: interest?.location?.neighborhood ?? "",
     desiredRadiusKm: interest?.desiredRadiusKm ?? "30",
     acceptsNationwideOffers: Boolean(interest?.acceptsNationwideOffers),
+    allowsWhatsappContact: Boolean(interest?.allowsWhatsappContact),
+    whatsappContact: interest?.whatsappContact ?? "",
     boostEnabled: Boolean(interest?.boostEnabled),
     preferredCondition: interest?.preferredCondition ?? "",
     preferredContactMode: interest?.preferredContactMode ?? "Chat",
@@ -188,6 +218,8 @@ function buildInterestPayload(interestForm) {
     neighborhood: interestForm.neighborhood,
     desiredRadiusKm: Number(interestForm.desiredRadiusKm || 0),
     acceptsNationwideOffers: interestForm.acceptsNationwideOffers,
+    allowsWhatsappContact: interestForm.allowsWhatsappContact,
+    whatsappContact: interestForm.allowsWhatsappContact ? interestForm.whatsappContact : null,
     boostEnabled: interestForm.boostEnabled,
     preferredCondition: interestForm.preferredCondition,
     preferredContactMode: interestForm.preferredContactMode,
@@ -196,6 +228,50 @@ function buildInterestPayload(interestForm) {
       .map((tag) => tag.trim())
       .filter(Boolean)
   };
+}
+
+function buildSellerItemPayload(itemForm) {
+  return {
+    title: itemForm.title,
+    description: itemForm.description,
+    referenceImageUrl: itemForm.referenceImageUrl || null,
+    category: itemForm.category,
+    desiredPrice: itemForm.desiredPrice || null,
+    city: itemForm.city,
+    state: itemForm.state,
+    neighborhood: itemForm.neighborhood,
+    tags: itemForm.tags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+  };
+}
+
+function mapSellerItemToForm(groupOrItem) {
+  const item = groupOrItem?.item ?? groupOrItem;
+  return {
+    title: item?.title ?? "",
+    description: item?.description ?? "",
+    referenceImageUrl: item?.referenceImageUrl ?? "",
+    category: item?.category ?? "SERVICOS",
+    desiredPrice: item?.desiredPrice ?? "",
+    city: item?.location?.city ?? "",
+    state: item?.location?.state ?? "",
+    neighborhood: item?.location?.neighborhood ?? "",
+    tags: item?.tags?.join(", ") ?? ""
+  };
+}
+
+function isBoostActive(interest) {
+  return Boolean(
+    interest?.boostEnabled
+    && interest?.boostedUntil
+    && new Date(interest.boostedUntil).getTime() > Date.now()
+  );
+}
+
+function BoostRocket() {
+  return <span className="boost-rocket" aria-label="Interesse impulsionado" title="Interesse impulsionado">🚀</span>;
 }
 
 function readSeenMessages(userId) {
@@ -246,6 +322,7 @@ export default function App() {
   const myInterestsSectionRef = useRef(null);
   const sentOffersSectionRef = useRef(null);
   const receivedOffersSectionRef = useRef(null);
+  const sellerItemsSectionRef = useRef(null);
   const newInterestSectionRef = useRef(null);
   const [session, setSession] = useState(() => getStoredSession());
   const [dashboard, setDashboard] = useState(null);
@@ -254,6 +331,8 @@ export default function App() {
   const [interests, setInterests] = useState([]);
   const [selectedInterest, setSelectedInterest] = useState(null);
   const [offers, setOffers] = useState([]);
+  const [sellerItems, setSellerItems] = useState([]);
+  const [selectedSellerItemId, setSelectedSellerItemId] = useState(null);
   const [authMode, setAuthMode] = useState(initialResetState.mode);
   const [isAuthModalVisible, setIsAuthModalVisible] = useState(initialResetState.mode === "reset");
   const [loginForm, setLoginForm] = useState(initialLoginForm);
@@ -267,6 +346,9 @@ export default function App() {
   const [interestForm, setInterestForm] = useState(initialInterestForm);
   const [editingInterestId, setEditingInterestId] = useState(null);
   const [offerForm, setOfferForm] = useState(initialOfferForm);
+  const [sellerItemForm, setSellerItemForm] = useState(initialSellerItemForm);
+  const [editingSellerItemId, setEditingSellerItemId] = useState(null);
+  const [sellerItemShareForm, setSellerItemShareForm] = useState(initialSellerItemShareForm);
   const [expandedInterests, setExpandedInterests] = useState({});
   const [expandedOffers, setExpandedOffers] = useState({});
   const [filters, setFilters] = useState({
@@ -275,6 +357,7 @@ export default function App() {
     city: "",
     maxBudget: ""
   });
+  const [homeMatchFilter, setHomeMatchFilter] = useState(null);
   const [loggedSection, setLoggedSection] = useState(loggedSections.EXPLORE);
   const [passwordRecoveryPreview, setPasswordRecoveryPreview] = useState(null);
   const [isLoadingPublic, setIsLoadingPublic] = useState(true);
@@ -282,6 +365,8 @@ export default function App() {
   const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
   const [isSubmittingInterest, setIsSubmittingInterest] = useState(false);
   const [isSubmittingOffer, setIsSubmittingOffer] = useState(false);
+  const [isSubmittingSellerItem, setIsSubmittingSellerItem] = useState(false);
+  const [sharingSellerItemInterestId, setSharingSellerItemInterestId] = useState(null);
   const [isProcessingPurchase, setIsProcessingPurchase] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [feedbackModal, setFeedbackModal] = useState(null);
@@ -301,7 +386,13 @@ export default function App() {
   const debouncedQuery = useDebouncedValue(filters.query, 350);
   const deferredQuery = useDeferredValue(debouncedQuery);
   const currentUser = session?.user ?? null;
-  const myInterests = useMemo(() => (dashboard?.myInterests ?? []).slice().sort(byNewest), [dashboard?.myInterests]);
+  const myInterests = useMemo(
+    () => (dashboard?.myInterests ?? [])
+      .filter((interest) => interest.status === "OPEN")
+      .slice()
+      .sort(byNewest),
+    [dashboard?.myInterests]
+  );
   const sentOffers = useMemo(() => (dashboard?.offersSent ?? []).slice().sort(byNewest), [dashboard?.offersSent]);
   const receivedOffers = useMemo(() => (dashboard?.offersReceived ?? []).slice().sort(byNewest), [dashboard?.offersReceived]);
   const creditProducts = useMemo(
@@ -317,10 +408,19 @@ export default function App() {
     [monetizationAccount?.products]
   );
   const visibleHomeInterests = useMemo(
-    () => interests.filter((interest) => !currentUser?.id || interest.ownerId !== currentUser.id),
-    [interests, currentUser?.id]
+    () => {
+      const source = homeMatchFilter?.matchingInterests ?? interests;
+      return source.filter((interest) => !currentUser?.id || interest.ownerId !== currentUser.id);
+    },
+    [homeMatchFilter, interests, currentUser?.id]
+  );
+  const selectedSellerItemGroup = useMemo(
+    () => sellerItems.find((group) => group.item?.id === selectedSellerItemId) ?? sellerItems[0] ?? null,
+    [sellerItems, selectedSellerItemId]
   );
   const isSelectedInterestMine = selectedInterest?.ownerId === currentUser?.id;
+  const canSendOffer = Boolean(monetizationAccount?.subscriptionActive || (monetizationAccount?.sellerCredits ?? 0) > 0);
+  const noCreditsTooltip = "Você não possui créditos ativos para enviar ofertas.";
 
   function openFeedback(type, title, message) {
     setFeedbackModal({ type, title, message });
@@ -329,6 +429,19 @@ export default function App() {
   function openAuthModal(mode) {
     setAuthMode(mode);
     setIsAuthModalVisible(true);
+  }
+
+  function updateHomeFilters(updater) {
+    setHomeMatchFilter(null);
+    setFilters(updater);
+  }
+
+  function clearHomeMatchFilter() {
+    setHomeMatchFilter(null);
+    const nextVisibleInterests = interests.filter((interest) => !currentUser?.id || interest.ownerId !== currentUser.id);
+    setSelectedInterest((current) =>
+      nextVisibleInterests.find((interest) => interest.id === current?.id) ?? nextVisibleInterests[0] ?? null
+    );
   }
 
   function navigateTo(section) {
@@ -379,6 +492,15 @@ export default function App() {
         });
       });
     }
+
+    if (section === loggedSections.SELLER_ITEMS) {
+      window.requestAnimationFrame(() => {
+        sellerItemsSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      });
+    }
   }
 
   function openNewInterestForm() {
@@ -412,6 +534,23 @@ export default function App() {
     setEditingInterestId(null);
     setInterestForm(initialInterestForm);
     navigateTo(loggedSections.MY_INTERESTS);
+  }
+
+  function startEditingSellerItem(group) {
+    const item = group?.item ?? group;
+    if (!item?.id) {
+      return;
+    }
+
+    setEditingSellerItemId(item.id);
+    setSellerItemForm(mapSellerItemToForm(item));
+    setSelectedSellerItemId(item.id);
+    navigateTo(loggedSections.SELLER_ITEMS);
+  }
+
+  function cancelSellerItemEditing() {
+    setEditingSellerItemId(null);
+    setSellerItemForm(initialSellerItemForm);
   }
 
   function closeAuthModal() {
@@ -474,13 +613,15 @@ export default function App() {
     setIsLoadingPrivate(true);
 
     try {
-      const [me, dashboardData, monetizationData] = await Promise.all([
+      const [me, dashboardData, monetizationData, sellerItemData] = await Promise.all([
         fetchMe(),
         fetchDashboard(),
-        fetchMonetizationAccount()
+        fetchMonetizationAccount(),
+        fetchSellerItems()
       ]);
       const nextSession = {
         expiresAt: me.expiresAt,
+        token: me.token ?? session.token ?? null,
         user: me.user
       };
 
@@ -488,11 +629,16 @@ export default function App() {
       storeSession(nextSession);
       setDashboard(dashboardData);
       setMonetizationAccount(monetizationData);
+      setSellerItems(sellerItemData);
+      setSelectedSellerItemId((current) =>
+        sellerItemData.some((group) => group.item?.id === current) ? current : sellerItemData[0]?.item?.id ?? null
+      );
     } catch (requestError) {
       clearSession();
       setSession(null);
       setDashboard(null);
       setMonetizationAccount(null);
+      setSellerItems([]);
       setLoggedSection(loggedSections.EXPLORE);
       openFeedback("error", "Sessão encerrada", requestError.message || "Entre novamente para continuar.");
     } finally {
@@ -519,6 +665,7 @@ export default function App() {
 
         const nextSession = {
           expiresAt: me.expiresAt,
+          token: me.token ?? null,
           user: me.user
         };
 
@@ -549,6 +696,7 @@ export default function App() {
     if (!session) {
       setIsLoadingPrivate(false);
       setDashboard(null);
+      setSellerItems([]);
       return;
     }
 
@@ -582,6 +730,17 @@ export default function App() {
   }, [loggedSection, myInterests, selectedInterest?.id]);
 
   useEffect(() => {
+    if (sellerItems.length === 0) {
+      setSelectedSellerItemId(null);
+      return;
+    }
+
+    setSelectedSellerItemId((current) =>
+      sellerItems.some((group) => group.item?.id === current) ? current : sellerItems[0].item?.id ?? null
+    );
+  }, [sellerItems]);
+
+  useEffect(() => {
     if (!selectedInterest?.id) {
       return;
     }
@@ -613,28 +772,24 @@ export default function App() {
       return;
     }
 
-    const allOffers = [...receivedOffers, ...sentOffers];
-    if (allOffers.length === 0) {
-      setHasUnreadMessages(false);
-      setNotifications([]);
-      return;
-    }
-
     const receivedIds = new Set(receivedOffers.map((offer) => offer.id));
     const seenMap = readSeenMessages(currentUser.id);
-    const unreadEntries = allOffers
+    const unreadMessageEntries = [...receivedOffers, ...sentOffers]
       .map((offer) => {
         if (!offer.latestMessageAt || offer.latestMessageSenderId === currentUser.id) {
           return null;
         }
 
         const latestIncoming = new Date(offer.latestMessageAt).getTime();
-        const lastSeen = Number(seenMap[offer.id] ?? 0);
+        const notificationId = `offer:${offer.id}`;
+        const lastSeen = Number(seenMap[notificationId] ?? seenMap[offer.id] ?? 0);
         if (latestIncoming <= lastSeen) {
           return null;
         }
 
         return {
+          id: notificationId,
+          type: "message",
           offerId: offer.id,
           section: receivedIds.has(offer.id) ? loggedSections.RECEIVED_OFFERS : loggedSections.SENT_OFFERS,
           title: offer.interestTitle ?? "Nova mensagem",
@@ -642,12 +797,54 @@ export default function App() {
           createdAt: offer.latestMessageAt
         };
       })
-      .filter(Boolean)
+      .filter(Boolean);
+
+    const sellerItemEntries = sellerItems
+      .map((group) => {
+        const matches = group.matchingInterests ?? [];
+        if (!group.item?.id || matches.length === 0) {
+          return null;
+        }
+
+        const latestMatchTime = matches.reduce((latest, interest) => {
+          const nextTime = new Date(interest.createdAt ?? 0).getTime();
+          return nextTime > latest ? nextTime : latest;
+        }, 0);
+        const notificationId = `seller-item:${group.item.id}:${group.matchCount}:${latestMatchTime}`;
+        if (seenMap[notificationId]) {
+          return null;
+        }
+
+        return {
+          id: notificationId,
+          type: "seller-item-match",
+          sellerItemId: group.item.id,
+          section: loggedSections.SELLER_ITEMS,
+          title: group.item.title ?? "Item parecido",
+          message: "Existem pessoas procurando um item parecido com o seu.",
+          createdAt: latestMatchTime ? new Date(latestMatchTime).toISOString() : new Date().toISOString()
+        };
+      })
+      .filter(Boolean);
+
+    const unreadEntries = [...unreadMessageEntries, ...sellerItemEntries]
       .sort((left, right) => new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime());
 
     setNotifications(unreadEntries);
     setHasUnreadMessages(unreadEntries.length > 0);
-  }, [session, currentUser?.id, receivedOffers, sentOffers, messageSyncKey]);
+  }, [session, currentUser?.id, receivedOffers, sentOffers, sellerItems, messageSyncKey]);
+
+  useEffect(() => {
+    if (!session) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      refreshPrivateData().catch(() => {});
+    }, 45000);
+
+    return () => window.clearInterval(intervalId);
+  }, [session?.user?.id]);
 
   async function handleLoginSubmit(event) {
     event.preventDefault();
@@ -657,6 +854,7 @@ export default function App() {
       const authResponse = await login(loginForm);
       const nextSession = {
         expiresAt: authResponse.expiresAt,
+        token: authResponse.token ?? null,
         user: authResponse.user
       };
 
@@ -681,6 +879,7 @@ export default function App() {
       const authResponse = await register(registerForm);
       const nextSession = {
         expiresAt: authResponse.expiresAt,
+        token: authResponse.token ?? null,
         user: authResponse.user
       };
 
@@ -740,6 +939,7 @@ export default function App() {
       setSession(null);
       setDashboard(null);
       setMonetizationAccount(null);
+      setSellerItems([]);
       setLoggedSection(loggedSections.EXPLORE);
       setOffers([]);
       setConversationModal((current) => ({ ...current, visible: false, data: null, draftMessage: "" }));
@@ -813,6 +1013,11 @@ export default function App() {
       return;
     }
 
+    if (!canSendOffer) {
+      openFeedback("error", "Créditos insuficientes", noCreditsTooltip);
+      return;
+    }
+
     setIsSubmittingOffer(true);
 
     try {
@@ -835,6 +1040,36 @@ export default function App() {
       openFeedback("error", "Não foi possível enviar", requestError.message || "Tente novamente.");
     } finally {
       setIsSubmittingOffer(false);
+    }
+  }
+
+  async function handleCloseInterest(interestId) {
+    if (!interestId) {
+      return;
+    }
+
+    try {
+      await closeInterest(interestId);
+      await Promise.all([refreshPrivateData(), refreshPublicData()]);
+      setSelectedInterest(null);
+      openFeedback("success", "Anúncio desativado", "Seu anúncio não aparecerá mais para outros usuários.");
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível desativar", requestError.message || "Tente novamente.");
+    }
+  }
+
+  async function handleDeleteInterest(interestId) {
+    if (!interestId || !window.confirm("Deseja excluir este anúncio definitivamente?")) {
+      return;
+    }
+
+    try {
+      await deleteInterest(interestId);
+      await Promise.all([refreshPrivateData(), refreshPublicData()]);
+      setSelectedInterest(null);
+      openFeedback("success", "Anúncio excluído", "O anúncio foi removido da plataforma.");
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível excluir", requestError.message || "Tente novamente.");
     }
   }
 
@@ -880,6 +1115,99 @@ export default function App() {
       openFeedback("error", "Compra não concluída", requestError.message || "Tente novamente.");
     } finally {
       setIsProcessingPurchase(false);
+    }
+  }
+
+  async function handleSellerItemImageChange(event) {
+    const [file] = event.target.files ?? [];
+    if (!file) {
+      setSellerItemForm((current) => ({ ...current, referenceImageUrl: "" }));
+      return;
+    }
+
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setSellerItemForm((current) => ({ ...current, referenceImageUrl: dataUrl }));
+    } catch (requestError) {
+      openFeedback("error", "Imagem inválida", requestError.message || "Não foi possível usar a imagem.");
+    }
+  }
+
+  async function handleSellerItemSubmit(event) {
+    event.preventDefault();
+
+    if (!session) {
+      openAuthModal("login");
+      return;
+    }
+
+    setIsSubmittingSellerItem(true);
+    try {
+      const item = editingSellerItemId
+        ? await updateSellerItem(editingSellerItemId, buildSellerItemPayload(sellerItemForm))
+        : await createSellerItem(buildSellerItemPayload(sellerItemForm));
+      setSellerItemForm(initialSellerItemForm);
+      setEditingSellerItemId(null);
+      await refreshPrivateData();
+      setSelectedSellerItemId(item.id);
+      openFeedback(
+        "success",
+        editingSellerItemId ? "Item atualizado" : "Item cadastrado",
+        editingSellerItemId
+          ? "Seu item foi atualizado com sucesso."
+          : "Agora vamos monitorar interesses compatíveis com ele."
+      );
+    } catch (requestError) {
+      openFeedback(
+        "error",
+        editingSellerItemId ? "Não foi possível atualizar" : "Não foi possível cadastrar",
+        requestError.message || "Revise os dados e tente novamente."
+      );
+    } finally {
+      setIsSubmittingSellerItem(false);
+    }
+  }
+
+  async function handleDeactivateSellerItem(itemId) {
+    if (!itemId) {
+      return;
+    }
+
+    try {
+      await deactivateSellerItem(itemId);
+      await refreshPrivateData();
+      openFeedback("success", "Item desativado", "Você pode cadastrar outro item quando quiser.");
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível desativar", requestError.message || "Tente novamente.");
+    }
+  }
+
+  async function handleShareSellerItem(itemId, interest) {
+    if (!itemId || !interest?.id) {
+      return;
+    }
+
+    if (!canSendOffer) {
+      openFeedback("error", "Créditos insuficientes", noCreditsTooltip);
+      return;
+    }
+
+    setSharingSellerItemInterestId(interest.id);
+    try {
+      await shareSellerItemOffer(itemId, interest.id, {
+        offeredPrice: selectedSellerItemGroup?.item?.desiredPrice,
+        sellerPhone: sellerItemShareForm.sellerPhone,
+        message: sellerItemShareForm.message,
+        includesDelivery: sellerItemShareForm.includesDelivery
+      });
+      await refreshPrivateData();
+      setSellerItemShareForm(initialSellerItemShareForm);
+      navigateTo(loggedSections.SENT_OFFERS);
+      openFeedback("success", "Item compartilhado", "Sua oferta foi enviada usando o item cadastrado.");
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível compartilhar", requestError.message || "Tente novamente.");
+    } finally {
+      setSharingSellerItemInterestId(null);
     }
   }
 
@@ -975,8 +1303,41 @@ export default function App() {
 
   async function handleNotificationSelect(notification) {
     setIsNotificationModalVisible(false);
+    if (notification.type === "seller-item-match") {
+      if (currentUser?.id && notification.id) {
+        const seenMap = readSeenMessages(currentUser.id);
+        writeSeenMessages(currentUser.id, {
+          ...seenMap,
+          [notification.id]: new Date(notification.createdAt ?? 0).getTime()
+        });
+        setMessageSyncKey((current) => current + 1);
+      }
+      if (notification.sellerItemId) {
+        setSelectedSellerItemId(notification.sellerItemId);
+      }
+      const matchedGroup = sellerItems.find((group) => group.item?.id === notification.sellerItemId);
+      const matchingInterests = (matchedGroup?.matchingInterests ?? [])
+        .filter((interest) => !currentUser?.id || interest.ownerId !== currentUser.id);
+      setHomeMatchFilter({
+        sellerItemId: notification.sellerItemId,
+        sellerItemTitle: matchedGroup?.item?.title ?? notification.title ?? "item parecido",
+        matchingInterests
+      });
+      setFilters({
+        query: "",
+        category: "",
+        city: "",
+        maxBudget: ""
+      });
+      setSelectedInterest(matchingInterests[0] ?? null);
+      navigateTo(loggedSections.EXPLORE);
+      return;
+    }
+
     navigateTo(notification.section ?? loggedSections.RECEIVED_OFFERS);
-    await openConversation(notification.offerId);
+    if (notification.offerId) {
+      await openConversation(notification.offerId);
+    }
   }
 
   function openNotificationModal() {
@@ -1007,7 +1368,7 @@ export default function App() {
     const seenMap = readSeenMessages(currentUser.id);
     const nextSeenMap = notifications.reduce((accumulator, notification) => ({
       ...accumulator,
-      [notification.offerId]: new Date(notification.createdAt ?? 0).getTime()
+      [notification.id ?? notification.offerId]: new Date(notification.createdAt ?? 0).getTime()
     }), seenMap);
 
     writeSeenMessages(currentUser.id, nextSeenMap);
@@ -1065,7 +1426,7 @@ export default function App() {
               <input
                 value={filters.query}
                 onChange={(event) =>
-                  setFilters((current) => ({ ...current, query: event.target.value }))
+                  updateHomeFilters((current) => ({ ...current, query: event.target.value }))
                 }
                 placeholder="Buscar por produto, serviço ou palavra-chave"
               />
@@ -1073,7 +1434,7 @@ export default function App() {
               <select
                 value={filters.category}
                 onChange={(event) =>
-                  setFilters((current) => ({ ...current, category: event.target.value }))
+                  updateHomeFilters((current) => ({ ...current, category: event.target.value }))
                 }
               >
                 <option value="">Todas as categorias</option>
@@ -1087,7 +1448,7 @@ export default function App() {
               <input
                 value={filters.city}
                 onChange={(event) =>
-                  setFilters((current) => ({ ...current, city: event.target.value }))
+                  updateHomeFilters((current) => ({ ...current, city: event.target.value }))
                 }
                 placeholder="Cidade"
               />
@@ -1097,19 +1458,33 @@ export default function App() {
                 min="0"
                 value={filters.maxBudget}
                 onChange={(event) =>
-                  setFilters((current) => ({ ...current, maxBudget: event.target.value }))
+                  updateHomeFilters((current) => ({ ...current, maxBudget: event.target.value }))
                 }
                 placeholder="Orçamento máximo"
               />
             </div>
 
-            {isLoadingPublic ? (
+            {homeMatchFilter ? (
+              <div className="context-filter-card">
+                <div>
+                  <span className="eyebrow">Filtro por item</span>
+                  <strong>Mostrando interesses parecidos com: {homeMatchFilter.sellerItemTitle}</strong>
+                </div>
+                <button type="button" className="text-button" onClick={clearHomeMatchFilter}>
+                  Limpar filtro
+                </button>
+              </div>
+            ) : null}
+
+            {isLoadingPublic && !homeMatchFilter ? (
               <div className="loading-card">Carregando interesses publicados...</div>
             ) : visibleHomeInterests.length === 0 ? (
               <EmptyState
-                title={session ? "Nenhum interesse de outros usuários" : "Nada publicado ainda"}
+                title={homeMatchFilter ? "Nenhum interesse parecido encontrado" : (session ? "Nenhum interesse de outros usuários" : "Nada publicado ainda")}
                 description={
-                  session
+                  homeMatchFilter
+                    ? "Quando aparecer um novo interesse parecido com esse item, ele ficará listado aqui."
+                    : session
                     ? "Quando outros usuários publicarem interesses, eles aparecerão aqui."
                     : "Quando os primeiros interesses forem cadastrados, eles aparecerão aqui."
                 }
@@ -1130,9 +1505,12 @@ export default function App() {
 
           <aside className="panel panel--sticky">
             <div className="panel__header">
-              <div>
+              <div className="panel-title-stack">
                 <span className="eyebrow">Detalhe</span>
-                <h2>{selectedInterest?.title ?? "Selecione um interesse"}</h2>
+                <h2 className="title-with-badge">
+                  {selectedInterest?.title ?? "Selecione um interesse"}
+                  {isBoostActive(selectedInterest) ? <BoostRocket /> : null}
+                </h2>
               </div>
             </div>
 
@@ -1168,6 +1546,18 @@ export default function App() {
                     <span>Publicado por</span>
                     <strong>{selectedInterest.ownerName}</strong>
                   </div>
+                  {selectedInterest.allowsWhatsappContact && selectedInterest.whatsappContact ? (
+                    <div className="detail-row">
+                      <span>WhatsApp</span>
+                      <a
+                        href={`https://wa.me/${selectedInterest.whatsappContact.replace(/\D/g, "")}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {selectedInterest.whatsappContact}
+                      </a>
+                    </div>
+                  ) : null}
                 </div>
 
                 <p className="detail-description">{selectedInterest.description}</p>
@@ -1256,10 +1646,12 @@ export default function App() {
                       <button
                         type="submit"
                         className="primary-button"
-                        disabled={isSubmittingOffer}
+                        disabled={isSubmittingOffer || !canSendOffer}
+                        title={!canSendOffer ? noCreditsTooltip : undefined}
                       >
                         {isSubmittingOffer ? "Enviando..." : "Enviar oferta"}
                       </button>
+                      {!canSendOffer ? <p className="form-note">{noCreditsTooltip}</p> : null}
                     </form>
                   )
                 ) : (
@@ -1320,7 +1712,10 @@ export default function App() {
 
             <div className="accordion-card__summary-main">
               <div className="accordion-card__copy">
-                <strong>{interest.title}</strong>
+                <strong className="title-with-badge">
+                  {interest.title}
+                  {isBoostActive(interest) ? <BoostRocket /> : null}
+                </strong>
                 <span>{interest.location?.city ? `${interest.location.city}/${interest.location?.state}` : "Sem local informado"}</span>
               </div>
             </div>
@@ -1557,6 +1952,242 @@ export default function App() {
     );
   }
 
+  function renderSellerItemsPage() {
+    const selectedItem = selectedSellerItemGroup?.item ?? null;
+    const matchingInterests = selectedSellerItemGroup?.matchingInterests ?? [];
+    const shareDisabled = !canSendOffer || !sellerItemShareForm.sellerPhone.trim();
+
+    return (
+      <section ref={sellerItemsSectionRef} className="workspace-grid workspace-grid--wide">
+        <article className="panel">
+          <div className="panel__header">
+            <div>
+              <span className="eyebrow">Página</span>
+              <h2>Meus itens</h2>
+            </div>
+          </div>
+
+          <form className="stacked-form seller-item-form" onSubmit={handleSellerItemSubmit}>
+            <div className="form-heading">
+              <span className="eyebrow">{editingSellerItemId ? "Editar item" : "Cadastrar item"}</span>
+              <h3>{editingSellerItemId ? "Atualize o item cadastrado" : "Algo que você aceitaria negociar"}</h3>
+            </div>
+
+            <input
+              placeholder="Título do item ou serviço"
+              value={sellerItemForm.title}
+              onChange={(event) => setSellerItemForm((current) => ({ ...current, title: event.target.value }))}
+              required
+            />
+            <textarea
+              rows="4"
+              placeholder="Descreva o que você tem, estado de conservação ou detalhes do serviço"
+              value={sellerItemForm.description}
+              onChange={(event) => setSellerItemForm((current) => ({ ...current, description: event.target.value }))}
+              required
+            />
+
+            <div className="two-columns">
+              <select
+                value={sellerItemForm.category}
+                onChange={(event) => setSellerItemForm((current) => ({ ...current, category: event.target.value }))}
+              >
+                {categories.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min="0"
+                placeholder="Valor que você analisaria"
+                value={sellerItemForm.desiredPrice}
+                onChange={(event) => setSellerItemForm((current) => ({ ...current, desiredPrice: event.target.value }))}
+              />
+            </div>
+
+            <div className="three-columns">
+              <input
+                placeholder="Cidade"
+                value={sellerItemForm.city}
+                onChange={(event) => setSellerItemForm((current) => ({ ...current, city: event.target.value }))}
+              />
+              <input
+                placeholder="Estado"
+                value={sellerItemForm.state}
+                onChange={(event) => setSellerItemForm((current) => ({ ...current, state: event.target.value }))}
+              />
+              <input
+                placeholder="Bairro"
+                value={sellerItemForm.neighborhood}
+                onChange={(event) => setSellerItemForm((current) => ({ ...current, neighborhood: event.target.value }))}
+              />
+            </div>
+
+            <input
+              placeholder="Tags separadas por vírgula"
+              value={sellerItemForm.tags}
+              onChange={(event) => setSellerItemForm((current) => ({ ...current, tags: event.target.value }))}
+            />
+
+            <div className="media-field">
+              <label htmlFor="seller-item-image">Foto do item</label>
+              <input id="seller-item-image" type="file" accept="image/*" onChange={handleSellerItemImageChange} />
+              {sellerItemForm.referenceImageUrl ? (
+                <img
+                  className="interest-upload-preview"
+                  src={sellerItemForm.referenceImageUrl}
+                  alt="Prévia do item"
+                  decoding="async"
+                />
+              ) : null}
+            </div>
+
+            <div className="form-actions">
+              {editingSellerItemId ? (
+                <button type="button" className="ghost-button" onClick={cancelSellerItemEditing}>
+                  Cancelar edição
+                </button>
+              ) : null}
+              <button type="submit" className="primary-button" disabled={isSubmittingSellerItem}>
+                {isSubmittingSellerItem
+                  ? (editingSellerItemId ? "Salvando..." : "Cadastrando...")
+                  : (editingSellerItemId ? "Salvar alterações" : "Cadastrar item")}
+              </button>
+            </div>
+          </form>
+        </article>
+
+        <aside className="panel panel--sticky">
+          <div className="panel__header">
+            <div>
+              <span className="eyebrow">Meus Itens</span>
+              <h2>{selectedItem?.title ?? "Cadastre um item"}</h2>
+            </div>
+          </div>
+
+          {sellerItems.length ? (
+            <>
+              <div className="seller-item-tabs">
+                {sellerItems.map((group) => (
+                  <button
+                    type="button"
+                    key={group.item.id}
+                    className={group.item.id === selectedItem?.id ? "active" : ""}
+                    onClick={() => setSelectedSellerItemId(group.item.id)}
+                  >
+                    {group.item.referenceImageUrl ? (
+                      <img src={group.item.referenceImageUrl} alt={group.item.title} loading="lazy" decoding="async" />
+                    ) : (
+                      <span>{group.item.title?.charAt(0) ?? "I"}</span>
+                    )}
+                    <strong>{group.item.title}</strong>
+                    <small>{group.matchCount} interesses</small>
+                  </button>
+                ))}
+              </div>
+
+              {selectedItem ? (
+                <div className="seller-item-summary">
+                  <div>
+                    <strong>{currency(selectedItem.desiredPrice)}</strong>
+                    <span>{selectedItem.location?.city ? `${selectedItem.location.city}/${selectedItem.location?.state}` : "Sem local informado"}</span>
+                  </div>
+                  <div className="inline-actions">
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => startEditingSellerItem(selectedItem)}
+                    >
+                      Editar item
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => handleDeactivateSellerItem(selectedItem.id)}
+                    >
+                      Desativar item
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="stacked-form seller-share-form">
+                <input
+                  placeholder="Telefone ou WhatsApp para propostas"
+                  value={sellerItemShareForm.sellerPhone}
+                  onChange={(event) =>
+                    setSellerItemShareForm((current) => ({ ...current, sellerPhone: event.target.value }))
+                  }
+                  required
+                />
+                <textarea
+                  rows="3"
+                  placeholder="Mensagem opcional ao compartilhar este item"
+                  value={sellerItemShareForm.message}
+                  onChange={(event) =>
+                    setSellerItemShareForm((current) => ({ ...current, message: event.target.value }))
+                  }
+                />
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={sellerItemShareForm.includesDelivery}
+                    onChange={(event) =>
+                      setSellerItemShareForm((current) => ({ ...current, includesDelivery: event.target.checked }))
+                    }
+                  />
+                  <span>Inclui entrega ou deslocamento</span>
+                </label>
+                {!canSendOffer ? <p className="form-note">{noCreditsTooltip}</p> : null}
+              </div>
+
+              {matchingInterests.length ? (
+                <div className="seller-match-list">
+                  {matchingInterests.map((interest) => (
+                    <article key={interest.id} className="seller-match-card">
+                      {interest.referenceImageUrl ? (
+                        <img src={interest.referenceImageUrl} alt={interest.title} loading="lazy" decoding="async" />
+                      ) : null}
+                      <div>
+                        <strong className="title-with-badge">
+                          {interest.title}
+                          {isBoostActive(interest) ? <BoostRocket /> : null}
+                        </strong>
+                        <p>{interest.description}</p>
+                        <span>{currency(interest.budgetMax)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="primary-button primary-button--compact"
+                        disabled={shareDisabled || sharingSellerItemInterestId === interest.id}
+                        title={!canSendOffer ? noCreditsTooltip : !sellerItemShareForm.sellerPhone.trim() ? "Informe um telefone para enviar a oferta." : undefined}
+                        onClick={() => handleShareSellerItem(selectedItem.id, interest)}
+                      >
+                        {sharingSellerItemInterestId === interest.id ? "Enviando..." : "Compartilhar item"}
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="Nenhum interesse compatível ainda"
+                  description="Quando alguém procurar algo parecido com este item, ele aparecerá aqui."
+                />
+              )}
+            </>
+          ) : (
+            <EmptyState
+              title="Nenhum item cadastrado"
+              description="Cadastre um item ou serviço para descobrir usuários interessados em algo parecido."
+            />
+          )}
+        </aside>
+      </section>
+    );
+  }
+
   function renderLoggedArea() {
     const statCards = [
       {
@@ -1627,6 +2258,13 @@ export default function App() {
           </button>
           <button
             type="button"
+            className={loggedSection === loggedSections.SELLER_ITEMS ? "active" : ""}
+            onClick={() => navigateTo(loggedSections.SELLER_ITEMS)}
+          >
+            Meus itens
+          </button>
+          <button
+            type="button"
             className={loggedSection === loggedSections.CREDITS ? "active" : ""}
             onClick={() => navigateTo(loggedSections.CREDITS)}
           >
@@ -1693,6 +2331,23 @@ export default function App() {
                   >
                     Editar anúncio
                   </button>
+
+                  <div className="inline-actions">
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => handleCloseInterest(selectedInterest.id)}
+                    >
+                      Desativar anúncio
+                    </button>
+                    <button
+                      type="button"
+                      className="danger-button"
+                      onClick={() => handleDeleteInterest(selectedInterest.id)}
+                    >
+                      Excluir anúncio
+                    </button>
+                  </div>
 
                   <div className="boost-box">
                     <div>
@@ -1806,6 +2461,8 @@ export default function App() {
             )}
           </section>
         ) : null}
+
+        {loggedSection === loggedSections.SELLER_ITEMS ? renderSellerItemsPage() : null}
 
         {loggedSection === loggedSections.NEW_INTEREST ? (
           <section ref={newInterestSectionRef} className="panel panel--form panel--spaced">
@@ -1974,6 +2631,34 @@ export default function App() {
                   />
                   <span>Aceita propostas de todo o Brasil</span>
                 </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={interestForm.allowsWhatsappContact}
+                    onChange={(event) =>
+                      setInterestForm((current) => ({
+                        ...current,
+                        allowsWhatsappContact: event.target.checked,
+                        whatsappContact: event.target.checked ? current.whatsappContact : ""
+                      }))
+                    }
+                  />
+                  <span>Permitir contato via WhatsApp</span>
+                </label>
+              </div>
+
+              {interestForm.allowsWhatsappContact ? (
+                <input
+                  placeholder="WhatsApp para contato"
+                  value={interestForm.whatsappContact}
+                  onChange={(event) =>
+                    setInterestForm((current) => ({ ...current, whatsappContact: event.target.value }))
+                  }
+                  required
+                />
+              ) : null}
+
+              <div className="two-columns">
                 <label className="checkbox-row">
                   <input
                     type="checkbox"

@@ -10,22 +10,14 @@ import lombok.Value;
 
 @Value
 @Builder
-public class CreateInterestCommand {
+public class CreateSellerItemCommand {
     String title;
     String description;
     String referenceImageUrl;
     InterestCategory category;
-    BigDecimal budgetMin;
-    BigDecimal budgetMax;
+    BigDecimal desiredPrice;
     String city;
     String state;
     String neighborhood;
-    Integer desiredRadiusKm;
-    boolean acceptsNationwideOffers;
-    boolean allowsWhatsappContact;
-    String whatsappContact;
-    boolean boostEnabled;
-    String preferredCondition;
-    String preferredContactMode;
     List<String> tags;
 }

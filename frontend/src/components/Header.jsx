@@ -21,6 +21,8 @@ export default function Header({
   onRegisterClick,
   onLogout
 }) {
+  const firstName = user?.name?.trim().split(/\s+/)[0] ?? "";
+
   return (
     <header className="topbar">
       <button
@@ -76,10 +78,8 @@ export default function Header({
           </button>
 
           <div className="profile-badge">
-            <strong>{user?.name}</strong>
-            <span>
-              {user?.city}/{user?.state}
-            </span>
+            <strong>{firstName}</strong>
+            <span>{user?.city}/{user?.state}</span>
           </div>
 
           <button type="button" className="ghost-button" onClick={onLogout}>

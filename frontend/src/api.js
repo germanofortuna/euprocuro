@@ -176,6 +176,18 @@ export async function updateInterest(interestId, payload) {
   });
 }
 
+export async function closeInterest(interestId) {
+  return request(`/interests/${interestId}/close`, {
+    method: "PATCH"
+  });
+}
+
+export async function deleteInterest(interestId) {
+  return request(`/interests/${interestId}`, {
+    method: "DELETE"
+  });
+}
+
 export async function fetchOffers(interestId) {
   return request(`/interests/${interestId}/offers`);
 }
@@ -193,6 +205,37 @@ export async function fetchOfferConversation(offerId) {
 
 export async function sendOfferMessage(offerId, payload) {
   return request(`/offers/${offerId}/messages`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function fetchSellerItems() {
+  return request("/seller-items");
+}
+
+export async function createSellerItem(payload) {
+  return request("/seller-items", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateSellerItem(itemId, payload) {
+  return request(`/seller-items/${itemId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deactivateSellerItem(itemId) {
+  return request(`/seller-items/${itemId}/deactivate`, {
+    method: "PATCH"
+  });
+}
+
+export async function shareSellerItemOffer(itemId, interestId, payload) {
+  return request(`/seller-items/${itemId}/interests/${interestId}/offer`, {
     method: "POST",
     body: JSON.stringify(payload)
   });

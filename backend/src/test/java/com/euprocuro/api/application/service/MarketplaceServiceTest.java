@@ -308,6 +308,27 @@ class MarketplaceServiceTest {
                 .hasMessageContaining("dono");
     }
 
+    @Test
+    void closeInterestShouldMarkOwnedInterestAsClosed() {
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        InterestPost result = marketplaceService.closeInterest("buyer-1", "interest-1");
+
+        assertThat(result.getStatus()).isEqualTo(InterestStatus.CLOSED);
+        verify(eventPublisherGateway).publish(eq("interest.closed"), any(Map.class));
+    }
+
+    @Test
+    void deleteInterestShouldRemoveOwnedInterest() {
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+
+        marketplaceService.deleteInterest("buyer-1", "interest-1");
+
+        verify(interestGateway).deleteById("interest-1");
+        verify(eventPublisherGateway).publish(eq("interest.deleted"), any(Map.class));
+    }
+
     private UserProfile baseBuyer() {
         return UserProfile.builder()
                 .id("buyer-1")

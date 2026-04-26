@@ -41,6 +41,8 @@ public class CreateInterestRequest {
     private String neighborhood;
     private Integer desiredRadiusKm;
     private boolean acceptsNationwideOffers;
+    private boolean allowsWhatsappContact;
+    private String whatsappContact;
     private boolean boostEnabled;
     private String preferredCondition;
     private String preferredContactMode;

@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 
@@ -13,7 +12,7 @@ import com.euprocuro.api.domain.model.InterestCategory;
 import lombok.Data;
 
 @Data
-public class UpdateInterestRequest {
+public class UpdateSellerItemRequest {
     @NotBlank
     private String title;
 
@@ -25,26 +24,10 @@ public class UpdateInterestRequest {
     @NotNull
     private InterestCategory category;
 
-    @DecimalMin("0.00")
-    private BigDecimal budgetMin;
+    private BigDecimal desiredPrice;
 
-    @NotNull
-    @DecimalMin("0.00")
-    private BigDecimal budgetMax;
-
-    @NotBlank
     private String city;
-
-    @NotBlank
     private String state;
-
     private String neighborhood;
-    private Integer desiredRadiusKm;
-    private boolean acceptsNationwideOffers;
-    private boolean allowsWhatsappContact;
-    private String whatsappContact;
-    private boolean boostEnabled;
-    private String preferredCondition;
-    private String preferredContactMode;
     private List<String> tags = new ArrayList<>();
 }

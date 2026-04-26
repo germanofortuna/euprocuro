@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
-public class InterestPost {
+public class SellerItem {
     private String id;
     private String ownerId;
     private String ownerName;
@@ -21,19 +21,10 @@ public class InterestPost {
     private String description;
     private String referenceImageUrl;
     private InterestCategory category;
-    private BigDecimal budgetMin;
-    private BigDecimal budgetMax;
+    private BigDecimal desiredPrice;
     private LocationInfo location;
     private List<String> tags;
-    private Integer desiredRadiusKm;
-    private boolean acceptsNationwideOffers;
-    private boolean allowsWhatsappContact;
-    private String whatsappContact;
-    private boolean boostEnabled;
-    private Instant boostedUntil;
-    private String preferredCondition;
-    private String preferredContactMode;
-    private InterestStatus status;
+    private boolean active;
     private Instant createdAt;
     private Instant updatedAt;
 }

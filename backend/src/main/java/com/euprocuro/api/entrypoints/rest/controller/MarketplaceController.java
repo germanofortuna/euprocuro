@@ -9,7 +9,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -102,6 +104,19 @@ public class MarketplaceController {
         return RestMapper.toResponse(
                 marketplaceUseCase.updateInterest(CurrentUserContext.userId(request), id, RestMapper.toCommand(requestBody))
         );
+    }
+
+    @PatchMapping("/interests/{id}/close")
+    public InterestResponse closeInterest(@PathVariable String id, HttpServletRequest request) {
+        return RestMapper.toResponse(
+                marketplaceUseCase.closeInterest(CurrentUserContext.userId(request), id)
+        );
+    }
+
+    @DeleteMapping("/interests/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteInterest(@PathVariable String id, HttpServletRequest request) {
+        marketplaceUseCase.deleteInterest(CurrentUserContext.userId(request), id);
     }
 
     @GetMapping("/interests/{id}/offers")

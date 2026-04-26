@@ -22,6 +22,8 @@ public class UpdateInterestCommand {
     String neighborhood;
     Integer desiredRadiusKm;
     boolean acceptsNationwideOffers;
+    boolean allowsWhatsappContact;
+    String whatsappContact;
     boolean boostEnabled;
     String preferredCondition;
     String preferredContactMode;

@@ -55,6 +55,11 @@ public class InterestGatewayAdapter implements InterestGateway {
     }
 
     @Override
+    public void deleteById(String id) {
+        repository.deleteById(id);
+    }
+
+    @Override
     public long countByStatus(InterestStatus status) {
         return repository.countByStatus(status);
     }

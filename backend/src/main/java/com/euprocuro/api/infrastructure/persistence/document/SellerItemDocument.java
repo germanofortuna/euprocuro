@@ -8,7 +8,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import com.euprocuro.api.domain.model.InterestCategory;
-import com.euprocuro.api.domain.model.InterestStatus;
+import com.euprocuro.api.domain.model.LocationInfo;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,11 +16,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@Builder(toBuilder = true)
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document("interest_posts")
-public class InterestPostDocument {
+@Document("seller_items")
+public class SellerItemDocument {
     @Id
     private String id;
     private String ownerId;
@@ -29,19 +29,10 @@ public class InterestPostDocument {
     private String description;
     private String referenceImageUrl;
     private InterestCategory category;
-    private BigDecimal budgetMin;
-    private BigDecimal budgetMax;
-    private LocationDocument location;
+    private BigDecimal desiredPrice;
+    private LocationInfo location;
     private List<String> tags;
-    private Integer desiredRadiusKm;
-    private boolean acceptsNationwideOffers;
-    private boolean allowsWhatsappContact;
-    private String whatsappContact;
-    private boolean boostEnabled;
-    private Instant boostedUntil;
-    private String preferredCondition;
-    private String preferredContactMode;
-    private InterestStatus status;
+    private boolean active;
     private Instant createdAt;
     private Instant updatedAt;
 }

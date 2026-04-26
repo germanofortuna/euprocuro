@@ -70,6 +70,8 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .tags(Optional.ofNullable(command.getTags()).orElse(List.of()))
                 .desiredRadiusKm(command.getDesiredRadiusKm())
                 .acceptsNationwideOffers(command.isAcceptsNationwideOffers())
+                .allowsWhatsappContact(command.isAllowsWhatsappContact())
+                .whatsappContact(command.isAllowsWhatsappContact() ? normalizeReferenceImage(command.getWhatsappContact()) : null)
                 .boostEnabled(command.isBoostEnabled())
                 .preferredCondition(command.getPreferredCondition())
                 .preferredContactMode(command.getPreferredContactMode())
@@ -86,6 +88,40 @@ public class MarketplaceService implements MarketplaceUseCase {
                 "budgetMax", saved.getBudgetMax()
         ));
         return saved;
+    }
+
+    @Override
+    public InterestPost closeInterest(String currentUserId, String interestId) {
+        InterestPost existingInterest = getInterest(interestId);
+        if (!Objects.equals(existingInterest.getOwnerId(), currentUserId)) {
+            throw new ForbiddenException("Apenas o dono do interesse pode desativar esse anuncio.");
+        }
+
+        InterestPost closedInterest = existingInterest.toBuilder()
+                .status(InterestStatus.CLOSED)
+                .updatedAt(Instant.now())
+                .build();
+
+        InterestPost saved = interestGateway.save(closedInterest);
+        eventPublisherGateway.publish("interest.closed", Map.of(
+                "interestId", saved.getId(),
+                "ownerId", saved.getOwnerId()
+        ));
+        return saved;
+    }
+
+    @Override
+    public void deleteInterest(String currentUserId, String interestId) {
+        InterestPost existingInterest = getInterest(interestId);
+        if (!Objects.equals(existingInterest.getOwnerId(), currentUserId)) {
+            throw new ForbiddenException("Apenas o dono do interesse pode excluir esse anuncio.");
+        }
+
+        interestGateway.deleteById(interestId);
+        eventPublisherGateway.publish("interest.deleted", Map.of(
+                "interestId", interestId,
+                "ownerId", currentUserId
+        ));
     }
 
     @Override
@@ -113,6 +149,8 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .tags(Optional.ofNullable(command.getTags()).orElse(List.of()))
                 .desiredRadiusKm(command.getDesiredRadiusKm())
                 .acceptsNationwideOffers(command.isAcceptsNationwideOffers())
+                .allowsWhatsappContact(command.isAllowsWhatsappContact())
+                .whatsappContact(command.isAllowsWhatsappContact() ? normalizeReferenceImage(command.getWhatsappContact()) : null)
                 .boostEnabled(command.isBoostEnabled())
                 .preferredCondition(command.getPreferredCondition())
                 .preferredContactMode(command.getPreferredContactMode())

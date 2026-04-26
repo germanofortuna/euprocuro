@@ -10,6 +10,12 @@ function currency(value) {
 }
 
 export default function InterestCard({ interest, selected, onClick }) {
+  const isBoosted = Boolean(
+    interest.boostEnabled
+    && interest.boostedUntil
+    && new Date(interest.boostedUntil).getTime() > Date.now()
+  );
+
   return (
     <button
       type="button"
@@ -28,7 +34,7 @@ export default function InterestCard({ interest, selected, onClick }) {
 
       <div className="interest-card__head">
         <span className="pill">{interest.category}</span>
-        {interest.boostEnabled ? <span className="pill pill--boost">Destaque</span> : null}
+        {isBoosted ? <span className="boost-rocket" aria-label="Interesse impulsionado" title="Interesse impulsionado">🚀</span> : null}
       </div>
 
       <h3>{interest.title}</h3>

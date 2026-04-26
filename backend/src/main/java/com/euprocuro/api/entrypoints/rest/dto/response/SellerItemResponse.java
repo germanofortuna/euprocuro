@@ -5,14 +5,13 @@ import java.time.Instant;
 import java.util.List;
 
 import com.euprocuro.api.domain.model.InterestCategory;
-import com.euprocuro.api.domain.model.InterestStatus;
 
 import lombok.Builder;
 import lombok.Value;
 
 @Value
 @Builder
-public class InterestResponse {
+public class SellerItemResponse {
     String id;
     String ownerId;
     String ownerName;
@@ -20,19 +19,10 @@ public class InterestResponse {
     String description;
     String referenceImageUrl;
     InterestCategory category;
-    BigDecimal budgetMin;
-    BigDecimal budgetMax;
+    BigDecimal desiredPrice;
     LocationResponse location;
     List<String> tags;
-    Integer desiredRadiusKm;
-    boolean acceptsNationwideOffers;
-    boolean allowsWhatsappContact;
-    String whatsappContact;
-    boolean boostEnabled;
-    Instant boostedUntil;
-    String preferredCondition;
-    String preferredContactMode;
-    InterestStatus status;
+    boolean active;
     Instant createdAt;
     Instant updatedAt;
 }
