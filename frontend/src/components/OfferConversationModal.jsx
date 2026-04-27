@@ -1,14 +1,23 @@
+import { memo } from "react";
+
 import EmptyState from "./EmptyState";
+
+const timestampFormatter = new Intl.DateTimeFormat("pt-BR", {
+  dateStyle: "short",
+  timeStyle: "short"
+});
+
+const currencyFormatter = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL"
+});
 
 function formatTimestamp(value) {
   if (!value) {
     return "Agora";
   }
 
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short"
-  }).format(new Date(value));
+  return timestampFormatter.format(new Date(value));
 }
 
 function currency(value) {
@@ -16,11 +25,33 @@ function currency(value) {
     return "A combinar";
   }
 
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL"
-  }).format(Number(value));
+  return currencyFormatter.format(Number(value));
 }
+
+const ConversationThread = memo(function ConversationThread({ messages, currentUserId }) {
+  if (messages.length === 0) {
+    return (
+      <EmptyState
+        title="Ainda sem mensagens"
+        description="Use o chat abaixo para alinhar detalhes da negociaÃ§Ã£o dentro da plataforma."
+      />
+    );
+  }
+
+  return messages.map((message) => {
+    const isMine = message.senderId === currentUserId;
+    return (
+      <article
+        key={message.id}
+        className={`conversation-bubble ${isMine ? "conversation-bubble--mine" : ""}`}
+      >
+        <strong>{message.senderName}</strong>
+        <p>{message.content}</p>
+        <span>{formatTimestamp(message.createdAt)}</span>
+      </article>
+    );
+  });
+});
 
 export default function OfferConversationModal({ modal, currentUserId, onClose, onDraftChange, onSubmit }) {
   if (!modal?.visible) {
@@ -35,6 +66,7 @@ export default function OfferConversationModal({ modal, currentUserId, onClose, 
     ? `https://wa.me/${counterpartyPhone.replace(/\D/g, "")}`
     : null;
   const mailtoLink = counterpartyEmail ? `mailto:${counterpartyEmail}` : null;
+  const conversationMessages = modal.data?.messages ?? [];
 
   return (
     <div className="modal-overlay" role="presentation" onClick={onClose}>
@@ -99,26 +131,7 @@ export default function OfferConversationModal({ modal, currentUserId, onClose, 
             </div>
 
             <div className="conversation-thread">
-              {(modal.data?.messages ?? []).length === 0 ? (
-                <EmptyState
-                  title="Ainda sem mensagens"
-                  description="Use o chat abaixo para alinhar detalhes da negociação dentro da plataforma."
-                />
-              ) : (
-                modal.data.messages.map((message) => {
-                  const isMine = message.senderId === currentUserId;
-                  return (
-                    <article
-                      key={message.id}
-                      className={`conversation-bubble ${isMine ? "conversation-bubble--mine" : ""}`}
-                    >
-                      <strong>{message.senderName}</strong>
-                      <p>{message.content}</p>
-                      <span>{formatTimestamp(message.createdAt)}</span>
-                    </article>
-                  );
-                })
-              )}
+              <ConversationThread messages={conversationMessages} currentUserId={currentUserId} />
             </div>
 
             <form className="conversation-form" onSubmit={onSubmit}>

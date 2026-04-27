@@ -1,12 +1,14 @@
+const timestampFormatter = new Intl.DateTimeFormat("pt-BR", {
+  dateStyle: "short",
+  timeStyle: "short"
+});
+
 function formatTimestamp(value) {
   if (!value) {
     return "Agora";
   }
 
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short"
-  }).format(new Date(value));
+  return timestampFormatter.format(new Date(value));
 }
 
 export default function NotificationModal({
