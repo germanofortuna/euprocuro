@@ -407,6 +407,7 @@ export default function App() {
   const [offers, setOffers] = useState([]);
   const [sellerItems, setSellerItems] = useState([]);
   const [selectedSellerItemId, setSelectedSellerItemId] = useState(null);
+  const [showInactiveSellerItems, setShowInactiveSellerItems] = useState(false);
   const [authMode, setAuthMode] = useState(initialResetState.mode);
   const [isAuthModalVisible, setIsAuthModalVisible] = useState(initialResetState.mode === "reset");
   const [loginForm, setLoginForm] = useState(initialLoginForm);
@@ -419,9 +420,11 @@ export default function App() {
   });
   const [interestForm, setInterestForm] = useState(initialInterestForm);
   const [editingInterestId, setEditingInterestId] = useState(null);
+  const [isInterestModalVisible, setIsInterestModalVisible] = useState(false);
   const [offerForm, setOfferForm] = useState(initialOfferForm);
   const [sellerItemForm, setSellerItemForm] = useState(initialSellerItemForm);
   const [editingSellerItemId, setEditingSellerItemId] = useState(null);
+  const [isSellerItemModalVisible, setIsSellerItemModalVisible] = useState(false);
   const [sellerItemShareForm, setSellerItemShareForm] = useState(initialSellerItemShareForm);
   const [expandedInterests, setExpandedInterests] = useState({});
   const [expandedOffers, setExpandedOffers] = useState({});
@@ -497,6 +500,10 @@ export default function App() {
     [sellerItems, selectedSellerItemId]
   );
   const isSelectedInterestMine = selectedInterest?.ownerId === currentUser?.id;
+  const sentOfferForSelectedInterest = useMemo(
+    () => sentOffers.find((offer) => offer.interestPostId === selectedInterest?.id) ?? null,
+    [sentOffers, selectedInterest?.id]
+  );
   const canSendOffer = Boolean(monetizationAccount?.subscriptionActive || (monetizationAccount?.sellerCredits ?? 0) > 0);
   const noCreditsTooltip = "Você não possui créditos ativos para enviar ofertas.";
 
@@ -766,7 +773,7 @@ export default function App() {
   function openNewInterestForm() {
     setEditingInterestId(null);
     setInterestForm(initialInterestForm);
-    navigateTo(loggedSections.NEW_INTEREST);
+    setIsInterestModalVisible(true);
   }
 
   function toggleInterestExpansion(interest) {
@@ -787,13 +794,13 @@ export default function App() {
   function startEditingInterest(interest) {
     setEditingInterestId(interest.id);
     setInterestForm(mapInterestToForm(interest));
-    navigateTo(loggedSections.NEW_INTEREST);
+    setIsInterestModalVisible(true);
   }
 
   function cancelInterestEditing() {
     setEditingInterestId(null);
     setInterestForm(initialInterestForm);
-    navigateTo(loggedSections.MY_INTERESTS);
+    setIsInterestModalVisible(false);
   }
 
   function startEditingSellerItem(group) {
@@ -805,12 +812,13 @@ export default function App() {
     setEditingSellerItemId(item.id);
     setSellerItemForm(mapSellerItemToForm(item));
     setSelectedSellerItemId(item.id);
-    navigateTo(loggedSections.SELLER_ITEMS);
+    setIsSellerItemModalVisible(true);
   }
 
   function cancelSellerItemEditing() {
     setEditingSellerItemId(null);
     setSellerItemForm(initialSellerItemForm);
+    setIsSellerItemModalVisible(false);
   }
 
   function closeAuthModal() {
@@ -935,7 +943,7 @@ export default function App() {
         fetchMe(),
         fetchDashboard(),
         fetchMonetizationAccount(),
-        fetchSellerItems()
+        fetchSellerItems({ includeInactive: showInactiveSellerItems })
       ]);
       const nextSession = {
         expiresAt: me.expiresAt,
@@ -1080,7 +1088,7 @@ export default function App() {
     }
 
     refreshPrivateData();
-  }, [session?.user?.id]);
+  }, [session?.user?.id, showInactiveSellerItems]);
 
   useEffect(() => {
     if (!currentUser?.id) {
@@ -1236,6 +1244,7 @@ export default function App() {
       .filter(Boolean);
 
     const sellerItemEntries = sellerItems
+      .filter((group) => group.item?.active)
       .map((group) => {
         const matches = group.matchingInterests ?? [];
         if (!group.item?.id || matches.length === 0) {
@@ -1433,6 +1442,7 @@ export default function App() {
 
       setEditingInterestId(null);
       setInterestForm(initialInterestForm);
+      setIsInterestModalVisible(false);
       await Promise.all([refreshPrivateData(), refreshPublicData()]);
       navigateTo(loggedSections.MY_INTERESTS);
       openFeedback(
@@ -1601,6 +1611,7 @@ export default function App() {
         : await createSellerItem(buildSellerItemPayload(sellerItemForm));
       setSellerItemForm(initialSellerItemForm);
       setEditingSellerItemId(null);
+      setIsSellerItemModalVisible(false);
       await refreshPrivateData();
       setSelectedSellerItemId(item.id);
       openFeedback(
@@ -2062,6 +2073,8 @@ export default function App() {
                         Ir para interesses ativos
                       </button>
                     </div>
+                  ) : sentOfferForSelectedInterest ? (
+                    renderSentOfferSummary(sentOfferForSelectedInterest)
                   ) : (
                     <form className="stacked-form" onSubmit={handleOfferSubmit}>
                       <div className="form-heading">
@@ -2313,6 +2326,73 @@ export default function App() {
     );
   }
 
+  function renderSentOfferSummary(offer) {
+    return (
+      <div className="sent-offer-summary">
+        <div className="form-heading">
+          <span className="eyebrow">Oferta enviada</span>
+          <h3>Você já respondeu este interesse</h3>
+        </div>
+
+        {offer.offerImageUrl ? (
+          <img
+            className="offer-card__image"
+            src={offer.offerImageUrl}
+            alt={`Foto enviada por ${offer.sellerName ?? "você"}`}
+            loading="lazy"
+            decoding="async"
+          />
+        ) : null}
+
+        <div className="sent-offer-summary__grid">
+          <div>
+            <span>Valor ofertado</span>
+            <strong>{currency(offer.offeredPrice)}</strong>
+          </div>
+          <div>
+            <span>Contato informado</span>
+            <strong>{offer.sellerPhone || "Não informado"}</strong>
+          </div>
+          <div>
+            <span>Enviada em</span>
+            <strong>{formatTimestamp(offer.createdAt)}</strong>
+          </div>
+          <div>
+            <span>Entrega/deslocamento</span>
+            <strong>{offer.includesDelivery ? "Inclui" : "Não informado"}</strong>
+          </div>
+        </div>
+
+        <p>{offer.message || "Sem mensagem informada."}</p>
+
+        {offer.highlights?.length ? (
+          <div className="tag-cluster tag-cluster--compact">
+            {offer.highlights.map((highlight) => (
+              <span key={highlight}>{highlight}</span>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="cta-card__actions">
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => openConversation(offer.id)}
+          >
+            Abrir conversa
+          </button>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => navigateTo(loggedSections.SENT_OFFERS)}
+          >
+            Ver ofertas enviadas
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   function renderPaymentTracker() {
     if (!paymentStatus) {
       return (
@@ -2467,6 +2547,101 @@ export default function App() {
     );
   }
 
+  function renderSellerItemForm() {
+    return (
+      <form className="stacked-form seller-item-form" onSubmit={handleSellerItemSubmit}>
+        <div className="form-heading">
+          <span className="eyebrow">{editingSellerItemId ? "Editar item" : "Cadastrar item"}</span>
+          <h3>{editingSellerItemId ? "Atualize o item cadastrado" : "Algo que você aceitaria negociar"}</h3>
+        </div>
+
+        <input
+          placeholder="Título do item ou serviço"
+          value={sellerItemForm.title}
+          onChange={(event) => setSellerItemForm((current) => ({ ...current, title: event.target.value }))}
+          required
+        />
+        <textarea
+          rows="4"
+          placeholder="Descreva o que você tem, estado de conservação ou detalhes do serviço"
+          value={sellerItemForm.description}
+          onChange={(event) => setSellerItemForm((current) => ({ ...current, description: event.target.value }))}
+          required
+        />
+
+        <div className="two-columns">
+          <select
+            value={sellerItemForm.category}
+            onChange={(event) => setSellerItemForm((current) => ({ ...current, category: event.target.value }))}
+          >
+            {categories.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min="0"
+            placeholder="Valor que você analisaria"
+            value={sellerItemForm.desiredPrice}
+            onChange={(event) => setSellerItemForm((current) => ({ ...current, desiredPrice: event.target.value }))}
+          />
+        </div>
+
+        <div className="three-columns">
+          <input
+            placeholder="Cidade"
+            value={sellerItemForm.city}
+            onChange={(event) => setSellerItemForm((current) => ({ ...current, city: event.target.value }))}
+          />
+          <input
+            placeholder="Estado"
+            value={sellerItemForm.state}
+            onChange={(event) => setSellerItemForm((current) => ({ ...current, state: event.target.value }))}
+          />
+          <input
+            placeholder="Bairro"
+            value={sellerItemForm.neighborhood}
+            onChange={(event) => setSellerItemForm((current) => ({ ...current, neighborhood: event.target.value }))}
+          />
+        </div>
+
+        <input
+          placeholder="Tags separadas por vírgula"
+          value={sellerItemForm.tags}
+          onChange={(event) => setSellerItemForm((current) => ({ ...current, tags: event.target.value }))}
+        />
+
+        <div className="media-field">
+          <label htmlFor="seller-item-image">Foto do item</label>
+          <input id="seller-item-image" type="file" accept="image/*" onChange={handleSellerItemImageChange} />
+          {sellerItemForm.referenceImageUrl ? (
+            <img
+              className="interest-upload-preview"
+              src={sellerItemForm.referenceImageUrl}
+              alt="Prévia do item"
+              decoding="async"
+            />
+          ) : null}
+        </div>
+
+        <div className="form-actions">
+          {editingSellerItemId ? (
+            <button type="button" className="ghost-button" onClick={cancelSellerItemEditing}>
+              Cancelar edição
+            </button>
+          ) : null}
+          <button type="submit" className="primary-button" disabled={isSubmittingSellerItem}>
+            {isSubmittingSellerItem
+              ? (editingSellerItemId ? "Salvando..." : "Cadastrando...")
+              : (editingSellerItemId ? "Salvar alterações" : "Cadastrar item")}
+          </button>
+        </div>
+      </form>
+    );
+  }
+
   function renderSellerItemsPage() {
     const selectedItem = selectedSellerItemGroup?.item ?? null;
     const matchingInterests = selectedSellerItemGroup?.matchingInterests ?? [];
@@ -2482,96 +2657,23 @@ export default function App() {
             </div>
           </div>
 
-          <form className="stacked-form seller-item-form" onSubmit={handleSellerItemSubmit}>
-            <div className="form-heading">
-              <span className="eyebrow">{editingSellerItemId ? "Editar item" : "Cadastrar item"}</span>
-              <h3>{editingSellerItemId ? "Atualize o item cadastrado" : "Algo que você aceitaria negociar"}</h3>
-            </div>
-
-            <input
-              placeholder="Título do item ou serviço"
-              value={sellerItemForm.title}
-              onChange={(event) => setSellerItemForm((current) => ({ ...current, title: event.target.value }))}
-              required
-            />
-            <textarea
-              rows="4"
-              placeholder="Descreva o que você tem, estado de conservação ou detalhes do serviço"
-              value={sellerItemForm.description}
-              onChange={(event) => setSellerItemForm((current) => ({ ...current, description: event.target.value }))}
-              required
-            />
-
-            <div className="two-columns">
-              <select
-                value={sellerItemForm.category}
-                onChange={(event) => setSellerItemForm((current) => ({ ...current, category: event.target.value }))}
+          <div className="cta-card seller-item-create-card">
+            <strong>Cadastre itens que você aceitaria negociar</strong>
+            <p>Ao cadastrar um item, a plataforma mostra interesses parecidos de outros usuários.</p>
+            <div className="cta-card__actions">
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => {
+                  setEditingSellerItemId(null);
+                  setSellerItemForm(initialSellerItemForm);
+                  setIsSellerItemModalVisible(true);
+                }}
               >
-                {categories.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min="0"
-                placeholder="Valor que você analisaria"
-                value={sellerItemForm.desiredPrice}
-                onChange={(event) => setSellerItemForm((current) => ({ ...current, desiredPrice: event.target.value }))}
-              />
-            </div>
-
-            <div className="three-columns">
-              <input
-                placeholder="Cidade"
-                value={sellerItemForm.city}
-                onChange={(event) => setSellerItemForm((current) => ({ ...current, city: event.target.value }))}
-              />
-              <input
-                placeholder="Estado"
-                value={sellerItemForm.state}
-                onChange={(event) => setSellerItemForm((current) => ({ ...current, state: event.target.value }))}
-              />
-              <input
-                placeholder="Bairro"
-                value={sellerItemForm.neighborhood}
-                onChange={(event) => setSellerItemForm((current) => ({ ...current, neighborhood: event.target.value }))}
-              />
-            </div>
-
-            <input
-              placeholder="Tags separadas por vírgula"
-              value={sellerItemForm.tags}
-              onChange={(event) => setSellerItemForm((current) => ({ ...current, tags: event.target.value }))}
-            />
-
-            <div className="media-field">
-              <label htmlFor="seller-item-image">Foto do item</label>
-              <input id="seller-item-image" type="file" accept="image/*" onChange={handleSellerItemImageChange} />
-              {sellerItemForm.referenceImageUrl ? (
-                <img
-                  className="interest-upload-preview"
-                  src={sellerItemForm.referenceImageUrl}
-                  alt="Prévia do item"
-                  decoding="async"
-                />
-              ) : null}
-            </div>
-
-            <div className="form-actions">
-              {editingSellerItemId ? (
-                <button type="button" className="ghost-button" onClick={cancelSellerItemEditing}>
-                  Cancelar edição
-                </button>
-              ) : null}
-              <button type="submit" className="primary-button" disabled={isSubmittingSellerItem}>
-                {isSubmittingSellerItem
-                  ? (editingSellerItemId ? "Salvando..." : "Cadastrando...")
-                  : (editingSellerItemId ? "Salvar alterações" : "Cadastrar item")}
+                Cadastrar item
               </button>
             </div>
-          </form>
+          </div>
         </article>
 
         <aside className="panel panel--sticky">
@@ -2581,6 +2683,14 @@ export default function App() {
               <h2>{selectedItem?.title ?? "Cadastre um item"}</h2>
             </div>
           </div>
+          <label className="seller-items-toggle">
+            <input
+              type="checkbox"
+              checked={showInactiveSellerItems}
+              onChange={(event) => setShowInactiveSellerItems(event.target.checked)}
+            />
+            <span>Mostrar itens desativados</span>
+          </label>
 
           {sellerItems.length ? (
             <>
@@ -2589,15 +2699,21 @@ export default function App() {
                   <button
                     type="button"
                     key={group.item.id}
-                    className={group.item.id === selectedItem?.id ? "active" : ""}
+                    className={[
+                      group.item.id === selectedItem?.id ? "active" : "",
+                      !group.item.active ? "seller-item-tab--inactive" : ""
+                    ].filter(Boolean).join(" ")}
                     onClick={() => openSellerItemMatches(group)}
                   >
                     {group.item.referenceImageUrl ? (
                       <img src={group.item.referenceImageUrl} alt={group.item.title} loading="lazy" decoding="async" />
                     ) : (
-                      <span>{group.item.title?.charAt(0) ?? "I"}</span>
+                      <span className="seller-item-tab__placeholder">{group.item.title?.charAt(0) ?? "I"}</span>
                     )}
-                    <strong>{group.item.title}</strong>
+                    <span className="seller-item-tab__title">
+                      <strong>{group.item.title}</strong>
+                      {!group.item.active ? <em>Desativado</em> : null}
+                    </span>
                     <small className="seller-match-count">
                       <strong>{group.matchCount}</strong>
                       <span>possíveis<br />interessados</span>
@@ -2608,25 +2724,37 @@ export default function App() {
 
               {selectedItem ? (
                 <div className="seller-item-summary">
-                  <div>
+                  <div className="seller-item-summary__content">
                     <strong>{currency(selectedItem.desiredPrice)}</strong>
-                    <span>{selectedItem.location?.city ? `${selectedItem.location.city}/${selectedItem.location?.state}` : "Sem local informado"}</span>
+                    {!selectedItem.active ? <span className="seller-item-status-badge">Desativado</span> : null}
+                    {selectedItem.description ? (
+                      <p title={selectedItem.description}>{selectedItem.description}</p>
+                    ) : null}
+                    {selectedItem.tags?.length ? (
+                      <div className="seller-item-summary__tags" aria-label="Tags do item">
+                        {selectedItem.tags.slice(0, 3).map((tag) => (
+                          <span key={tag}>{tag}</span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="inline-actions">
+                  <div className="inline-actions inline-actions--seller-summary">
                     <button
                       type="button"
-                      className="ghost-button"
+                      className="ghost-button ghost-button--small"
                       onClick={() => startEditingSellerItem(selectedItem)}
                     >
                       Editar item
                     </button>
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      onClick={() => handleDeactivateSellerItem(selectedItem.id)}
-                    >
-                      Desativar item
-                    </button>
+                    {selectedItem.active ? (
+                      <button
+                        type="button"
+                        className="ghost-button ghost-button--small"
+                        onClick={() => handleDeactivateSellerItem(selectedItem.id)}
+                      >
+                        Desativar item
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
@@ -2702,6 +2830,34 @@ export default function App() {
             />
           )}
         </aside>
+
+        {isSellerItemModalVisible ? (
+          <div className="modal-overlay" role="presentation" onClick={cancelSellerItemEditing}>
+            <section
+              className="form-modal panel panel--form"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="seller-item-form-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="feedback-modal__header">
+                <div>
+                  <span className="eyebrow">Meus itens</span>
+                  <h2 id="seller-item-form-title">{editingSellerItemId ? "Editar item" : "Cadastrar item"}</h2>
+                </div>
+                <button
+                  type="button"
+                  className="modal-close-button"
+                  onClick={cancelSellerItemEditing}
+                  aria-label="Fechar modal"
+                >
+                  X
+                </button>
+              </div>
+              {renderSellerItemForm()}
+            </section>
+          </div>
+        ) : null}
       </section>
     );
   }
@@ -2983,13 +3139,29 @@ export default function App() {
 
         {loggedSection === loggedSections.SELLER_ITEMS ? renderSellerItemsPage() : null}
 
-        {loggedSection === loggedSections.NEW_INTEREST ? (
-          <section ref={newInterestSectionRef} className="panel panel--form panel--spaced">
-            <div className="panel__header">
+        {isInterestModalVisible ? (
+          <div className="modal-overlay" role="presentation" onClick={cancelInterestEditing}>
+            <section
+              ref={newInterestSectionRef}
+              className="form-modal panel panel--form"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="interest-form-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+            <div className="feedback-modal__header">
               <div>
                 <span className="eyebrow">Página</span>
-                <h2>{editingInterestId ? "Editar anúncio" : "Cadastrar interesse"}</h2>
+                <h2 id="interest-form-title">{editingInterestId ? "Editar anúncio" : "Cadastrar interesse"}</h2>
               </div>
+              <button
+                type="button"
+                className="modal-close-button"
+                onClick={cancelInterestEditing}
+                aria-label="Fechar modal"
+              >
+                X
+              </button>
             </div>
 
             <form className="stacked-form" onSubmit={handleInterestSubmit}>
@@ -3206,7 +3378,8 @@ export default function App() {
                 </button>
               </div>
             </form>
-          </section>
+            </section>
+          </div>
         ) : null}
       </>
     );

@@ -101,11 +101,39 @@ class SellerItemServiceTest {
         when(sellerItemGateway.findByOwnerIdOrderByCreatedAtDesc("seller-1")).thenReturn(List.of(activeItem, inactiveItem));
         when(marketplaceUseCase.listInterests(any(InterestSearchFilter.class))).thenReturn(List.of(matchingInterest, ownInterest));
 
-        List<SellerItemMatchesView> results = sellerItemService.listItemsWithMatches("seller-1");
+        List<SellerItemMatchesView> results = sellerItemService.listItemsWithMatches("seller-1", false);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).getItem().getId()).isEqualTo("item-1");
         assertThat(results.get(0).getMatchingInterests()).extracting(InterestPost::getId).containsExactly("interest-1");
+    }
+
+    @Test
+    void listItemsWithMatchesShouldIncludeInactiveItemsWhenRequestedWithoutMatches() {
+        SellerItem activeItem = baseSellerItem();
+        SellerItem inactiveItem = baseSellerItem().toBuilder()
+                .id("item-2")
+                .title("Violao")
+                .active(false)
+                .build();
+        InterestPost matchingInterest = baseInterest().toBuilder()
+                .id("interest-1")
+                .title("Procuro Celta 2012")
+                .description("Quero um carro pequeno")
+                .category(InterestCategory.AUTOMOVEIS)
+                .tags(List.of("celta"))
+                .build();
+
+        when(sellerItemGateway.findByOwnerIdOrderByCreatedAtDesc("seller-1")).thenReturn(List.of(activeItem, inactiveItem));
+        when(marketplaceUseCase.listInterests(any(InterestSearchFilter.class))).thenReturn(List.of(matchingInterest));
+
+        List<SellerItemMatchesView> results = sellerItemService.listItemsWithMatches("seller-1", true);
+
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).getItem().isActive()).isTrue();
+        assertThat(results.get(0).getMatchingInterests()).extracting(InterestPost::getId).containsExactly("interest-1");
+        assertThat(results.get(1).getItem().isActive()).isFalse();
+        assertThat(results.get(1).getMatchingInterests()).isEmpty();
     }
 
     @Test
@@ -223,7 +251,7 @@ class SellerItemServiceTest {
         when(sellerItemGateway.findByOwnerIdOrderByCreatedAtDesc("seller-1")).thenReturn(List.of(activeItem));
         when(marketplaceUseCase.listInterests(any(InterestSearchFilter.class))).thenReturn(List.of(differentCategory, noTextMatch));
 
-        List<SellerItemMatchesView> results = sellerItemService.listItemsWithMatches("seller-1");
+        List<SellerItemMatchesView> results = sellerItemService.listItemsWithMatches("seller-1", false);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).getMatchingInterests()).isEmpty();

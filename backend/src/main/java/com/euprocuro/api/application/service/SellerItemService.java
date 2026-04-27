@@ -40,17 +40,17 @@ public class SellerItemService implements SellerItemUseCase {
     private final MarketplaceUseCase marketplaceUseCase;
 
     @Override
-    public List<SellerItemMatchesView> listItemsWithMatches(String currentUserId) {
+    public List<SellerItemMatchesView> listItemsWithMatches(String currentUserId, boolean includeInactive) {
         List<InterestPost> openInterests = marketplaceUseCase.listInterests(InterestSearchFilter.builder()
                 .openOnly(true)
                 .build());
 
         return sellerItemGateway.findByOwnerIdOrderByCreatedAtDesc(currentUserId)
                 .stream()
-                .filter(SellerItem::isActive)
+                .filter(item -> includeInactive || item.isActive())
                 .map(item -> SellerItemMatchesView.builder()
                         .item(item)
-                        .matchingInterests(matchInterests(currentUserId, item, openInterests))
+                        .matchingInterests(item.isActive() ? matchInterests(currentUserId, item, openInterests) : List.of())
                         .build())
                 .collect(Collectors.toList());
     }

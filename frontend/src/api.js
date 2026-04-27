@@ -258,8 +258,9 @@ export async function sendOfferMessage(offerId, payload) {
   });
 }
 
-export async function fetchSellerItems() {
-  return request("/seller-items");
+export async function fetchSellerItems({ includeInactive = false } = {}) {
+  const query = includeInactive ? "?includeInactive=true" : "";
+  return request(`/seller-items${query}`);
 }
 
 export async function createSellerItem(payload) {

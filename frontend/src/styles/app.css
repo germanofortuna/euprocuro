@@ -316,6 +316,7 @@ img {
 .hero__copy,
 .hero__stats,
 .stacked-form,
+.sent-offer-summary,
 .filters,
 .detail-block,
 .offers,
@@ -373,6 +374,7 @@ img {
 
 .hero-card,
 .cta-card,
+.sent-offer-summary,
 .preview-card,
 .detail-block,
 .offers,
@@ -509,9 +511,17 @@ textarea:focus {
 }
 
 .primary-button--compact,
+.ghost-button--small,
 .ghost-button--icon {
   width: auto;
   padding: 11px 14px;
+}
+
+.ghost-button--small {
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 0.88rem;
 }
 
 .ghost-button {
@@ -893,6 +903,7 @@ textarea:focus {
 .load-more-button {
   width: 100%;
   min-height: 42px;
+  margin-top: 10px;
 }
 
 .interest-upload-preview {
@@ -912,6 +923,34 @@ textarea:focus {
 .activity-card p,
 .offer-card p {
   color: var(--muted);
+}
+
+.sent-offer-summary {
+  margin-top: 10px;
+}
+
+.sent-offer-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sent-offer-summary__grid > div {
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.sent-offer-summary__grid span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.sent-offer-summary__grid strong {
+  color: var(--ink);
 }
 
 .interest-card__head,
@@ -1217,6 +1256,18 @@ textarea:focus {
   gap: 10px;
 }
 
+.inline-actions--seller-summary {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.inline-actions--seller-summary .ghost-button {
+  min-width: 136px;
+  margin-bottom: 0;
+}
+
 .inline-actions--interest-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1289,7 +1340,7 @@ textarea:focus {
 }
 
 .seller-item-tabs img,
-.seller-item-tabs button > span,
+.seller-item-tab__placeholder,
 .seller-match-card > img {
   width: 48px;
   height: 48px;
@@ -1297,7 +1348,7 @@ textarea:focus {
   object-fit: cover;
 }
 
-.seller-item-tabs button > span {
+.seller-item-tab__placeholder {
   display: grid;
   place-items: center;
   background: rgba(30, 111, 242, 0.12);
@@ -1308,6 +1359,47 @@ textarea:focus {
 .seller-item-tabs small {
   color: var(--muted);
   font-weight: 700;
+}
+
+.seller-item-tab__title {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.seller-item-tab__title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seller-item-tab__title em,
+.seller-item-status-badge {
+  width: fit-content;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.12);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  text-transform: uppercase;
+}
+
+.seller-item-tab--inactive {
+  opacity: 0.72;
+}
+
+.seller-items-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .seller-match-count {
@@ -1341,9 +1433,42 @@ textarea:focus {
   background: rgba(237, 245, 255, 0.94);
 }
 
-.seller-item-summary div {
+.seller-item-summary__content {
   display: grid;
-  gap: 4px;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.seller-item-summary__content p {
+  margin: 0;
+  max-width: 320px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seller-item-summary__tags {
+  display: flex;
+  gap: 5px;
+  max-width: 320px;
+  overflow: hidden;
+}
+
+.seller-item-summary__tags span {
+  max-width: 96px;
+  overflow: hidden;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .seller-item-summary span,
@@ -1432,6 +1557,7 @@ textarea:focus {
 
 .auth-modal,
 .conversation-modal,
+.form-modal,
 .feedback-modal {
   width: min(720px, 100%);
   max-height: min(88vh, 920px);
@@ -1458,6 +1584,14 @@ textarea:focus {
 
 .feedback-modal {
   width: min(460px, 100%);
+}
+
+.form-modal {
+  width: min(860px, calc(100vw - 32px));
+}
+
+.seller-item-create-card {
+  margin-top: 12px;
 }
 
 .feedback-modal p {
@@ -1629,7 +1763,7 @@ textarea:focus {
   }
 
   .seller-item-tabs img,
-  .seller-item-tabs button > span,
+  .seller-item-tab__placeholder,
   .seller-match-card > img {
     width: 64px;
     height: 64px;

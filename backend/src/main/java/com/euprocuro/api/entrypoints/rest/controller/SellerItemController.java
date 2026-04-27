@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -37,8 +38,11 @@ public class SellerItemController {
     private final SellerItemUseCase sellerItemUseCase;
 
     @GetMapping
-    public List<SellerItemMatchesResponse> listItemsWithMatches(HttpServletRequest request) {
-        return sellerItemUseCase.listItemsWithMatches(CurrentUserContext.userId(request))
+    public List<SellerItemMatchesResponse> listItemsWithMatches(
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "false") boolean includeInactive
+    ) {
+        return sellerItemUseCase.listItemsWithMatches(CurrentUserContext.userId(request), includeInactive)
                 .stream()
                 .map(RestMapper::toResponse)
                 .collect(Collectors.toList());

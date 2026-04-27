@@ -10,7 +10,7 @@ import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.SellerItem;
 
 public interface SellerItemUseCase {
-    List<SellerItemMatchesView> listItemsWithMatches(String currentUserId);
+    List<SellerItemMatchesView> listItemsWithMatches(String currentUserId, boolean includeInactive);
 
     SellerItem createItem(String currentUserId, CreateSellerItemCommand command);
 
