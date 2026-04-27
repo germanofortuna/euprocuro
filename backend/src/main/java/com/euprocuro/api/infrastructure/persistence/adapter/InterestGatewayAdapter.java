@@ -1,14 +1,23 @@
 package com.euprocuro.api.infrastructure.persistence.adapter;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Component;
 
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.model.InterestPost;
+import com.euprocuro.api.domain.model.InterestSearchCriteria;
 import com.euprocuro.api.domain.model.InterestStatus;
+import com.euprocuro.api.infrastructure.persistence.document.InterestPostDocument;
 import com.euprocuro.api.infrastructure.persistence.mapper.InterestPersistenceMapper;
 import com.euprocuro.api.infrastructure.persistence.repository.SpringDataInterestRepository;
 
@@ -19,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 public class InterestGatewayAdapter implements InterestGateway {
 
     private final SpringDataInterestRepository repository;
+    private final MongoTemplate mongoTemplate;
 
     @Override
     public InterestPost save(InterestPost interestPost) {
@@ -29,6 +39,39 @@ public class InterestGatewayAdapter implements InterestGateway {
     public List<InterestPost> findAll() {
         return repository.findAll()
                 .stream()
+                .map(InterestPersistenceMapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<InterestPost> search(InterestSearchCriteria criteria, int offset, int limit) {
+        int safeOffset = Math.max(0, offset);
+        int safeLimit = Math.max(1, limit);
+        Instant now = Instant.now();
+        List<InterestPostDocument> documents = new ArrayList<>();
+
+        Query activeBoostQuery = new Query(activeBoostCriteria(criteria, now))
+                .with(Sort.by(Sort.Direction.DESC, "createdAt"));
+        long activeBoostCount = mongoTemplate.count(activeBoostQuery, InterestPostDocument.class);
+
+        if (safeOffset < activeBoostCount) {
+            Query activePageQuery = new Query(activeBoostCriteria(criteria, now))
+                    .with(Sort.by(Sort.Direction.DESC, "createdAt"))
+                    .skip(safeOffset)
+                    .limit(safeLimit);
+            documents.addAll(mongoTemplate.find(activePageQuery, InterestPostDocument.class));
+        }
+
+        if (documents.size() < safeLimit) {
+            long regularOffset = Math.max(0, safeOffset - activeBoostCount);
+            Query regularPageQuery = new Query(regularInterestCriteria(criteria, now))
+                    .with(Sort.by(Sort.Direction.DESC, "createdAt"))
+                    .skip(regularOffset)
+                    .limit(safeLimit - documents.size());
+            documents.addAll(mongoTemplate.find(regularPageQuery, InterestPostDocument.class));
+        }
+
+        return documents.stream()
                 .map(InterestPersistenceMapper::toDomain)
                 .collect(Collectors.toList());
     }
@@ -67,5 +110,71 @@ public class InterestGatewayAdapter implements InterestGateway {
     @Override
     public long count() {
         return repository.count();
+    }
+
+    private Criteria activeBoostCriteria(InterestSearchCriteria criteria, Instant now) {
+        return new Criteria().andOperator(
+                baseCriteria(criteria),
+                Criteria.where("boostEnabled").is(true),
+                Criteria.where("boostedUntil").gt(now)
+        );
+    }
+
+    private Criteria regularInterestCriteria(InterestSearchCriteria criteria, Instant now) {
+        return new Criteria().andOperator(
+                baseCriteria(criteria),
+                new Criteria().orOperator(
+                        Criteria.where("boostEnabled").is(false),
+                        Criteria.where("boostedUntil").exists(false),
+                        Criteria.where("boostedUntil").is(null),
+                        Criteria.where("boostedUntil").lte(now)
+                )
+        );
+    }
+
+    private Criteria baseCriteria(InterestSearchCriteria searchCriteria) {
+        List<Criteria> criteria = new ArrayList<>();
+
+        if (searchCriteria.isOpenOnly()) {
+            criteria.add(Criteria.where("status").is(InterestStatus.OPEN));
+        }
+
+        if (searchCriteria.getCategory() != null) {
+            criteria.add(Criteria.where("category").is(searchCriteria.getCategory()));
+        }
+
+        if (searchCriteria.getCity() != null && !searchCriteria.getCity().isBlank()) {
+            criteria.add(Criteria.where("location.city")
+                    .regex(exactRegex(searchCriteria.getCity()), "i"));
+        }
+
+        if (searchCriteria.getMaxBudget() != null) {
+            criteria.add(new Criteria().orOperator(
+                    Criteria.where("budgetMax").exists(false),
+                    Criteria.where("budgetMax").is(null),
+                    Criteria.where("budgetMax").lte(searchCriteria.getMaxBudget())
+            ));
+        }
+
+        if (searchCriteria.getQuery() != null && !searchCriteria.getQuery().isBlank()) {
+            String queryRegex = containsRegex(searchCriteria.getQuery());
+            criteria.add(new Criteria().orOperator(
+                    Criteria.where("title").regex(queryRegex, "i"),
+                    Criteria.where("description").regex(queryRegex, "i"),
+                    Criteria.where("tags").regex(queryRegex, "i")
+            ));
+        }
+
+        return criteria.isEmpty()
+                ? new Criteria()
+                : new Criteria().andOperator(criteria.toArray(new Criteria[0]));
+    }
+
+    private String exactRegex(String value) {
+        return "^" + Pattern.quote(value.trim()) + "$";
+    }
+
+    private String containsRegex(String value) {
+        return ".*" + Pattern.quote(value.trim()) + ".*";
     }
 }

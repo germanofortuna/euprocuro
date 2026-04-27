@@ -169,6 +169,7 @@ public final class RestMapper {
                 .offeredPrice(request.getOfferedPrice())
                 .sellerPhone(request.getSellerPhone())
                 .message(request.getMessage())
+                .offerImageUrl(request.getOfferImageUrl())
                 .includesDelivery(request.isIncludesDelivery())
                 .highlights(request.getHighlights())
                 .build();
@@ -314,6 +315,7 @@ public final class RestMapper {
                 .sellerPhone(domain.getSellerPhone())
                 .offeredPrice(domain.getOfferedPrice())
                 .message(domain.getMessage())
+                .offerImageUrl(domain.getOfferImageUrl())
                 .includesDelivery(domain.isIncludesDelivery())
                 .highlights(Optional.ofNullable(domain.getHighlights()).orElse(List.of()))
                 .status(domain.getStatus())
@@ -366,6 +368,7 @@ public final class RestMapper {
                 .interestPostId(view.getInterestPostId())
                 .interestTitle(view.getInterestTitle())
                 .referenceImageUrl(view.getReferenceImageUrl())
+                .offerImageUrl(view.getOfferImageUrl())
                 .buyerId(view.getBuyerId())
                 .sellerName(view.getSellerName())
                 .sellerEmail(view.getSellerEmail())
@@ -395,6 +398,7 @@ public final class RestMapper {
                 .sellerEmail(view.getSellerEmail())
                 .sellerPhone(view.getSellerPhone())
                 .offeredPrice(view.getOfferedPrice())
+                .offerImageUrl(view.getOfferImageUrl())
                 .messages(view.getMessages().stream().map(RestMapper::toResponse).collect(Collectors.toList()))
                 .build();
     }

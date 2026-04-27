@@ -63,7 +63,9 @@ public class MarketplaceController {
             @RequestParam(required = false) String city,
             @RequestParam(required = false) BigDecimal maxBudget,
             @RequestParam(required = false) String query,
-            @RequestParam(defaultValue = "true") boolean openOnly
+            @RequestParam(defaultValue = "true") boolean openOnly,
+            @RequestParam(defaultValue = "0") int offset,
+            @RequestParam(defaultValue = "10") int limit
     ) {
         InterestSearchFilter filter = InterestSearchFilter.builder()
                 .category(category)
@@ -73,7 +75,7 @@ public class MarketplaceController {
                 .openOnly(openOnly)
                 .build();
 
-        return marketplaceUseCase.listInterests(filter)
+        return marketplaceUseCase.listInterests(filter, offset, limit)
                 .stream()
                 .map(RestMapper::toResponse)
                 .collect(Collectors.toList());

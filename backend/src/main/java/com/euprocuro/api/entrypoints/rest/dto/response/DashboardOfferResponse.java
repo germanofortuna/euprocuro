@@ -16,6 +16,7 @@ public class DashboardOfferResponse {
     String interestPostId;
     String interestTitle;
     String referenceImageUrl;
+    String offerImageUrl;
     String buyerId;
     String sellerName;
     String sellerEmail;

@@ -20,6 +20,7 @@ public class OfferResponse {
     String sellerPhone;
     BigDecimal offeredPrice;
     String message;
+    String offerImageUrl;
     boolean includesDelivery;
     List<String> highlights;
     OfferStatus status;

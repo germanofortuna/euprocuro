@@ -22,6 +22,8 @@ public class CreateOfferRequest {
     @NotBlank
     private String message;
 
+    private String offerImageUrl;
+
     private boolean includesDelivery;
     private List<String> highlights = new ArrayList<>();
 }

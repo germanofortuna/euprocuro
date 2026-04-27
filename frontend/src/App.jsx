@@ -66,6 +66,7 @@ const initialOfferForm = {
   offeredPrice: "",
   sellerPhone: "",
   message: "",
+  offerImageUrl: "",
   includesDelivery: false,
   highlights: ""
 };
@@ -119,6 +120,7 @@ const loggedSections = {
 const MESSAGE_SEEN_STORAGE_KEY = "eu-procuro-message-seen";
 const MAX_REFERENCE_IMAGE_SIZE = 1200;
 const REFERENCE_IMAGE_QUALITY = 0.78;
+const HOME_PAGE_SIZE = 10;
 
 function currency(value) {
   if (value === null || value === undefined || value === "") {
@@ -140,6 +142,10 @@ function formatTimestamp(value) {
     dateStyle: "short",
     timeStyle: "short"
   }).format(new Date(value));
+}
+
+function firstName(value) {
+  return value?.trim().split(/\s+/)[0] ?? "usuário";
 }
 
 function createResetStateFromLocation() {
@@ -385,6 +391,7 @@ export default function App() {
   const sharedInterestIdRef = useRef(initialSharedInterestId);
   const notificationButtonRef = useRef(null);
   const publicRequestSeq = useRef(0);
+  const detailRequestSeq = useRef(0);
   const realtimeHandlerRef = useRef(null);
   const myInterestsSectionRef = useRef(null);
   const sentOffersSectionRef = useRef(null);
@@ -425,9 +432,13 @@ export default function App() {
     maxBudget: ""
   });
   const [homeMatchFilter, setHomeMatchFilter] = useState(null);
+  const [homeOffset, setHomeOffset] = useState(0);
+  const [hasMoreInterests, setHasMoreInterests] = useState(false);
   const [loggedSection, setLoggedSection] = useState(loggedSections.EXPLORE);
   const [passwordRecoveryPreview, setPasswordRecoveryPreview] = useState(null);
   const [isLoadingPublic, setIsLoadingPublic] = useState(true);
+  const [isLoadingMorePublic, setIsLoadingMorePublic] = useState(false);
+  const [isLoadingInterestDetail, setIsLoadingInterestDetail] = useState(false);
   const [isLoadingPrivate, setIsLoadingPrivate] = useState(Boolean(getStoredSession()));
   const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
   const [isSubmittingInterest, setIsSubmittingInterest] = useState(false);
@@ -509,10 +520,57 @@ export default function App() {
     window.history[replace ? "replaceState" : "pushState"]({}, "", nextUrl);
   }
 
+  async function loadInterestDetail(interestId, options = {}) {
+    if (!interestId) {
+      setSelectedInterest(null);
+      return;
+    }
+
+    const requestId = detailRequestSeq.current + 1;
+    detailRequestSeq.current = requestId;
+    const shouldUpdateUrl = options.updateUrl !== false;
+
+    if (options.summary) {
+      setSelectedInterest(options.summary);
+    }
+
+    if (shouldUpdateUrl) {
+      updateInterestUrl(interestId, Boolean(options.replace));
+    }
+
+    setIsLoadingInterestDetail(true);
+
+    try {
+      const interest = await fetchInterest(interestId);
+      if (requestId !== detailRequestSeq.current) {
+        return;
+      }
+
+      setSelectedInterest(interest);
+      setInterests((current) => (
+        current.some((item) => item.id === interest.id)
+          ? current.map((item) => (item.id === interest.id ? { ...item, ...interest } : item))
+          : [interest, ...current]
+      ));
+    } catch (requestError) {
+      if (requestId === detailRequestSeq.current) {
+        setSelectedInterest(null);
+        openFeedback("error", "Falha ao abrir anúncio", requestError.message || "Tente novamente.");
+      }
+    } finally {
+      if (requestId === detailRequestSeq.current) {
+        setIsLoadingInterestDetail(false);
+      }
+    }
+  }
+
   function selectPublicInterest(interest, options = {}) {
     setSelectedInterest(interest);
-    updateInterestUrl(interest.id, Boolean(options.replace));
     setLoggedSection(loggedSections.EXPLORE);
+    loadInterestDetail(interest.id, {
+      summary: interest,
+      replace: Boolean(options.replace)
+    }).catch(() => {});
   }
 
   function buildInterestShareUrl(interest) {
@@ -607,6 +665,8 @@ export default function App() {
   function updateHomeFilters(updater) {
     setHomeMatchFilter(null);
     updateInterestUrl(null, true);
+    setHomeOffset(0);
+    setHasMoreInterests(false);
     setFilters(updater);
   }
 
@@ -617,6 +677,31 @@ export default function App() {
     setSelectedInterest((current) =>
       nextVisibleInterests.find((interest) => interest.id === current?.id) ?? null
     );
+  }
+
+  function openSellerItemMatches(group) {
+    const item = group?.item;
+    if (!item?.id) {
+      return;
+    }
+
+    const matchingInterests = (group.matchingInterests ?? [])
+      .filter((interest) => !currentUser?.id || interest.ownerId !== currentUser.id);
+
+    setSelectedSellerItemId(item.id);
+    setHomeMatchFilter({
+      sellerItemId: item.id,
+      sellerItemTitle: item.title ?? "item cadastrado",
+      matchingInterests
+    });
+    setFilters({
+      query: "",
+      category: "",
+      city: "",
+      maxBudget: ""
+    });
+    setSelectedInterest(matchingInterests[0] ?? null);
+    navigateTo(loggedSections.EXPLORE);
   }
 
   function navigateTo(section) {
@@ -736,27 +821,61 @@ export default function App() {
     }
   }
 
-  async function refreshPublicData(nextFilters = filters, preserveSelection = true) {
+  async function refreshPublicData(nextFilters = filters, preserveSelection = true, options = {}) {
     const requestId = publicRequestSeq.current + 1;
     publicRequestSeq.current = requestId;
-    setIsLoadingPublic(true);
+    const append = Boolean(options.append);
+    const offset = append ? homeOffset : 0;
+
+    if (append) {
+      setIsLoadingMorePublic(true);
+    } else {
+      setIsLoadingPublic(true);
+    }
 
     try {
       const interestData = await fetchInterests({
         query: nextFilters.query,
         category: nextFilters.category,
         city: nextFilters.city,
-        maxBudget: nextFilters.maxBudget || undefined
+        maxBudget: nextFilters.maxBudget || undefined,
+        offset,
+        limit: HOME_PAGE_SIZE + 1
       });
 
       if (requestId !== publicRequestSeq.current) {
         return;
       }
 
-      setInterests(interestData);
+      const pageInterests = interestData.slice(0, HOME_PAGE_SIZE);
+      setHasMoreInterests(interestData.length > HOME_PAGE_SIZE);
+      setHomeOffset(offset + pageInterests.length);
+      setInterests((current) => {
+        if (!append) {
+          return pageInterests;
+        }
+
+        const currentIds = new Set(current.map((interest) => interest.id));
+        return [
+          ...current,
+          ...pageInterests.filter((interest) => !currentIds.has(interest.id))
+        ];
+      });
+
+      if (!append && !sharedInterestIdRef.current && pageInterests[0]?.id) {
+        loadInterestDetail(pageInterests[0].id, {
+          summary: pageInterests[0],
+          updateUrl: false
+        }).catch(() => {});
+      }
+
+      if (append) {
+        return;
+      }
+
       setSelectedInterest((currentSelected) => {
         if (preserveSelection && currentSelected) {
-          const refreshedSelection = interestData.find((interest) => interest.id === currentSelected.id);
+          const refreshedSelection = pageInterests.find((interest) => interest.id === currentSelected.id);
           if (refreshedSelection) {
             return refreshedSelection;
           }
@@ -769,7 +888,7 @@ export default function App() {
         }
 
         return sharedInterestIdRef.current
-          ? interestData.find((interest) => interest.id === sharedInterestIdRef.current) ?? currentSelected ?? null
+          ? pageInterests.find((interest) => interest.id === sharedInterestIdRef.current) ?? currentSelected ?? null
           : null;
       });
     } catch (requestError) {
@@ -779,8 +898,18 @@ export default function App() {
     } finally {
       if (requestId === publicRequestSeq.current) {
         setIsLoadingPublic(false);
+        setIsLoadingMorePublic(false);
       }
     }
+  }
+
+  function handleLoadMoreInterests() {
+    refreshPublicData({
+      query: deferredQuery,
+      category: filters.category,
+      city: filters.city,
+      maxBudget: filters.maxBudget
+    }, true, { append: true }).catch(() => {});
   }
 
   async function refreshCategories() {
@@ -838,6 +967,13 @@ export default function App() {
   }
 
   function handleRealtimeEvent(envelope) {
+    if (envelope?.type === "offer.created") {
+      refreshPrivateData({ silent: true }).then(() => {
+        setMessageSyncKey((current) => current + 1);
+      }).catch(() => {});
+      return;
+    }
+
     if (envelope?.type !== "conversation-message.created" || !envelope.payload) {
       return;
     }
@@ -929,27 +1065,10 @@ export default function App() {
       return undefined;
     }
 
-    let isCancelled = false;
-
-    fetchInterest(sharedInterestIdRef.current)
-      .then((interest) => {
-        if (isCancelled) {
-          return;
-        }
-
-        setHomeMatchFilter(null);
-        updateInterestUrl(interest.id, true);
-        setLoggedSection(loggedSections.EXPLORE);
-        setSelectedInterest(interest);
-        setInterests((current) => (
-          current.some((item) => item.id === interest.id) ? current : [interest, ...current]
-        ));
-      })
-      .catch(() => {});
-
-    return () => {
-      isCancelled = true;
-    };
+    setHomeMatchFilter(null);
+    setLoggedSection(loggedSections.EXPLORE);
+    loadInterestDetail(sharedInterestIdRef.current, { replace: true }).catch(() => {});
+    return undefined;
   }, []);
 
   useEffect(() => {
@@ -1070,6 +1189,27 @@ export default function App() {
 
     const receivedIds = new Set(receivedOffers.map((offer) => offer.id));
     const seenMap = readSeenMessages(currentUser.id);
+    const newOfferEntries = receivedOffers
+      .map((offer) => {
+        const createdAt = new Date(offer.createdAt ?? 0).getTime();
+        const notificationId = `new-offer:${offer.id}`;
+        const lastSeen = Number(seenMap[notificationId] ?? 0);
+        if (!createdAt || createdAt <= lastSeen) {
+          return null;
+        }
+
+        return {
+          id: notificationId,
+          type: "new-offer",
+          offerId: offer.id,
+          section: loggedSections.RECEIVED_OFFERS,
+          title: offer.interestTitle ?? "Nova oferta recebida",
+          message: `${offer.sellerName ?? "Um vendedor"} enviou uma proposta: ${offer.message ?? "sem descrição."}`,
+          createdAt: offer.createdAt
+        };
+      })
+      .filter(Boolean);
+
     const unreadMessageEntries = [...receivedOffers, ...sentOffers]
       .map((offer) => {
         if (!offer.latestMessageAt || offer.latestMessageSenderId === currentUser.id) {
@@ -1123,7 +1263,7 @@ export default function App() {
       })
       .filter(Boolean);
 
-    const unreadEntries = [...unreadMessageEntries, ...sellerItemEntries]
+    const unreadEntries = [...newOfferEntries, ...unreadMessageEntries, ...sellerItemEntries]
       .sort((left, right) => new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime());
 
     setNotifications(unreadEntries);
@@ -1259,6 +1399,21 @@ export default function App() {
     }
   }
 
+  async function handleOfferImageChange(event) {
+    const [file] = event.target.files ?? [];
+    if (!file) {
+      setOfferForm((current) => ({ ...current, offerImageUrl: "" }));
+      return;
+    }
+
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setOfferForm((current) => ({ ...current, offerImageUrl: dataUrl }));
+    } catch (requestError) {
+      openFeedback("error", "Imagem inválida", requestError.message || "Não foi possível usar a imagem.");
+    }
+  }
+
   async function handleInterestSubmit(event) {
     event.preventDefault();
 
@@ -1322,6 +1477,7 @@ export default function App() {
         offeredPrice: offerForm.offeredPrice,
         sellerPhone: offerForm.sellerPhone,
         message: offerForm.message,
+        offerImageUrl: offerForm.offerImageUrl || null,
         includesDelivery: offerForm.includesDelivery,
         highlights: offerForm.highlights
           .split(",")
@@ -1600,6 +1756,15 @@ export default function App() {
 
   async function handleNotificationSelect(notification) {
     setIsNotificationModalVisible(false);
+    if (currentUser?.id && notification.id) {
+      const seenMap = readSeenMessages(currentUser.id);
+      writeSeenMessages(currentUser.id, {
+        ...seenMap,
+        [notification.id]: new Date(notification.createdAt ?? 0).getTime()
+      });
+      setMessageSyncKey((current) => current + 1);
+    }
+
     if (notification.type === "seller-item-match") {
       if (currentUser?.id && notification.id) {
         const seenMap = readSeenMessages(currentUser.id);
@@ -1671,7 +1836,6 @@ export default function App() {
     writeSeenMessages(currentUser.id, nextSeenMap);
     setNotifications([]);
     setHasUnreadMessages(false);
-    setIsNotificationModalVisible(false);
     setMessageSyncKey((current) => current + 1);
   }
 
@@ -1787,23 +1951,39 @@ export default function App() {
                 }
               />
             ) : (
-              <div className="interest-list">
-                {visibleHomeInterests.map((interest) => (
-                  <InterestCard
-                    key={interest.id}
-                    interest={interest}
-                    selected={interest.id === selectedInterest?.id}
-                    onClick={selectPublicInterest}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="interest-list">
+                  {visibleHomeInterests.map((interest) => (
+                    <InterestCard
+                      key={interest.id}
+                      interest={interest}
+                      selected={interest.id === selectedInterest?.id}
+                      onClick={selectPublicInterest}
+                    />
+                  ))}
+                </div>
+                {!homeMatchFilter && hasMoreInterests ? (
+                  <button
+                    type="button"
+                    className="ghost-button load-more-button"
+                    disabled={isLoadingMorePublic}
+                    onClick={handleLoadMoreInterests}
+                  >
+                    {isLoadingMorePublic ? "Carregando..." : "Ver mais"}
+                  </button>
+                ) : null}
+              </>
             )}
           </article>
 
           <aside className="panel panel--sticky">
             <div className="panel__header">
               <div className="panel-title-stack">
-                <span className="eyebrow">Detalhe</span>
+                <span className="eyebrow">
+                  {selectedInterest
+                    ? `O usuário ${firstName(selectedInterest.ownerName)} procura por um(a)`
+                    : "Selecione um interesse"}
+                </span>
                 <h2 className="title-with-badge">
                   {selectedInterest?.title ?? "Selecione um interesse"}
                   {isBoostActive(selectedInterest) ? <BoostRocket /> : null}
@@ -1811,7 +1991,9 @@ export default function App() {
               </div>
             </div>
 
-            {selectedInterest ? (
+            {isLoadingInterestDetail ? (
+              <div className="loading-card">Carregando anúncio...</div>
+            ) : selectedInterest ? (
               <>
                 {selectedInterest.referenceImageUrl ? (
                   <img
@@ -1929,6 +2111,22 @@ export default function App() {
                           }))
                         }
                       />
+                      <div className="media-field">
+                        <label htmlFor="offer-image">Foto do item oferecido</label>
+                        <input
+                          id="offer-image"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleOfferImageChange}
+                        />
+                        {offerForm.offerImageUrl ? (
+                          <img
+                            className="interest-upload-preview"
+                            src={offerForm.offerImageUrl}
+                            alt="Prévia da foto enviada na oferta"
+                          />
+                        ) : null}
+                      </div>
                       <label className="checkbox-row">
                         <input
                           type="checkbox"
@@ -2038,9 +2236,11 @@ export default function App() {
 
   function renderOfferListItem(offer, side = "left", interestImageUrl = null) {
     const isExpanded = Boolean(expandedOffers[offer.id]);
-    const resolvedImageUrl = interestImageUrl ?? offer.referenceImageUrl ?? null;
-    const primaryLabel = side === "right" ? offer.sellerName : offer.interestTitle;
-    const secondaryLabel = side === "right"
+    const resolvedImageUrl = offer.offerImageUrl ?? interestImageUrl ?? offer.referenceImageUrl ?? null;
+    const isIncomingOffer = side === "right" || side === "received";
+    const primaryLabel = isIncomingOffer ? offer.sellerName : offer.interestTitle;
+    const receivedSecondaryLabel = `${currency(offer.offeredPrice)} - ${offer.interestTitle ?? "Interesse"}`;
+    const secondaryLabel = isIncomingOffer
       ? `${currency(offer.offeredPrice)} • ${formatTimestamp(offer.createdAt)}`
       : `${currency(offer.offeredPrice)} • ${offer.sellerName ?? "Sem anunciante"}`;
 
@@ -2069,7 +2269,7 @@ export default function App() {
             <div className="accordion-card__summary-main">
               <div className="accordion-card__copy">
                 <strong>{primaryLabel}</strong>
-                <span>{secondaryLabel}</span>
+                <span>{side === "received" ? receivedSecondaryLabel : secondaryLabel}</span>
               </div>
             </div>
           </div>
@@ -2079,11 +2279,27 @@ export default function App() {
 
         {isExpanded ? (
           <div className="accordion-card__content">
+            {offer.offerImageUrl ? (
+              <img
+                className="offer-card__image"
+                src={offer.offerImageUrl}
+                alt={`Foto enviada por ${offer.sellerName ?? "vendedor"}`}
+                loading="lazy"
+                decoding="async"
+              />
+            ) : null}
             <p>{offer.message || "Sem mensagem informada."}</p>
             <div className="accordion-card__meta">
-              {side === "right" ? <span>{offer.sellerEmail || "Sem e-mail"}</span> : <span>{offer.interestTitle}</span>}
+              {isIncomingOffer ? <span>{offer.sellerEmail || "Sem e-mail"}</span> : <span>{offer.interestTitle}</span>}
               <span>{offer.sellerPhone || formatTimestamp(offer.createdAt)}</span>
             </div>
+            {offer.highlights?.length ? (
+              <div className="tag-cluster tag-cluster--compact">
+                {offer.highlights.map((highlight) => (
+                  <span key={highlight}>{highlight}</span>
+                ))}
+              </div>
+            ) : null}
             <button
               type="button"
               className="ghost-button"
@@ -2374,7 +2590,7 @@ export default function App() {
                     type="button"
                     key={group.item.id}
                     className={group.item.id === selectedItem?.id ? "active" : ""}
-                    onClick={() => setSelectedSellerItemId(group.item.id)}
+                    onClick={() => openSellerItemMatches(group)}
                   >
                     {group.item.referenceImageUrl ? (
                       <img src={group.item.referenceImageUrl} alt={group.item.title} loading="lazy" decoding="async" />
@@ -2382,7 +2598,10 @@ export default function App() {
                       <span>{group.item.title?.charAt(0) ?? "I"}</span>
                     )}
                     <strong>{group.item.title}</strong>
-                    <small>{group.matchCount} interesses</small>
+                    <small className="seller-match-count">
+                      <strong>{group.matchCount}</strong>
+                      <span>possíveis<br />interessados</span>
+                    </small>
                   </button>
                 ))}
               </div>
@@ -2491,7 +2710,7 @@ export default function App() {
     const statCards = [
       {
         key: loggedSections.MY_INTERESTS,
-        label: "Interesses Ativos",
+        label: "Meus Interesses",
         value: dashboard?.totalActiveInterests ?? "...",
         accent: loggedSection === loggedSections.MY_INTERESTS
       },
@@ -2539,7 +2758,7 @@ export default function App() {
             className={loggedSection === loggedSections.MY_INTERESTS ? "active" : ""}
             onClick={() => navigateTo(loggedSections.MY_INTERESTS)}
           >
-            Interesses ativos
+            Meus Interesses
           </button>
           <button
             type="button"
@@ -2751,7 +2970,7 @@ export default function App() {
 
             {receivedOffers.length ? (
               <div className="accordion-list">
-                {receivedOffers.map((offer) => renderOfferListItem(offer, "left"))}
+                {receivedOffers.map((offer) => renderOfferListItem(offer, "received"))}
               </div>
             ) : (
               <EmptyState

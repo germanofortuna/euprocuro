@@ -48,7 +48,7 @@ export default function NotificationModal({
         {notifications.length ? (
           <>
             <button type="button" className="text-button notification-read-all" onClick={onMarkAllRead}>
-              Marcar todas como lida
+              Marcar todas como lidas
             </button>
             <div className="notification-list">
               {notifications.map((notification) => (

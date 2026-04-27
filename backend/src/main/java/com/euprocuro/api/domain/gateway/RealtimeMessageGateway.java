@@ -4,4 +4,6 @@ import com.euprocuro.api.domain.model.ConversationMessage;
 
 public interface RealtimeMessageGateway {
     void publishConversationMessage(String userId, ConversationMessage message);
+
+    void publishOfferCreated(String userId, String offerId);
 }

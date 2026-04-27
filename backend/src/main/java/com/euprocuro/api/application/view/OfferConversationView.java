@@ -19,5 +19,6 @@ public class OfferConversationView {
     String sellerEmail;
     String sellerPhone;
     BigDecimal offeredPrice;
+    String offerImageUrl;
     List<ConversationMessageView> messages;
 }

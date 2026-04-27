@@ -59,6 +59,7 @@ public class ConversationService implements ConversationUseCase {
                 .sellerEmail(offer.getSellerEmail())
                 .sellerPhone(offer.getSellerPhone())
                 .offeredPrice(offer.getOfferedPrice())
+                .offerImageUrl(offer.getOfferImageUrl())
                 .messages(listMessages(currentUserId, offerId))
                 .build();
     }

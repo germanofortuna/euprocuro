@@ -25,8 +25,10 @@ import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
+import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.InterestPost;
+import com.euprocuro.api.domain.model.InterestSearchCriteria;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.Offer;
@@ -44,6 +46,7 @@ public class MarketplaceService implements MarketplaceUseCase {
     private final OfferGateway offerGateway;
     private final EventPublisherGateway eventPublisherGateway;
     private final EmailGateway emailGateway;
+    private final RealtimeMessageGateway realtimeMessageGateway;
 
     @Override
     public InterestPost createInterest(String currentUserId, CreateInterestCommand command) {
@@ -186,6 +189,17 @@ public class MarketplaceService implements MarketplaceUseCase {
     }
 
     @Override
+    public List<InterestPost> listInterests(InterestSearchFilter filter, int offset, int limit) {
+        return interestGateway.search(InterestSearchCriteria.builder()
+                .category(filter.getCategory())
+                .city(filter.getCity())
+                .maxBudget(filter.getMaxBudget())
+                .query(filter.getQuery())
+                .openOnly(filter.isOpenOnly())
+                .build(), Math.max(0, offset), Math.max(1, Math.min(limit, 50)));
+    }
+
+    @Override
     public InterestPost getInterest(String id) {
         return interestGateway.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Interesse nao encontrado."));
@@ -225,6 +239,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .sellerPhone(command.getSellerPhone())
                 .offeredPrice(command.getOfferedPrice())
                 .message(command.getMessage())
+                .offerImageUrl(normalizeReferenceImage(command.getOfferImageUrl()))
                 .includesDelivery(command.isIncludesDelivery())
                 .highlights(Optional.ofNullable(command.getHighlights()).orElse(List.of()))
                 .status(OfferStatus.SENT)
@@ -242,6 +257,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 "ownerId", interestPost.getOwnerId(),
                 "offeredPrice", saved.getOfferedPrice()
         ));
+        realtimeMessageGateway.publishOfferCreated(interestPost.getOwnerId(), saved.getId());
         return saved;
     }
 

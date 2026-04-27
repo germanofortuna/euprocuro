@@ -20,6 +20,8 @@ public interface MarketplaceUseCase {
 
     List<InterestPost> listInterests(InterestSearchFilter filter);
 
+    List<InterestPost> listInterests(InterestSearchFilter filter, int offset, int limit);
+
     InterestPost getInterest(String id);
 
     Offer createOffer(String currentUserId, String interestId, CreateOfferCommand command);

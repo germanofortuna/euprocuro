@@ -30,6 +30,7 @@ import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
+import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
@@ -52,6 +53,8 @@ class MarketplaceServiceTest {
     private EventPublisherGateway eventPublisherGateway;
     @Mock
     private EmailGateway emailGateway;
+    @Mock
+    private RealtimeMessageGateway realtimeMessageGateway;
 
     @InjectMocks
     private MarketplaceService marketplaceService;

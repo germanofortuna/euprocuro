@@ -12,6 +12,7 @@ public class CreateOfferCommand {
     BigDecimal offeredPrice;
     String sellerPhone;
     String message;
+    String offerImageUrl;
     boolean includesDelivery;
     List<String> highlights;
 }

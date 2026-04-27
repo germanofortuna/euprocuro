@@ -84,6 +84,15 @@ export default function OfferConversationModal({ modal, currentUserId, onClose, 
               </div>
               <div className="hero-card">
                 <strong>Oferta</strong>
+                {modal.data?.offerImageUrl ? (
+                  <img
+                    className="offer-card__image"
+                    src={modal.data.offerImageUrl}
+                    alt="Foto enviada na oferta"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : null}
                 <p>{currency(modal.data?.offeredPrice)}</p>
                 <p>Comprador: {modal.data?.buyerName}</p>
               </div>

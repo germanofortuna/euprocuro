@@ -120,6 +120,7 @@ public class SellerItemService implements SellerItemUseCase {
                 .offeredPrice(command.getOfferedPrice() != null ? command.getOfferedPrice() : item.getDesiredPrice())
                 .sellerPhone(command.getSellerPhone())
                 .message(buildMessage(item, command.getMessage()))
+                .offerImageUrl(item.getReferenceImageUrl())
                 .includesDelivery(command.isIncludesDelivery())
                 .highlights(item.getTags())
                 .build();

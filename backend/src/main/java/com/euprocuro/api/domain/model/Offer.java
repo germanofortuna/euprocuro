@@ -22,6 +22,7 @@ public class Offer {
     private String sellerPhone;
     private BigDecimal offeredPrice;
     private String message;
+    private String offerImageUrl;
     private boolean includesDelivery;
     private List<String> highlights;
     private OfferStatus status;

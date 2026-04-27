@@ -1,6 +1,7 @@
 package com.euprocuro.api.infrastructure.realtime;
 
 import java.time.Instant;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +19,7 @@ public class WebSocketRealtimeMessageGatewayAdapter implements RealtimeMessageGa
 
     private static final Logger LOGGER = LoggerFactory.getLogger(WebSocketRealtimeMessageGatewayAdapter.class);
     private static final String CONVERSATION_MESSAGE_CREATED = "conversation-message.created";
+    private static final String OFFER_CREATED = "offer.created";
 
     private final ChatWebSocketSessionRegistry sessionRegistry;
     private final ObjectMapper objectMapper;
@@ -34,6 +36,21 @@ public class WebSocketRealtimeMessageGatewayAdapter implements RealtimeMessageGa
             sessionRegistry.sendToUser(userId, objectMapper.writeValueAsString(envelope));
         } catch (Exception exception) {
             LOGGER.warn("Nao foi possivel enviar mensagem em tempo real para usuario '{}'.", userId);
+        }
+    }
+
+    @Override
+    public void publishOfferCreated(String userId, String offerId) {
+        try {
+            RealtimeEventEnvelope envelope = RealtimeEventEnvelope.builder()
+                    .type(OFFER_CREATED)
+                    .createdAt(Instant.now())
+                    .payload(Map.of("offerId", offerId))
+                    .build();
+
+            sessionRegistry.sendToUser(userId, objectMapper.writeValueAsString(envelope));
+        } catch (Exception exception) {
+            LOGGER.warn("Nao foi possivel enviar oferta em tempo real para usuario '{}'.", userId);
         }
     }
 }
