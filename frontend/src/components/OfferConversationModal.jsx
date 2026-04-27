@@ -33,7 +33,7 @@ const ConversationThread = memo(function ConversationThread({ messages, currentU
     return (
       <EmptyState
         title="Ainda sem mensagens"
-        description="Use o chat abaixo para alinhar detalhes da negociaÃ§Ã£o dentro da plataforma."
+        description="Use o chat abaixo para alinhar detalhes da negociação dentro da plataforma."
       />
     );
   }
