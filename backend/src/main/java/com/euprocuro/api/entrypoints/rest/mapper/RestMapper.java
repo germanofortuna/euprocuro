@@ -72,6 +72,7 @@ public final class RestMapper {
         return RegisterUserCommand.builder()
                 .name(request.getName())
                 .email(request.getEmail())
+                .documentNumber(request.getDocumentNumber())
                 .password(request.getPassword())
                 .city(request.getCity())
                 .state(request.getState())

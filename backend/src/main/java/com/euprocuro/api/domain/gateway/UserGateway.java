@@ -14,5 +14,7 @@ public interface UserGateway {
 
     Optional<UserProfile> findByEmail(String email);
 
+    Optional<UserProfile> findByDocumentNumber(String documentNumber);
+
     long count();
 }

@@ -4,8 +4,10 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +40,15 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthService implements AuthUseCase {
 
+    private static final Set<String> DISPOSABLE_EMAIL_DOMAINS = Set.of(
+            "10minutemail.com",
+            "guerrillamail.com",
+            "mailinator.com",
+            "tempmail.com",
+            "temp-mail.org",
+            "yopmail.com"
+    );
+
     private final UserGateway userGateway;
     private final AuthSessionGateway authSessionGateway;
     private final PasswordResetTokenGateway passwordResetTokenGateway;
@@ -59,18 +70,31 @@ public class AuthService implements AuthUseCase {
 
     @Override
     public AuthenticatedSessionView register(RegisterUserCommand command) {
+        String normalizedName = normalizeName(command.getName());
+        String normalizedEmail = normalizeEmail(command.getEmail());
+        String normalizedDocument = normalizeDocument(command.getDocumentNumber());
+        String documentType = documentType(normalizedDocument);
+
+        validateName(normalizedName);
+        validateEmail(normalizedEmail);
+        validateDocument(normalizedDocument);
         validatePassword(command.getPassword());
 
-        userGateway.findByEmail(command.getEmail()).ifPresent(existing -> {
+        userGateway.findByEmail(normalizedEmail).ifPresent(existing -> {
             throw new BusinessException("Ja existe usuario com este e-mail.");
+        });
+        userGateway.findByDocumentNumber(normalizedDocument).ifPresent(existing -> {
+            throw new BusinessException("Ja existe usuario com este CPF/CNPJ.");
         });
 
         UserProfile user = userGateway.save(UserProfile.builder()
-                .name(command.getName())
-                .email(command.getEmail().trim().toLowerCase())
+                .name(normalizedName)
+                .email(normalizedEmail)
+                .documentNumber(normalizedDocument)
+                .documentType(documentType)
                 .passwordHash(passwordEncoder.encode(command.getPassword()))
-                .city(command.getCity())
-                .state(command.getState())
+                .city(normalizeText(command.getCity()))
+                .state(normalizeState(command.getState()))
                 .bio(Optional.ofNullable(command.getBio()).orElse(""))
                 .buyerRating(4.8)
                 .sellerRating(4.8)
@@ -240,10 +264,111 @@ public class AuthService implements AuthUseCase {
         return session;
     }
 
-    private void validatePassword(String password) {
-        if (!StringUtils.hasText(password) || password.trim().length() < 6) {
-            throw new BusinessException("A senha deve ter pelo menos 6 caracteres.");
+    private void validateName(String name) {
+        if (!StringUtils.hasText(name) || name.length() < 5 || name.split("\\s+").length < 2) {
+            throw new BusinessException("Informe nome e sobrenome para criar a conta.");
         }
+    }
+
+    private void validateEmail(String email) {
+        int atIndex = email.indexOf("@");
+        if (atIndex <= 0 || atIndex == email.length() - 1) {
+            throw new BusinessException("Informe um e-mail valido.");
+        }
+
+        String domain = email.substring(atIndex + 1);
+        if (DISPOSABLE_EMAIL_DOMAINS.contains(domain)) {
+            throw new BusinessException("Use um e-mail permanente para criar a conta.");
+        }
+    }
+
+    private void validateDocument(String documentNumber) {
+        boolean valid = documentNumber.length() == 11
+                ? isValidCpf(documentNumber)
+                : documentNumber.length() == 14 && isValidCnpj(documentNumber);
+
+        if (!valid) {
+            throw new BusinessException("Informe um CPF ou CNPJ valido.");
+        }
+    }
+
+    private void validatePassword(String password) {
+        String value = Optional.ofNullable(password).orElse("");
+        if (value.length() < 8 || !value.matches(".*[A-Za-z].*") || !value.matches(".*\\d.*")) {
+            throw new BusinessException("A senha deve ter pelo menos 8 caracteres, com letras e numeros.");
+        }
+    }
+
+    private String normalizeName(String value) {
+        return normalizeText(value).replaceAll("\\s+", " ");
+    }
+
+    private String normalizeEmail(String value) {
+        return normalizeText(value).toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeText(String value) {
+        return Optional.ofNullable(value).orElse("").trim();
+    }
+
+    private String normalizeState(String value) {
+        String state = normalizeText(value).toUpperCase(Locale.ROOT);
+        if (state.length() > 2) {
+            throw new BusinessException("Informe a UF com 2 letras.");
+        }
+        return state;
+    }
+
+    private String normalizeDocument(String value) {
+        return Optional.ofNullable(value).orElse("").replaceAll("\\D", "");
+    }
+
+    private String documentType(String documentNumber) {
+        return documentNumber.length() == 11 ? "CPF" : "CNPJ";
+    }
+
+    private boolean isValidCpf(String documentNumber) {
+        if (hasAllSameDigits(documentNumber)) {
+            return false;
+        }
+
+        int firstDigit = calculateCpfDigit(documentNumber, 9);
+        int secondDigit = calculateCpfDigit(documentNumber, 10);
+        return firstDigit == Character.getNumericValue(documentNumber.charAt(9))
+                && secondDigit == Character.getNumericValue(documentNumber.charAt(10));
+    }
+
+    private int calculateCpfDigit(String documentNumber, int length) {
+        int sum = 0;
+        for (int index = 0; index < length; index++) {
+            sum += Character.getNumericValue(documentNumber.charAt(index)) * (length + 1 - index);
+        }
+        int remainder = (sum * 10) % 11;
+        return remainder == 10 ? 0 : remainder;
+    }
+
+    private boolean isValidCnpj(String documentNumber) {
+        if (hasAllSameDigits(documentNumber)) {
+            return false;
+        }
+
+        int firstDigit = calculateCnpjDigit(documentNumber, new int[] {5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2});
+        int secondDigit = calculateCnpjDigit(documentNumber, new int[] {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2});
+        return firstDigit == Character.getNumericValue(documentNumber.charAt(12))
+                && secondDigit == Character.getNumericValue(documentNumber.charAt(13));
+    }
+
+    private int calculateCnpjDigit(String documentNumber, int[] weights) {
+        int sum = 0;
+        for (int index = 0; index < weights.length; index++) {
+            sum += Character.getNumericValue(documentNumber.charAt(index)) * weights[index];
+        }
+        int remainder = sum % 11;
+        return remainder < 2 ? 0 : 11 - remainder;
+    }
+
+    private boolean hasAllSameDigits(String documentNumber) {
+        return documentNumber.chars().distinct().count() == 1;
     }
 
     private String buildResetLink(String token) {

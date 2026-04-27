@@ -116,8 +116,15 @@ export default function AuthModal({
               required
             />
             <input
+              placeholder="CPF ou CNPJ"
+              value={registerForm.documentNumber}
+              onChange={(event) => handleChange(onRegisterChange, "documentNumber", event.target.value)}
+              maxLength={18}
+              required
+            />
+            <input
               type="password"
-              placeholder="Senha com ao menos 6 caracteres"
+              placeholder="Senha com letras e números"
               value={registerForm.password}
               onChange={(event) => handleChange(onRegisterChange, "password", event.target.value)}
               required

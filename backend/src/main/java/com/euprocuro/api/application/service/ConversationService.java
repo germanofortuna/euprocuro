@@ -1,9 +1,11 @@
 package com.euprocuro.api.application.service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -60,7 +62,7 @@ public class ConversationService implements ConversationUseCase {
                 .sellerPhone(offer.getSellerPhone())
                 .offeredPrice(offer.getOfferedPrice())
                 .offerImageUrl(offer.getOfferImageUrl())
-                .messages(listMessages(currentUserId, offerId))
+                .messages(buildConversationMessages(currentUserId, offer, interest))
                 .build();
     }
 
@@ -117,6 +119,30 @@ public class ConversationService implements ConversationUseCase {
                 .stream()
                 .map(this::toView)
                 .collect(Collectors.toList());
+    }
+
+    private List<ConversationMessageView> buildConversationMessages(String currentUserId, Offer offer, InterestPost interest) {
+        List<ConversationMessageView> messages = new ArrayList<>();
+        initialOfferMessage(offer, interest).ifPresent(messages::add);
+        messages.addAll(listMessages(currentUserId, offer.getId()));
+        return messages;
+    }
+
+    private Optional<ConversationMessageView> initialOfferMessage(Offer offer, InterestPost interest) {
+        if (!StringUtils.hasText(offer.getMessage())) {
+            return Optional.empty();
+        }
+
+        return Optional.of(ConversationMessageView.builder()
+                .id("offer-initial-" + offer.getId())
+                .offerId(offer.getId())
+                .senderId(offer.getSellerId())
+                .senderName(offer.getSellerName())
+                .recipientId(interest.getOwnerId())
+                .recipientName(interest.getOwnerName())
+                .content(offer.getMessage().trim())
+                .createdAt(offer.getCreatedAt())
+                .build());
     }
 
     private Offer requireOfferParticipant(String currentUserId, String offerId) {

@@ -97,6 +97,7 @@ const initialLoginForm = {
 const initialRegisterForm = {
   name: "",
   email: "",
+  documentNumber: "",
   password: "",
   city: "",
   state: "",
@@ -1990,10 +1991,14 @@ export default function App() {
           <aside className="panel panel--sticky">
             <div className="panel__header">
               <div className="panel-title-stack">
-                <span className="eyebrow">
-                  {selectedInterest
-                    ? `O usuário ${firstName(selectedInterest.ownerName)} procura por um(a)`
-                    : "Selecione um interesse"}
+                <span className="eyebrow detail-owner-line">
+                  {selectedInterest ? (
+                    <>
+                      <span>O usuário</span>
+                      <strong>{firstName(selectedInterest.ownerName)}</strong>
+                      <span>procura por um(a)</span>
+                    </>
+                  ) : "Selecione um interesse"}
                 </span>
                 <h2 className="title-with-badge">
                   {selectedInterest?.title ?? "Selecione um interesse"}
@@ -2703,7 +2708,7 @@ export default function App() {
                       group.item.id === selectedItem?.id ? "active" : "",
                       !group.item.active ? "seller-item-tab--inactive" : ""
                     ].filter(Boolean).join(" ")}
-                    onClick={() => openSellerItemMatches(group)}
+                    onClick={() => setSelectedSellerItemId(group.item.id)}
                   >
                     {group.item.referenceImageUrl ? (
                       <img src={group.item.referenceImageUrl} alt={group.item.title} loading="lazy" decoding="async" />
@@ -2714,7 +2719,13 @@ export default function App() {
                       <strong>{group.item.title}</strong>
                       {!group.item.active ? <em>Desativado</em> : null}
                     </span>
-                    <small className="seller-match-count">
+                    <small
+                      className="seller-match-count"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openSellerItemMatches(group);
+                      }}
+                    >
                       <strong>{group.matchCount}</strong>
                       <span>possíveis<br />interessados</span>
                     </small>

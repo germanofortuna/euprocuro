@@ -60,7 +60,7 @@ class ConversationServiceTest {
     private ConversationService conversationService;
 
     @Test
-    void getOfferConversationShouldReturnMessagesForParticipant() {
+    void getOfferConversationShouldReturnInitialOfferMessageBeforeChatMessages() {
         Offer offer = baseOffer();
         InterestPost interest = baseInterest();
         ConversationMessage message = baseMessage();
@@ -73,8 +73,11 @@ class ConversationServiceTest {
 
         assertThat(result.getInterestTitle()).isEqualTo("Quero um violao");
         assertThat(result.getSellerEmail()).isEqualTo("carlos@teste.com");
-        assertThat(result.getMessages()).hasSize(1);
-        assertThat(result.getMessages().get(0).getContent()).isEqualTo("Ainda está disponível?");
+        assertThat(result.getMessages()).hasSize(2);
+        assertThat(result.getMessages().get(0).getId()).isEqualTo("offer-initial-offer-1");
+        assertThat(result.getMessages().get(0).getContent()).isEqualTo("Tenho um violao em otimo estado.");
+        assertThat(result.getMessages().get(0).getSenderId()).isEqualTo("seller-1");
+        assertThat(result.getMessages().get(1).getContent()).isEqualTo("Ainda está disponível?");
     }
 
     @Test
@@ -170,6 +173,7 @@ class ConversationServiceTest {
                 .sellerName("Carlos")
                 .sellerEmail("carlos@teste.com")
                 .sellerPhone("11999999999")
+                .message(" Tenho um violao em otimo estado. ")
                 .createdAt(Instant.now().minus(1, ChronoUnit.HOURS))
                 .build();
     }

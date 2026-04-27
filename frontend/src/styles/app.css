@@ -270,6 +270,17 @@ img {
   color: #0d8a4a;
 }
 
+.credits-badge--empty {
+  border-color: rgba(190, 18, 60, 0.24);
+  background: rgba(255, 237, 242, 0.95);
+  color: #b4233b;
+  box-shadow: 0 10px 24px rgba(190, 18, 60, 0.08);
+}
+
+.credits-badge--empty strong {
+  color: #b4233b;
+}
+
 .credits-badge span {
   font-size: 0.68rem;
   font-weight: 700;
@@ -283,6 +294,12 @@ img {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--accent-strong);
+}
+
+.detail-owner-line {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35em;
 }
 
 .hero,
@@ -1409,6 +1426,7 @@ textarea:focus {
   gap: 8px;
   justify-self: end;
   line-height: 1.05;
+  cursor: pointer;
 }
 
 .seller-match-count strong {

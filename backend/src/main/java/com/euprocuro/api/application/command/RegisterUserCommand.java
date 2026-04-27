@@ -8,6 +8,7 @@ import lombok.Value;
 public class RegisterUserCommand {
     String name;
     String email;
+    String documentNumber;
     String password;
     String city;
     String state;

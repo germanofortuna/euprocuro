@@ -22,6 +22,7 @@ export default function Header({
   onLogout
 }) {
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? "";
+  const hasNoCredits = !subscriptionActive && (sellerCredits ?? 0) <= 0;
 
   return (
     <header className="topbar">
@@ -50,7 +51,7 @@ export default function Header({
 
           <button
             type="button"
-            className="credits-badge"
+            className={`credits-badge ${hasNoCredits ? "credits-badge--empty" : ""}`}
             onClick={onCreditsClick}
             title="Ver créditos e pagamentos"
           >

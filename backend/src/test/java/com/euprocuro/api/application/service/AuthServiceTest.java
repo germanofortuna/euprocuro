@@ -69,16 +69,18 @@ class AuthServiceTest {
     @Test
     void registerShouldCreateEncodedUserAndSession() {
         RegisterUserCommand command = RegisterUserCommand.builder()
-                .name("Ana")
+                .name("Ana Silva")
                 .email("ana@teste.com")
-                .password("123456")
+                .documentNumber("529.982.247-25")
+                .password("Senha123")
                 .city("Sao Paulo")
                 .state("SP")
                 .bio("Compradora")
                 .build();
 
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("123456")).thenReturn("senha-hash");
+        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Senha123")).thenReturn("senha-hash");
         when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
             UserProfile user = invocation.getArgument(0);
             user.setId("user-1");
@@ -90,6 +92,8 @@ class AuthServiceTest {
 
         assertThat(result.getUser().getId()).isEqualTo("user-1");
         assertThat(result.getUser().getEmail()).isEqualTo("ana@teste.com");
+        assertThat(result.getUser().getDocumentNumber()).isEqualTo("52998224725");
+        assertThat(result.getUser().getDocumentType()).isEqualTo("CPF");
         assertThat(result.getToken()).isNotBlank();
         assertThat(result.getExpiresAt()).isAfter(Instant.now());
         verify(eventPublisherGateway).publish(eq("user.registered"), any(Map.class));
@@ -98,12 +102,13 @@ class AuthServiceTest {
     @Test
     void registerShouldRejectWeakPassword() {
         assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
-                .name("Ana")
+                .name("Ana Silva")
                 .email("ana@teste.com")
+                .documentNumber("52998224725")
                 .password("123")
                 .build()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("6 caracteres");
+                .hasMessageContaining("8 caracteres");
     }
 
     @Test
@@ -111,12 +116,64 @@ class AuthServiceTest {
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(baseUser()));
 
         assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
-                .name("Ana")
+                .name("Ana Silva")
                 .email("ana@teste.com")
-                .password("123456")
+                .documentNumber("52998224725")
+                .password("Senha123")
                 .build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Ja existe usuario");
+    }
+
+    @Test
+    void registerShouldRejectDuplicateDocument() {
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
+        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.of(baseUser()));
+
+        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
+                .name("Ana Silva")
+                .email("ana@teste.com")
+                .documentNumber("529.982.247-25")
+                .password("Senha123")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("CPF/CNPJ");
+    }
+
+    @Test
+    void registerShouldRejectInvalidDocument() {
+        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
+                .name("Ana Silva")
+                .email("ana@teste.com")
+                .documentNumber("111.111.111-11")
+                .password("Senha123")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("CPF ou CNPJ valido");
+    }
+
+    @Test
+    void registerShouldRejectDisposableEmail() {
+        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
+                .name("Ana Silva")
+                .email("ana@mailinator.com")
+                .documentNumber("52998224725")
+                .password("Senha123")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("e-mail permanente");
+    }
+
+    @Test
+    void registerShouldRejectIncompleteName() {
+        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
+                .name("Ana")
+                .email("ana@teste.com")
+                .documentNumber("52998224725")
+                .password("Senha123")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("nome e sobrenome");
     }
 
     @Test
@@ -268,14 +325,14 @@ class AuthServiceTest {
 
         when(passwordResetTokenGateway.findByToken("reset-123")).thenReturn(Optional.of(resetToken));
         when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
-        when(passwordEncoder.encode("nova123")).thenReturn("nova-hash");
+        when(passwordEncoder.encode("nova1234")).thenReturn("nova-hash");
         when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(passwordResetTokenGateway.save(any(PasswordResetToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         authService.resetPassword(ResetPasswordCommand.builder()
                 .token("reset-123")
-                .newPassword("nova123")
-                .confirmPassword("nova123")
+                .newPassword("nova1234")
+                .confirmPassword("nova1234")
                 .build());
 
         ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
@@ -300,8 +357,8 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.resetPassword(ResetPasswordCommand.builder()
                 .token("reset-123")
-                .newPassword("nova123")
-                .confirmPassword("nova123")
+                .newPassword("nova1234")
+                .confirmPassword("nova1234")
                 .build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("expirou");
@@ -311,7 +368,7 @@ class AuthServiceTest {
     void resetPasswordShouldRejectMismatchedConfirmation() {
         assertThatThrownBy(() -> authService.resetPassword(ResetPasswordCommand.builder()
                 .token("reset-123")
-                .newPassword("nova123")
+                .newPassword("nova1234")
                 .confirmPassword("outra123")
                 .build()))
                 .isInstanceOf(BusinessException.class)
@@ -331,8 +388,8 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.resetPassword(ResetPasswordCommand.builder()
                 .token("reset-123")
-                .newPassword("nova123")
-                .confirmPassword("nova123")
+                .newPassword("nova1234")
+                .confirmPassword("nova1234")
                 .build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("ja foi utilizado");
@@ -341,8 +398,10 @@ class AuthServiceTest {
     private UserProfile baseUser() {
         return UserProfile.builder()
                 .id("user-1")
-                .name("Ana")
+                .name("Ana Silva")
                 .email("ana@teste.com")
+                .documentNumber("52998224725")
+                .documentType("CPF")
                 .passwordHash("hash")
                 .city("Sao Paulo")
                 .state("SP")

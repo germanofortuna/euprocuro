@@ -15,6 +15,8 @@ public class UserProfile {
     private String id;
     private String name;
     private String email;
+    private String documentNumber;
+    private String documentType;
     private String passwordHash;
     private String city;
     private String state;

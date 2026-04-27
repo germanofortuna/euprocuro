@@ -43,6 +43,11 @@ public class UserGatewayAdapter implements UserGateway {
     }
 
     @Override
+    public Optional<UserProfile> findByDocumentNumber(String documentNumber) {
+        return repository.findByDocumentNumber(documentNumber).map(UserPersistenceMapper::toDomain);
+    }
+
+    @Override
     public long count() {
         return repository.count();
     }
