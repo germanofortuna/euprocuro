@@ -2452,6 +2452,7 @@ export default function App() {
     const sellerCredits = monetizationAccount?.sellerCredits ?? 0;
     const purchasedCreditsTotal = monetizationAccount?.purchasedCreditsTotal ?? 0;
     const hasPurchasedCredits = purchasedCreditsTotal > 0;
+    const hasNoCredits = !monetizationAccount?.subscriptionActive && sellerCredits <= 0;
 
     return (
       <section className="panel panel--spaced credits-page">
@@ -2465,7 +2466,7 @@ export default function App() {
           </button>
         </div>
 
-        <div className="credits-summary">
+        <div className={`credits-summary ${hasNoCredits ? "credits-summary--empty" : ""}`}>
           <div>
             <span>Saldo atual</span>
             <strong>{monetizationAccount?.subscriptionActive ? "Plano Pro ativo" : `${sellerCredits} créditos`}</strong>

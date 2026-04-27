@@ -100,6 +100,37 @@ class AuthServiceTest {
     }
 
     @Test
+    void registerShouldAcceptValidCnpj() {
+        RegisterUserCommand command = RegisterUserCommand.builder()
+                .name("Loja Teste")
+                .email("loja@teste.com")
+                .documentNumber("11.222.333/0001-81")
+                .password("Senha123")
+                .city("Erechim")
+                .state("rs")
+                .build();
+
+        when(userGateway.findByEmail("loja@teste.com")).thenReturn(Optional.empty());
+        when(userGateway.findByDocumentNumber("11222333000181")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Senha123")).thenReturn("senha-hash");
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
+            UserProfile user = invocation.getArgument(0);
+            user.setId("user-cnpj");
+            return user;
+        });
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthenticatedSessionView result = authService.register(command);
+
+        assertThat(result.getUser().getId()).isEqualTo("user-cnpj");
+        assertThat(result.getUser().getDocumentNumber()).isEqualTo("11222333000181");
+        assertThat(result.getUser().getDocumentType()).isEqualTo("CNPJ");
+        assertThat(result.getUser().getState()).isEqualTo("RS");
+        assertThat(result.getToken()).isNotBlank();
+        verify(eventPublisherGateway).publish(eq("user.registered"), any(Map.class));
+    }
+
+    @Test
     void registerShouldRejectWeakPassword() {
         assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
                 .name("Ana Silva")

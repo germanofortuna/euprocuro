@@ -650,6 +650,15 @@ textarea:focus {
   font-size: 1.8rem;
 }
 
+.credits-summary--empty {
+  border-color: rgba(190, 18, 60, 0.2);
+  background: linear-gradient(135deg, rgba(255, 237, 242, 0.94), rgba(255, 255, 255, 0.92));
+}
+
+.credits-summary--empty strong {
+  color: #b4233b;
+}
+
 .purchase-grid {
   display: grid;
   grid-template-columns: 1.2fr 0.8fr;
