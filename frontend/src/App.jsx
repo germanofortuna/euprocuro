@@ -11,6 +11,7 @@ import {
   deactivateSellerItem,
   deleteInterest,
   fetchCategories,
+  fetchInterest,
   fetchDashboard,
   fetchInterests,
   fetchMe,
@@ -149,6 +150,11 @@ function createResetStateFromLocation() {
   };
 }
 
+function createInitialSharedInterestId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("interest") ?? "";
+}
+
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) {
@@ -275,6 +281,63 @@ function BoostRocket() {
   return <span className="boost-rocket" aria-label="Interesse impulsionado" title="Interesse impulsionado">🚀</span>;
 }
 
+function WhatsAppIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M7.1 19.4 3.6 20.4 4.6 17A8.7 8.7 0 1 1 7.1 19.4Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8.6 8.1c.2-.4.4-.4.7-.4h.5c.2 0 .4.1.5.4l.8 1.8c.1.3.1.5-.1.7l-.5.6c.8 1.4 1.9 2.5 3.4 3.2l.6-.7c.2-.2.4-.3.7-.2l1.8.8c.3.1.4.3.4.6v.5c0 .3-.1.6-.4.8-.5.4-1.2.6-1.9.5-3.5-.5-6.3-3.2-6.8-6.7-.1-.7.1-1.4.3-1.9Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M4.8 4.5h4.5l3.5 4.8 4.1-4.8h2.3l-5.3 6.2 5.8 8.8h-4.5l-3.9-5.6-4.8 5.6H4.2l6-7L4.8 4.5Zm3.4 1.8 7.9 11.4h1.3L9.5 6.3H8.2Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M9.4 14.6 14.6 9.4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M10.6 7.2 12 5.8a4 4 0 0 1 5.7 5.7l-1.9 1.9a4 4 0 0 1-5.7 0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M13.4 16.8 12 18.2a4 4 0 0 1-5.7-5.7l1.9-1.9a4 4 0 0 1 5.7 0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function readSeenMessages(userId) {
   if (!userId) {
     return {};
@@ -318,6 +381,8 @@ function useDebouncedValue(value, delayMs) {
 
 export default function App() {
   const initialResetState = useMemo(() => createResetStateFromLocation(), []);
+  const initialSharedInterestId = useMemo(() => createInitialSharedInterestId(), []);
+  const sharedInterestIdRef = useRef(initialSharedInterestId);
   const notificationButtonRef = useRef(null);
   const publicRequestSeq = useRef(0);
   const realtimeHandlerRef = useRef(null);
@@ -428,6 +493,112 @@ export default function App() {
     setFeedbackModal({ type, title, message });
   }
 
+  function updateInterestUrl(interestId, replace = false) {
+    const url = new URL(window.location.href);
+
+    if (interestId) {
+      url.searchParams.delete("mode");
+      url.searchParams.delete("token");
+      url.searchParams.set("interest", interestId);
+    } else {
+      url.searchParams.delete("interest");
+    }
+
+    sharedInterestIdRef.current = interestId ?? "";
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    window.history[replace ? "replaceState" : "pushState"]({}, "", nextUrl);
+  }
+
+  function selectPublicInterest(interest, options = {}) {
+    setSelectedInterest(interest);
+    updateInterestUrl(interest.id, Boolean(options.replace));
+    setLoggedSection(loggedSections.EXPLORE);
+  }
+
+  function buildInterestShareUrl(interest) {
+    const url = new URL(`${window.location.origin}${window.location.pathname}`);
+    url.searchParams.set("interest", interest.id);
+    return url.toString();
+  }
+
+  function buildInterestShareText(interest) {
+    return `Olha esse interesse no Eu Procuro: ${interest.title} - ${buildInterestShareUrl(interest)}`;
+  }
+
+  function buildWhatsAppShareUrl(interest) {
+    return `https://wa.me/?text=${encodeURIComponent(buildInterestShareText(interest))}`;
+  }
+
+  function buildXShareUrl(interest) {
+    const url = new URL("https://twitter.com/intent/tweet");
+    url.searchParams.set("text", `Olha esse interesse no Eu Procuro: ${interest.title}`);
+    url.searchParams.set("url", buildInterestShareUrl(interest));
+    return url.toString();
+  }
+
+  async function copyInterestLinkToClipboard(interest) {
+    const url = buildInterestShareUrl(interest);
+
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(url);
+      return;
+    }
+
+    window.prompt("Copie o link do interesse:", url);
+  }
+
+  async function handleCopyInterestLink(interest) {
+    try {
+      await copyInterestLinkToClipboard(interest);
+      openFeedback("success", "Link copiado", "Agora você pode compartilhar esse interesse.");
+    } catch (error) {
+      window.prompt("Copie o link do interesse:", buildInterestShareUrl(interest));
+    }
+  }
+
+  function renderInterestShareActions(interest) {
+    if (!interest?.id) {
+      return null;
+    }
+
+    return (
+      <div className="share-card">
+        <div>
+          <span className="eyebrow">Compartilhar</span>
+          <strong>Envie este interesse para alguém</strong>
+        </div>
+        <div className="share-card__actions">
+          <a
+            className="share-button share-button--whatsapp"
+            href={buildWhatsAppShareUrl(interest)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Compartilhar no WhatsApp"
+          >
+            <WhatsAppIcon />
+          </a>
+          <a
+            className="share-button share-button--x"
+            href={buildXShareUrl(interest)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Compartilhar no X"
+          >
+            <XIcon />
+          </a>
+          <button
+            type="button"
+            className="share-button share-button--link"
+            onClick={() => handleCopyInterestLink(interest)}
+          >
+            <LinkIcon />
+            Copiar link
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   function openAuthModal(mode) {
     setAuthMode(mode);
     setIsAuthModalVisible(true);
@@ -435,14 +606,16 @@ export default function App() {
 
   function updateHomeFilters(updater) {
     setHomeMatchFilter(null);
+    updateInterestUrl(null, true);
     setFilters(updater);
   }
 
   function clearHomeMatchFilter() {
     setHomeMatchFilter(null);
+    updateInterestUrl(null, true);
     const nextVisibleInterests = interests.filter((interest) => !currentUser?.id || interest.ownerId !== currentUser.id);
     setSelectedInterest((current) =>
-      nextVisibleInterests.find((interest) => interest.id === current?.id) ?? nextVisibleInterests[0] ?? null
+      nextVisibleInterests.find((interest) => interest.id === current?.id) ?? null
     );
   }
 
@@ -451,7 +624,7 @@ export default function App() {
 
     if (section === loggedSections.EXPLORE) {
       setSelectedInterest((current) =>
-        visibleHomeInterests.find((interest) => interest.id === current?.id) ?? visibleHomeInterests[0] ?? null
+        visibleHomeInterests.find((interest) => interest.id === current?.id) ?? current ?? null
       );
     }
 
@@ -583,10 +756,21 @@ export default function App() {
       setInterests(interestData);
       setSelectedInterest((currentSelected) => {
         if (preserveSelection && currentSelected) {
-          return interestData.find((interest) => interest.id === currentSelected.id) ?? interestData[0] ?? null;
+          const refreshedSelection = interestData.find((interest) => interest.id === currentSelected.id);
+          if (refreshedSelection) {
+            return refreshedSelection;
+          }
+
+          if (sharedInterestIdRef.current === currentSelected.id) {
+            return currentSelected;
+          }
+
+          return null;
         }
 
-        return interestData[0] ?? null;
+        return sharedInterestIdRef.current
+          ? interestData.find((interest) => interest.id === sharedInterestIdRef.current) ?? currentSelected ?? null
+          : null;
       });
     } catch (requestError) {
       if (requestId === publicRequestSeq.current) {
@@ -741,6 +925,34 @@ export default function App() {
   }, [deferredQuery, filters.category, filters.city, filters.maxBudget]);
 
   useEffect(() => {
+    if (!sharedInterestIdRef.current) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+
+    fetchInterest(sharedInterestIdRef.current)
+      .then((interest) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setHomeMatchFilter(null);
+        updateInterestUrl(interest.id, true);
+        setLoggedSection(loggedSections.EXPLORE);
+        setSelectedInterest(interest);
+        setInterests((current) => (
+          current.some((item) => item.id === interest.id) ? current : [interest, ...current]
+        ));
+      })
+      .catch(() => {});
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!session) {
       setIsLoadingPrivate(false);
       setDashboard(null);
@@ -841,7 +1053,11 @@ export default function App() {
         return current;
       }
 
-      return visibleHomeInterests[0] ?? null;
+      if (current && sharedInterestIdRef.current === current.id) {
+        return current;
+      }
+
+      return null;
     });
   }, [loggedSection, visibleHomeInterests]);
 
@@ -1577,7 +1793,7 @@ export default function App() {
                     key={interest.id}
                     interest={interest}
                     selected={interest.id === selectedInterest?.id}
-                    onClick={setSelectedInterest}
+                    onClick={selectPublicInterest}
                   />
                 ))}
               </div>
@@ -1648,6 +1864,8 @@ export default function App() {
                     <span key={tag}>{tag}</span>
                   ))}
                 </div>
+
+                {renderInterestShareActions(selectedInterest)}
 
                 {session ? (
                   isSelectedInterestMine ? (
@@ -2404,6 +2622,8 @@ export default function App() {
                   ) : null}
 
                   <p className="detail-description">{selectedInterest.description}</p>
+
+                  {renderInterestShareActions(selectedInterest)}
 
                   <div className="inline-actions inline-actions--interest-actions">
                     <button

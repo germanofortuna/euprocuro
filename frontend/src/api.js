@@ -206,6 +206,10 @@ export async function fetchInterests(filters = {}) {
   return request(`/interests${queryString ? `?${queryString}` : ""}`);
 }
 
+export async function fetchInterest(interestId) {
+  return request(`/interests/${interestId}`);
+}
+
 export async function createInterest(payload) {
   return request("/interests", {
     method: "POST",
