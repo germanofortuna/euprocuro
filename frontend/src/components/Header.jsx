@@ -41,13 +41,6 @@ export default function Header({
           <nav className="topbar__nav">
             <button
               type="button"
-              className={currentSection === loggedSections.EXPLORE ? "active" : ""}
-              onClick={() => onNavigate(loggedSections.EXPLORE)}
-            >
-              Home
-            </button>
-            <button
-              type="button"
               className={currentSection === loggedSections.NEW_INTEREST ? "active" : ""}
               onClick={() => onNavigate(loggedSections.NEW_INTEREST)}
             >

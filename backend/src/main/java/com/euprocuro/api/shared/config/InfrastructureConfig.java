@@ -43,6 +43,13 @@ public class InfrastructureConfig {
     }
 
     @Bean
+    public Queue conversationMessageCreatedQueue(
+            @Value("${application.messaging.rabbit.conversation-message-created-queue:euprocuro.conversation.message.created}") String queueName
+    ) {
+        return new Queue(queueName, true);
+    }
+
+    @Bean
     public Queue authQueue(
             @Value("${application.messaging.rabbit.auth-queue:euprocuro.auth.events}") String queueName
     ) {
@@ -63,6 +70,14 @@ public class InfrastructureConfig {
             TopicExchange euProcuroExchange
     ) {
         return BindingBuilder.bind(offerCreatedQueue).to(euProcuroExchange).with("offer.created");
+    }
+
+    @Bean
+    public Binding conversationMessageCreatedBinding(
+            @Qualifier("conversationMessageCreatedQueue") Queue conversationMessageCreatedQueue,
+            TopicExchange euProcuroExchange
+    ) {
+        return BindingBuilder.bind(conversationMessageCreatedQueue).to(euProcuroExchange).with("conversation.message.created");
     }
 
     @Bean

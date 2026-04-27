@@ -2,6 +2,7 @@ package com.euprocuro.api.application.service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -17,8 +18,10 @@ import com.euprocuro.api.application.view.ConversationMessageView;
 import com.euprocuro.api.application.view.OfferConversationView;
 import com.euprocuro.api.domain.gateway.ConversationMessageGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
+import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
+import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.ConversationMessage;
 import com.euprocuro.api.domain.model.InterestPost;
@@ -36,6 +39,8 @@ public class ConversationService implements ConversationUseCase {
     private final UserGateway userGateway;
     private final ConversationMessageGateway conversationMessageGateway;
     private final EmailGateway emailGateway;
+    private final EventPublisherGateway eventPublisherGateway;
+    private final RealtimeMessageGateway realtimeMessageGateway;
 
     @Override
     public OfferConversationView getOfferConversation(String currentUserId, String offerId) {
@@ -91,6 +96,15 @@ public class ConversationService implements ConversationUseCase {
                 interest.getTitle(),
                 command.getContent().trim()
         );
+        eventPublisherGateway.publish("conversation.message.created", Map.of(
+                "messageId", message.getId(),
+                "offerId", message.getOfferId(),
+                "interestPostId", message.getInterestPostId(),
+                "senderId", message.getSenderId(),
+                "recipientId", message.getRecipientId(),
+                "createdAt", message.getCreatedAt()
+        ));
+        realtimeMessageGateway.publishConversationMessage(recipient.getId(), message);
 
         return toView(message);
     }

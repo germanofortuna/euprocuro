@@ -3,6 +3,8 @@ package com.euprocuro.api.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -23,8 +25,10 @@ import com.euprocuro.api.application.view.ConversationMessageView;
 import com.euprocuro.api.application.view.OfferConversationView;
 import com.euprocuro.api.domain.gateway.ConversationMessageGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
+import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
+import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.ConversationMessage;
 import com.euprocuro.api.domain.model.InterestCategory;
@@ -47,6 +51,10 @@ class ConversationServiceTest {
     private ConversationMessageGateway conversationMessageGateway;
     @Mock
     private EmailGateway emailGateway;
+    @Mock
+    private EventPublisherGateway eventPublisherGateway;
+    @Mock
+    private RealtimeMessageGateway realtimeMessageGateway;
 
     @InjectMocks
     private ConversationService conversationService;
@@ -112,6 +120,8 @@ class ConversationServiceTest {
         assertThat(result.getId()).isEqualTo("msg-1");
         assertThat(result.getRecipientId()).isEqualTo("buyer-1");
         assertThat(result.getContent()).isEqualTo("Podemos combinar entrega.");
+        verify(eventPublisherGateway).publish(eq("conversation.message.created"), any());
+        verify(realtimeMessageGateway).publishConversationMessage(eq("buyer-1"), any(ConversationMessage.class));
     }
 
     @Test
@@ -125,7 +135,11 @@ class ConversationServiceTest {
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
         when(userGateway.findById("buyer-1")).thenReturn(Optional.of(buyer));
         when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
-        when(conversationMessageGateway.save(any(ConversationMessage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(conversationMessageGateway.save(any(ConversationMessage.class))).thenAnswer(invocation -> {
+            ConversationMessage message = invocation.getArgument(0);
+            message.setId("msg-2");
+            return message;
+        });
 
         ConversationMessageView result = conversationService.sendMessage("buyer-1", "offer-1", SendConversationMessageCommand.builder()
                 .content("Pode mandar fotos?")

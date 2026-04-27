@@ -103,9 +103,10 @@ img {
 
 .topbar {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 18px 22px;
+  gap: 14px;
+  padding: 14px 18px;
 }
 
 .topbar__brand,
@@ -159,13 +160,25 @@ img {
 }
 
 .topbar__actions {
-  gap: 12px;
+  --topbar-control-height: 40px;
+  gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.topbar__actions .primary-button,
+.topbar__actions .ghost-button {
+  min-height: var(--topbar-control-height);
+  height: var(--topbar-control-height);
+  margin-bottom: 0;
+  padding: 0 14px;
+  font-size: 0.95rem;
 }
 
 .topbar__nav {
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .topbar__nav button,
@@ -175,7 +188,17 @@ img {
   border-radius: 14px;
   background: rgba(224, 237, 255, 0.92);
   color: var(--muted);
-  padding: 10px 14px;
+  padding: 0 12px;
+}
+
+.topbar__nav button,
+.credits-badge,
+.notification-button,
+.profile-badge {
+  min-height: var(--topbar-control-height);
+  height: var(--topbar-control-height);
+  box-sizing: border-box;
+  font-size: 0.95rem;
 }
 
 .hero__actions,
@@ -205,9 +228,9 @@ img {
 .profile-badge {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 16px;
+  gap: 5px;
+  padding: 0 12px;
+  border-radius: 14px;
   background: var(--surface-soft);
   color: var(--muted);
   white-space: nowrap;
@@ -219,18 +242,18 @@ img {
 
 .profile-badge strong::after {
   content: "·";
-  margin-left: 8px;
+  margin-left: 6px;
   color: var(--muted);
 }
 
 .credits-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   min-width: max-content;
-  padding: 10px 14px;
+  padding: 0 12px;
   border: 1px solid rgba(27, 156, 87, 0.24);
-  border-radius: 16px;
+  border-radius: 14px;
   background: rgba(232, 255, 242, 0.95);
   color: #137245;
   text-align: center;
@@ -239,15 +262,15 @@ img {
 }
 
 .credits-badge strong {
-  font-size: 1.1rem;
+  font-size: 1rem;
   color: #0d8a4a;
 }
 
 .credits-badge span {
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .eyebrow {
@@ -302,6 +325,14 @@ img {
   gap: 14px;
 }
 
+.stacked-form .form-heading {
+  margin-top: 20px;
+}
+
+.section-nav button {
+  height: 40px;
+}
+
 .detail-block {
   margin-top: 10px;
 }
@@ -350,6 +381,18 @@ img {
 
 .cta-card {
   margin-top: 10px;
+}
+
+.cta-card__actions {
+  gap: 10px;
+  align-items: stretch;
+}
+
+.cta-card__actions .primary-button,
+.cta-card__actions .ghost-button {
+  min-height: 54px;
+  margin-bottom: 0;
+  padding: 0 24px;
 }
 
 .workspace-grid {
@@ -674,6 +717,7 @@ textarea:focus {
 
 .boost-box {
   display: grid;
+  margin-bottom: 10px;
   gap: 14px;
   padding: 16px;
   border-radius: 20px;
@@ -706,8 +750,7 @@ textarea:focus {
 
 .notification-button {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: var(--topbar-control-height);
   border: 1px solid rgba(11, 79, 187, 0.18);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.96);
@@ -715,7 +758,7 @@ textarea:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  font-size: 1rem;
 }
 
 .notification-button--active {
@@ -724,10 +767,10 @@ textarea:focus {
 
 .notification-badge {
   position: absolute;
-  top: 9px;
-  right: 9px;
-  width: 10px;
-  height: 10px;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
   background: #ff5a5f;
   box-shadow: 0 0 0 3px white;
@@ -1039,6 +1082,7 @@ textarea:focus {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   align-items: stretch;
+  margin-bottom: 10px;
 }
 
 .inline-actions--interest-actions .ghost-button,

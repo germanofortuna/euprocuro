@@ -1,6 +1,20 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080/api";
 const SESSION_STORAGE_KEY = "eu-procuro-session";
 
+function buildWebSocketUrl(token) {
+  const configuredBase = import.meta.env.VITE_WS_BASE;
+  const apiUrl = new URL(API_BASE, window.location.origin);
+  const defaultProtocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
+  const defaultBase = `${defaultProtocol}//${apiUrl.host}/ws/chat`;
+  const url = new URL(configuredBase || defaultBase, window.location.origin);
+
+  if (token) {
+    url.searchParams.set("token", token);
+  }
+
+  return url.toString();
+}
+
 function buildErrorMessage(payload, fallbackMessage) {
   if (!payload) {
     return fallbackMessage;
@@ -83,6 +97,36 @@ export function storeSession(session) {
 
 export function clearSession() {
   window.localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+export function connectChatSocket({ token, onMessage, onOpen, onClose, onError } = {}) {
+  if (typeof WebSocket === "undefined") {
+    return null;
+  }
+
+  const socket = new WebSocket(buildWebSocketUrl(token));
+
+  socket.onopen = () => {
+    onOpen?.();
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      onMessage?.(JSON.parse(event.data));
+    } catch (error) {
+      onError?.(error);
+    }
+  };
+
+  socket.onerror = (event) => {
+    onError?.(event);
+  };
+
+  socket.onclose = (event) => {
+    onClose?.(event);
+  };
+
+  return socket;
 }
 
 export async function login(payload) {

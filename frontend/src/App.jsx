@@ -4,6 +4,7 @@ import {
   clearSession,
   boostInterest,
   closeInterest,
+  connectChatSocket,
   createInterest,
   createOffer,
   createSellerItem,
@@ -319,6 +320,7 @@ export default function App() {
   const initialResetState = useMemo(() => createResetStateFromLocation(), []);
   const notificationButtonRef = useRef(null);
   const publicRequestSeq = useRef(0);
+  const realtimeHandlerRef = useRef(null);
   const myInterestsSectionRef = useRef(null);
   const sentOffersSectionRef = useRef(null);
   const receivedOffersSectionRef = useRef(null);
@@ -605,12 +607,15 @@ export default function App() {
     }
   }
 
-  async function refreshPrivateData() {
+  async function refreshPrivateData(options = {}) {
     if (!session) {
       return;
     }
 
-    setIsLoadingPrivate(true);
+    const silent = Boolean(options.silent);
+    if (!silent) {
+      setIsLoadingPrivate(true);
+    }
 
     try {
       const [me, dashboardData, monetizationData, sellerItemData] = await Promise.all([
@@ -642,9 +647,52 @@ export default function App() {
       setLoggedSection(loggedSections.EXPLORE);
       openFeedback("error", "Sessão encerrada", requestError.message || "Entre novamente para continuar.");
     } finally {
-      setIsLoadingPrivate(false);
+      if (!silent) {
+        setIsLoadingPrivate(false);
+      }
     }
   }
+
+  function handleRealtimeEvent(envelope) {
+    if (envelope?.type !== "conversation-message.created" || !envelope.payload) {
+      return;
+    }
+
+    const message = envelope.payload;
+    const isOpenConversation = conversationModal.visible && conversationModal.data?.offerId === message.offerId;
+    if (isOpenConversation && currentUser?.id && message.senderId !== currentUser.id) {
+      const seenMap = readSeenMessages(currentUser.id);
+      writeSeenMessages(currentUser.id, {
+        ...seenMap,
+        [message.offerId]: new Date(message.createdAt ?? Date.now()).getTime(),
+        [`offer:${message.offerId}`]: new Date(message.createdAt ?? Date.now()).getTime()
+      });
+    }
+
+    setConversationModal((current) => {
+      if (!current.visible || current.data?.offerId !== message.offerId) {
+        return current;
+      }
+
+      const currentMessages = current.data?.messages ?? [];
+      if (currentMessages.some((currentMessage) => currentMessage.id === message.id)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        data: {
+          ...current.data,
+          messages: [...currentMessages, message]
+        }
+      };
+    });
+
+    setMessageSyncKey((current) => current + 1);
+    refreshPrivateData({ silent: true }).catch(() => {});
+  }
+
+  realtimeHandlerRef.current = handleRealtimeEvent;
 
   useEffect(() => {
     refreshCategories();
@@ -702,6 +750,38 @@ export default function App() {
 
     refreshPrivateData();
   }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!currentUser?.id) {
+      return undefined;
+    }
+
+    let socket = null;
+    let reconnectTimeoutId = null;
+    let closedByEffect = false;
+
+    const connect = () => {
+      socket = connectChatSocket({
+        token: session.token,
+        onMessage: (envelope) => realtimeHandlerRef.current?.(envelope),
+        onClose: () => {
+          if (!closedByEffect) {
+            reconnectTimeoutId = window.setTimeout(connect, 3000);
+          }
+        }
+      });
+    };
+
+    connect();
+
+    return () => {
+      closedByEffect = true;
+      if (reconnectTimeoutId) {
+        window.clearTimeout(reconnectTimeoutId);
+      }
+      socket?.close();
+    };
+  }, [session?.token, currentUser?.id]);
 
   useEffect(() => {
     if (!session || !selectedInterest || !isSelectedInterestMine) {
@@ -886,9 +966,10 @@ export default function App() {
       storeSession(nextSession);
       setSession(nextSession);
       setRegisterForm(initialRegisterForm);
-      openNewInterestForm();
+      setHomeMatchFilter(null);
+      setLoggedSection(loggedSections.EXPLORE);
       closeAuthModal();
-      openFeedback("success", "Conta criada", "Sua conta foi criada e você já pode cadastrar interesses.");
+      openFeedback("success", "Conta criada", "Sua conta foi criada e você já está na Home.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível criar a conta", requestError.message || "Revise os dados e tente novamente.");
     } finally {
