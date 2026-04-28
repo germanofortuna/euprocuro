@@ -75,6 +75,18 @@ Na pasta `backend`:
 mvn spring-boot:run
 ```
 
+Para rodar usando explicitamente o MongoDB local:
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+Para rodar usando MongoDB Atlas:
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=atlas
+```
+
 Ou:
 
 ```bash
@@ -86,6 +98,55 @@ Para subir com configuracoes de producao localmente:
 ```bash
 SPRING_PROFILES_ACTIVE=prod mvn spring-boot:run
 ```
+
+## MongoDB local x MongoDB Atlas
+
+O projeto esta preparado para alternar entre o MongoDB local e o MongoDB Atlas sem alterar codigo.
+
+Perfis disponiveis:
+
+- `local`: usa `mongodb://localhost:27017/euprocuro`
+- `atlas`: usa a variavel de ambiente `MONGO_ATLAS_URI`
+
+Arquivos de profile:
+
+- [application-local.yml](/C:/projetos/euprocuro/backend/src/main/resources/application-local.yml)
+- [application-atlas.yml](/C:/projetos/euprocuro/backend/src/main/resources/application-atlas.yml)
+
+### Configurando o Atlas no ambiente local
+
+No MongoDB Atlas:
+
+1. Acesse o projeto no Atlas.
+2. Va em `Security` > `Network Access`.
+3. Abra a aba `IP Access List`.
+4. Clique em `Add IP Address`.
+5. Use `Add Current IP Address`.
+6. Confirme e aguarde a regra ser aplicada.
+
+O Atlas permite conexoes apenas de IPs cadastrados na IP Access List. Se sua internet trocar de IP, sera necessario adicionar o novo IP.
+
+Depois, configure a variavel de ambiente no Windows PowerShell:
+
+```powershell
+[Environment]::SetEnvironmentVariable(
+  "MONGO_ATLAS_URI",
+  "mongodb+srv://usuario:senha@cluster.mongodb.net/euprocuro?retryWrites=true&w=majority&appName=euprocuro",
+  "User"
+)
+```
+
+Se a senha tiver caracteres especiais, eles precisam estar codificados na URI. Exemplo: `@` vira `%40`.
+
+Depois de criar ou alterar essa variavel, reinicie o IntelliJ ou o terminal para que a aplicacao enxergue o novo valor.
+
+Para conferir:
+
+```powershell
+[Environment]::GetEnvironmentVariable("MONGO_ATLAS_URI", "User")
+```
+
+Nao grave a URI real do Atlas em arquivos versionados. Use `.env` local ou variaveis de ambiente. Os arquivos `.env` ja estao ignorados pelo Git.
 
 ## Rodando o frontend
 
@@ -264,7 +325,13 @@ Ele roda em `push` e `pull_request`.
 1. Abra `C:\projetos\euprocuro`.
 2. Recarregue o Maven pelo `pom.xml` da raiz.
 3. Confirme o SDK do projeto como Java 11.
-4. Use as configuracoes salvas `Eu Procuro Backend` e `Eu Procuro Frontend`.
+4. Use uma das configuracoes salvas:
+   - `Eu Procuro Backend Local`
+   - `Eu Procuro Backend Atlas`
+   - `Eu Procuro Frontend`
+
+Use `Eu Procuro Backend Local` para trabalhar com o MongoDB do Rancher/Desktop.
+Use `Eu Procuro Backend Atlas` para trabalhar com o banco remoto no MongoDB Atlas.
 
 Se o IntelliJ nao localizar o Node automaticamente, configure manualmente:
 

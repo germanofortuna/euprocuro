@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Eu Procuro Backend Local" type="MavenRunConfiguration" factoryName="Maven">
+  <configuration default="false" name="Eu Procuro Backend Atlas" type="MavenRunConfiguration" factoryName="Maven">
     <MavenSettings>
       <option name="myGeneralSettings" />
       <option name="myRunnerSettings" />
@@ -10,7 +10,7 @@
           <option name="goals">
             <list>
               <option value="spring-boot:run" />
-              <option value="-Dspring-boot.run.profiles=local" />
+              <option value="-Dspring-boot.run.profiles=atlas" />
             </list>
           </option>
           <option name="profiles">
