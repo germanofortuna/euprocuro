@@ -209,7 +209,7 @@ class AuthServiceTest {
                 .password("Senha123")
                 .build()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("homologacao");
+                .hasMessageContaining("Ambiente restrito");
     }
 
     @Test
