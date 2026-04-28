@@ -1,0 +1,12 @@
+spring:
+  data:
+    mongodb:
+      uri: ${MONGO_ATLAS_HML_URI}
+
+application:
+  auth:
+    expose-reset-preview: false
+    expose-session-token: true
+    cookie:
+      secure: true
+      same-site: None

@@ -319,6 +319,7 @@ Ele roda em `push` e `pull_request`.
 - Backend containerizado em [backend/Dockerfile](/C:/projetos/euprocuro/backend/Dockerfile)
 - Exemplo de blueprint do Render em [render.yaml](/C:/projetos/euprocuro/render.yaml)
 - Exemplo de variaveis em [.env.example](/C:/projetos/euprocuro/.env.example)
+- Guia de HML em [docs/hml-deploy.md](/C:/projetos/euprocuro/docs/hml-deploy.md)
 
 ## IntelliJ
 

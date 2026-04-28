@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: eu-procuro-api
+    name: eu-procuro-api-hml
     runtime: docker
     rootDir: backend
     plan: free
@@ -8,8 +8,20 @@ services:
     healthCheckPath: /actuator/health
     envVars:
       - key: SPRING_PROFILES_ACTIVE
-        value: prod
+        value: prod,hml
+      - key: MONGO_ATLAS_HML_URI
+        sync: false
+      - key: APP_CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: APP_RESET_BASE_URL
+        sync: false
       - key: APP_AUTH_COOKIE_SECURE
         value: "true"
+      - key: APP_AUTH_COOKIE_SAME_SITE
+        value: None
       - key: APP_AUTH_EXPOSE_RESET_PREVIEW
         value: "false"
+      - key: APP_AUTH_EXPOSE_SESSION_TOKEN
+        value: "true"
+      - key: APP_MONETIZATION_PROVIDER
+        value: LOCAL_MOCK

@@ -3475,7 +3475,7 @@ export default function App() {
       <FeedbackModal modal={feedbackModal} onClose={() => setFeedbackModal(null)} />
 
       <footer className="app-footer">
-        <small>Todos os direitos reservados para Germano Antonio Fortuna</small>
+        <small>Todos os direitos reservados para Eu Procuro Corp.</small>
       </footer>
     </div>
   );
