@@ -2,6 +2,51 @@ function handleChange(setter, field, value) {
   setter((current) => ({ ...current, [field]: value }));
 }
 
+function formatCpfCnpj(value) {
+  const digits = value.replace(/\D/g, "").slice(0, 14);
+  if (digits.length <= 11) {
+    return digits
+      .replace(/^(\d{3})(\d)/, "$1.$2")
+      .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d)/, ".$1-$2");
+  }
+
+  return digits
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d)/, "$1-$2");
+}
+
+function passwordStatus(password) {
+  const value = password ?? "";
+  if (!value) {
+    return {
+      valid: false,
+      message: "Use pelo menos 8 caracteres, com letras e números."
+    };
+  }
+
+  if (value.length < 8) {
+    return {
+      valid: false,
+      message: "Senha curta: use pelo menos 8 caracteres."
+    };
+  }
+
+  if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) {
+    return {
+      valid: false,
+      message: "Inclua letras e números para deixar a senha válida."
+    };
+  }
+
+  return {
+    valid: true,
+    message: "Senha válida."
+  };
+}
+
 export default function AuthModal({
   visible,
   mode,
@@ -37,6 +82,7 @@ export default function AuthModal({
     { value: "login", label: "Entrar" },
     { value: "register", label: "Criar conta" }
   ];
+  const currentPasswordStatus = passwordStatus(registerForm.password);
 
   return (
     <div className="modal-overlay" role="presentation" onClick={onClose}>
@@ -118,7 +164,7 @@ export default function AuthModal({
             <input
               placeholder="CPF ou CNPJ"
               value={registerForm.documentNumber}
-              onChange={(event) => handleChange(onRegisterChange, "documentNumber", event.target.value)}
+              onChange={(event) => handleChange(onRegisterChange, "documentNumber", formatCpfCnpj(event.target.value))}
               maxLength={18}
               required
             />
@@ -129,6 +175,11 @@ export default function AuthModal({
               onChange={(event) => handleChange(onRegisterChange, "password", event.target.value)}
               required
             />
+            {registerForm.password ? (
+              <span className={`password-status ${currentPasswordStatus.valid ? "password-status--valid" : "password-status--invalid"}`}>
+                {currentPasswordStatus.message}
+              </span>
+            ) : null}
             <div className="two-columns">
               <input
                 placeholder="Cidade"

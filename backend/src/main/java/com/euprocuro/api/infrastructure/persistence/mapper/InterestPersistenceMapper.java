@@ -40,6 +40,7 @@ public final class InterestPersistenceMapper {
                 .status(document.getStatus())
                 .createdAt(document.getCreatedAt())
                 .updatedAt(document.getUpdatedAt())
+                .expiresAt(document.getExpiresAt())
                 .build();
     }
 
@@ -71,6 +72,7 @@ public final class InterestPersistenceMapper {
                 .status(domain.getStatus())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
+                .expiresAt(domain.getExpiresAt())
                 .build();
     }
 

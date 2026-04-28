@@ -108,6 +108,13 @@ public class MarketplaceController {
         );
     }
 
+    @PatchMapping("/interests/{id}/renew")
+    public InterestResponse renewInterest(@PathVariable String id, HttpServletRequest request) {
+        return RestMapper.toResponse(
+                marketplaceUseCase.renewInterest(CurrentUserContext.userId(request), id)
+        );
+    }
+
     @PatchMapping("/interests/{id}/close")
     public InterestResponse closeInterest(@PathVariable String id, HttpServletRequest request) {
         return RestMapper.toResponse(

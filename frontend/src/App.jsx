@@ -25,6 +25,7 @@ import {
   logout,
   purchaseProduct,
   register,
+  renewInterest,
   resetPassword,
   sendOfferMessage,
   shareSellerItemOffer,
@@ -122,6 +123,7 @@ const MESSAGE_SEEN_STORAGE_KEY = "eu-procuro-message-seen";
 const MAX_REFERENCE_IMAGE_SIZE = 1200;
 const REFERENCE_IMAGE_QUALITY = 0.78;
 const HOME_PAGE_SIZE = 10;
+const LISTING_EXPIRATION_DAYS = Number(import.meta.env.VITE_LISTING_EXPIRATION_DAYS ?? 30);
 
 function currency(value) {
   if (value === null || value === undefined || value === "") {
@@ -143,6 +145,62 @@ function formatTimestamp(value) {
     dateStyle: "short",
     timeStyle: "short"
   }).format(new Date(value));
+}
+
+function listingExpiresAt(listing) {
+  if (listing?.expiresAt) {
+    return new Date(listing.expiresAt);
+  }
+
+  if (!listing?.createdAt) {
+    return null;
+  }
+
+  const createdAt = new Date(listing.createdAt);
+  if (Number.isNaN(createdAt.getTime())) {
+    return null;
+  }
+
+  createdAt.setDate(createdAt.getDate() + LISTING_EXPIRATION_DAYS);
+  return createdAt;
+}
+
+function formatRemainingListingTime(listing) {
+  const expiresAt = listingExpiresAt(listing);
+  if (!expiresAt) {
+    return `Ativo por até ${LISTING_EXPIRATION_DAYS} dias`;
+  }
+
+  const diff = expiresAt.getTime() - Date.now();
+  if (diff <= 0) {
+    return "Expirado";
+  }
+
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  if (days > 1) {
+    return `Expira em ${days} dias`;
+  }
+
+  const hours = Math.max(1, Math.ceil(diff / (1000 * 60 * 60)));
+  return hours > 1 ? `Expira em ${hours} horas` : "Expira em 1 hora";
+}
+
+function remainingListingDays(listing) {
+  const expiresAt = listingExpiresAt(listing);
+  if (!expiresAt) {
+    return null;
+  }
+
+  return Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function isListingExpiringSoon(listing) {
+  const days = remainingListingDays(listing);
+  return days !== null && days > 0 && days < 10;
+}
+
+function expiryPillClass(listing) {
+  return `expiry-pill ${isListingExpiringSoon(listing) ? "expiry-pill--warning" : ""}`;
 }
 
 function firstName(value) {
@@ -1273,12 +1331,33 @@ export default function App() {
       })
       .filter(Boolean);
 
-    const unreadEntries = [...newOfferEntries, ...unreadMessageEntries, ...sellerItemEntries]
+    const expiringInterestEntries = myInterests
+      .filter((interest) => interest.status === "OPEN" && isListingExpiringSoon(interest))
+      .map((interest) => {
+        const expiresAt = listingExpiresAt(interest);
+        const notificationId = `interest-expiring:${interest.id}:${expiresAt?.toISOString() ?? "unknown"}`;
+        if (seenMap[notificationId]) {
+          return null;
+        }
+
+        return {
+          id: notificationId,
+          type: "interest-expiring",
+          interestId: interest.id,
+          section: loggedSections.MY_INTERESTS,
+          title: interest.title ?? "Anúncio perto de expirar",
+          message: `Seu anúncio expira em breve. ${formatRemainingListingTime(interest)}.`,
+          createdAt: expiresAt?.toISOString() ?? new Date().toISOString()
+        };
+      })
+      .filter(Boolean);
+
+    const unreadEntries = [...expiringInterestEntries, ...newOfferEntries, ...unreadMessageEntries, ...sellerItemEntries]
       .sort((left, right) => new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime());
 
     setNotifications(unreadEntries);
     setHasUnreadMessages(unreadEntries.length > 0);
-  }, [session, currentUser?.id, receivedOffers, sentOffers, sellerItems, messageSyncKey]);
+  }, [session, currentUser?.id, receivedOffers, sentOffers, sellerItems, myInterests, messageSyncKey]);
 
   useEffect(() => {
     if (!session) {
@@ -1693,6 +1772,31 @@ export default function App() {
     }
   }
 
+  async function handleRenewInterest(interestId = selectedInterest?.id) {
+    if (!interestId) {
+      return;
+    }
+
+    const availableCredits = monetizationAccount?.sellerCredits ?? currentUser?.sellerCredits ?? 0;
+    if (availableCredits <= 0) {
+      openFeedback(
+        "error",
+        "Créditos insuficientes",
+        "Você precisa de 1 crédito para renovar o anúncio. Abra a página de créditos para comprar."
+      );
+      navigateTo(loggedSections.CREDITS);
+      return;
+    }
+
+    try {
+      await renewInterest(interestId);
+      await Promise.all([refreshPrivateData(), refreshPublicData(), loadInterestDetail(interestId, { updateUrl: false })]);
+      openFeedback("success", "Anúncio renovado", `Seu anúncio ganhou mais ${LISTING_EXPIRATION_DAYS} dias.`);
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível renovar", requestError.message || "Tente novamente.");
+    }
+  }
+
   async function openConversation(offerId) {
     setConversationModal({
       visible: true,
@@ -1805,6 +1909,16 @@ export default function App() {
       });
       setSelectedInterest(matchingInterests[0] ?? null);
       navigateTo(loggedSections.EXPLORE);
+      return;
+    }
+
+    if (notification.type === "interest-expiring") {
+      const interest = myInterests.find((item) => item.id === notification.interestId);
+      if (interest) {
+        setSelectedInterest(interest);
+        setExpandedInterests((current) => ({ ...current, [interest.id]: true }));
+      }
+      navigateTo(loggedSections.MY_INTERESTS);
       return;
     }
 
@@ -2041,6 +2155,15 @@ export default function App() {
                     <span>Publicado por</span>
                     <strong>{selectedInterest.ownerName}</strong>
                   </div>
+                  {isSelectedInterestMine ? (
+                    <div className="detail-row">
+                      <span>Tempo restante</span>
+                      <strong className={expiryPillClass(selectedInterest)}>
+                        {isListingExpiringSoon(selectedInterest) ? "⚠ " : ""}
+                        {formatRemainingListingTime(selectedInterest)}
+                      </strong>
+                    </div>
+                  ) : null}
                   {selectedInterest.allowsWhatsappContact && selectedInterest.whatsappContact ? (
                     <div className="detail-row">
                       <span>WhatsApp</span>
@@ -2245,6 +2368,10 @@ export default function App() {
             <div className="accordion-card__meta">
               <span>{currency(interest.budgetMax)}</span>
               <span>{interest.tags?.slice(0, 3).join(" • ") || "Sem tags"}</span>
+              <span className={`${expiryPillClass(interest)} expiry-pill--inline`}>
+                {isListingExpiringSoon(interest) ? "⚠ " : ""}
+                {formatRemainingListingTime(interest)}
+              </span>
             </div>
           </div>
         ) : null}
@@ -2560,7 +2687,6 @@ export default function App() {
           <span className="eyebrow">{editingSellerItemId ? "Editar item" : "Cadastrar item"}</span>
           <h3>{editingSellerItemId ? "Atualize o item cadastrado" : "Algo que você aceitaria negociar"}</h3>
         </div>
-
         <input
           placeholder="Título do item ou serviço"
           value={sellerItemForm.title}
@@ -3009,6 +3135,21 @@ export default function App() {
                   ) : null}
 
                   <p className="detail-description">{selectedInterest.description}</p>
+                  <div className="expiry-renewal-row">
+                    <span className={`${expiryPillClass(selectedInterest)} expiry-pill--inline`}>
+                      {isListingExpiringSoon(selectedInterest) ? "⚠ " : ""}
+                      {formatRemainingListingTime(selectedInterest)}
+                    </span>
+                    {isListingExpiringSoon(selectedInterest) ? (
+                      <button
+                        type="button"
+                        className="text-button"
+                        onClick={() => handleRenewInterest(selectedInterest.id)}
+                      >
+                        Renovar por 1 crédito
+                      </button>
+                    ) : null}
+                  </div>
 
                   {renderInterestShareActions(selectedInterest)}
 
@@ -3177,6 +3318,10 @@ export default function App() {
             </div>
 
             <form className="stacked-form" onSubmit={handleInterestSubmit}>
+              <div className="expiry-note">
+                Este anúncio ficará ativo por até {LISTING_EXPIRATION_DAYS} dias e depois será removido automaticamente.
+              </div>
+
               {editingInterestId ? (
                 <div className="cta-card">
                   <strong>Você está editando um anúncio</strong>

@@ -14,6 +14,8 @@ public interface MarketplaceUseCase {
 
     InterestPost updateInterest(String currentUserId, String interestId, UpdateInterestCommand command);
 
+    InterestPost renewInterest(String currentUserId, String interestId);
+
     InterestPost closeInterest(String currentUserId, String interestId);
 
     void deleteInterest(String currentUserId, String interestId);

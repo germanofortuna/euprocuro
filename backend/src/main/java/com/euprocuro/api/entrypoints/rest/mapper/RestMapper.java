@@ -303,6 +303,7 @@ public final class RestMapper {
                 .status(domain.getStatus())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
+                .expiresAt(domain.getExpiresAt())
                 .build();
     }
 

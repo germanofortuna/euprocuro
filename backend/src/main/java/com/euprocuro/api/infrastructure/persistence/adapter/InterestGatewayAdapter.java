@@ -112,9 +112,24 @@ public class InterestGatewayAdapter implements InterestGateway {
         return repository.count();
     }
 
+    @Override
+    public long deleteExpired(Instant now, Instant legacyCutoff) {
+        Query query = new Query(new Criteria().orOperator(
+                Criteria.where("expiresAt").lt(now),
+                new Criteria().andOperator(
+                        new Criteria().orOperator(
+                                Criteria.where("expiresAt").exists(false),
+                                Criteria.where("expiresAt").is(null)
+                        ),
+                        Criteria.where("createdAt").lt(legacyCutoff)
+                )
+        ));
+        return mongoTemplate.remove(query, InterestPostDocument.class).getDeletedCount();
+    }
+
     private Criteria activeBoostCriteria(InterestSearchCriteria criteria, Instant now) {
         return new Criteria().andOperator(
-                baseCriteria(criteria),
+                baseCriteria(criteria, now),
                 Criteria.where("boostEnabled").is(true),
                 Criteria.where("boostedUntil").gt(now)
         );
@@ -122,7 +137,7 @@ public class InterestGatewayAdapter implements InterestGateway {
 
     private Criteria regularInterestCriteria(InterestSearchCriteria criteria, Instant now) {
         return new Criteria().andOperator(
-                baseCriteria(criteria),
+                baseCriteria(criteria, now),
                 new Criteria().orOperator(
                         Criteria.where("boostEnabled").is(false),
                         Criteria.where("boostedUntil").exists(false),
@@ -132,8 +147,13 @@ public class InterestGatewayAdapter implements InterestGateway {
         );
     }
 
-    private Criteria baseCriteria(InterestSearchCriteria searchCriteria) {
+    private Criteria baseCriteria(InterestSearchCriteria searchCriteria, Instant now) {
         List<Criteria> criteria = new ArrayList<>();
+        criteria.add(new Criteria().orOperator(
+                Criteria.where("expiresAt").exists(false),
+                Criteria.where("expiresAt").is(null),
+                Criteria.where("expiresAt").gt(now)
+        ));
 
         if (searchCriteria.isOpenOnly()) {
             criteria.add(Criteria.where("status").is(InterestStatus.OPEN));

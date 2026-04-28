@@ -26,6 +26,7 @@ import com.euprocuro.api.application.command.InterestSearchFilter;
 import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
+import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
@@ -90,6 +91,8 @@ class MarketplaceServiceTest {
         assertThat(result.getReferenceImageUrl()).isEqualTo("data:image/png;base64,abc");
         assertThat(result.getStatus()).isEqualTo(InterestStatus.OPEN);
         assertThat(result.getLocation().getCity()).isEqualTo("Campinas");
+        assertThat(result.getExpiresAt()).isAfter(result.getCreatedAt().plus(29, ChronoUnit.DAYS));
+        assertThat(result.getExpiresAt()).isBefore(result.getCreatedAt().plus(31, ChronoUnit.DAYS));
         verify(eventPublisherGateway).publish(eq("interest.created"), any(Map.class));
     }
 
@@ -138,6 +141,37 @@ class MarketplaceServiceTest {
     }
 
     @Test
+    void renewInterestShouldConsumeOneCreditAndExtendExpiration() {
+        InterestPost existingInterest = baseInterest();
+        existingInterest.setExpiresAt(Instant.now().plus(5, ChronoUnit.DAYS));
+        UserProfile owner = baseBuyer().toBuilder()
+                .sellerCredits(2)
+                .build();
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(existingInterest));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(owner));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        InterestPost result = marketplaceService.renewInterest("buyer-1", "interest-1");
+
+        assertThat(result.getExpiresAt()).isAfter(existingInterest.getExpiresAt().plus(29, ChronoUnit.DAYS));
+        verify(userGateway).save(any(UserProfile.class));
+        verify(eventPublisherGateway).publish(eq("interest.renewed"), any(Map.class));
+    }
+
+    @Test
+    void renewInterestShouldRejectOwnerWithoutCredits() {
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer().toBuilder()
+                .sellerCredits(0)
+                .build()));
+
+        assertThatThrownBy(() -> marketplaceService.renewInterest("buyer-1", "interest-1"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("credito");
+    }
+
+    @Test
     void updateInterestShouldRejectDifferentOwner() {
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
 
@@ -168,7 +202,11 @@ class MarketplaceServiceTest {
         closed.setId("3");
         closed.setStatus(InterestStatus.CLOSED);
 
-        when(interestGateway.findAll()).thenReturn(List.of(newest, closed, boosted));
+        InterestPost expired = baseInterest();
+        expired.setId("4");
+        expired.setExpiresAt(Instant.now().minus(1, ChronoUnit.HOURS));
+
+        when(interestGateway.findAll()).thenReturn(List.of(newest, closed, boosted, expired));
 
         List<InterestPost> results = marketplaceService.listInterests(InterestSearchFilter.builder()
                 .category(InterestCategory.SERVICOS)
@@ -179,6 +217,18 @@ class MarketplaceServiceTest {
                 .build());
 
         assertThat(results).extracting(InterestPost::getId).containsExactly("1", "2");
+    }
+
+    @Test
+    void getInterestShouldDeleteAndRejectExpiredInterest() {
+        InterestPost expired = baseInterest();
+        expired.setExpiresAt(Instant.now().minus(1, ChronoUnit.MINUTES));
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(expired));
+
+        assertThatThrownBy(() -> marketplaceService.getInterest("interest-1"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("expirado");
+        verify(interestGateway).deleteById("interest-1");
     }
 
     @Test

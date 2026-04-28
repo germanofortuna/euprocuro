@@ -46,6 +46,11 @@ application:
     from: ${APP_EMAIL_FROM:no-reply@euprocuro.local}
   monetization:
     provider: ${APP_MONETIZATION_PROVIDER:LOCAL_MOCK}
+  listings:
+    expiration-days: ${APP_LISTING_EXPIRATION_DAYS:5}
+    cleanup:
+      enabled: ${APP_LISTING_CLEANUP_ENABLED:true}
+      fixed-delay-ms: ${APP_LISTING_CLEANUP_FIXED_DELAY_MS:3600000}
   hml:
     access:
       enabled: ${APP_HML_ACCESS_ENABLED:false}

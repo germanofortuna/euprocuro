@@ -35,4 +35,5 @@ public class InterestResponse {
     InterestStatus status;
     Instant createdAt;
     Instant updatedAt;
+    Instant expiresAt;
 }

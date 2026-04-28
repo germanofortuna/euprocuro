@@ -1,6 +1,7 @@
 package com.euprocuro.api.application.service;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -8,6 +9,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
@@ -35,12 +37,18 @@ public class DashboardService implements DashboardUseCase {
     private final OfferGateway offerGateway;
     private final ConversationMessageGateway conversationMessageGateway;
 
+    @Value("${application.listings.expiration-days:30}")
+    private long listingExpirationDays = 30;
+
     @Override
     public PersonalDashboardView getDashboard(String userId) {
         UserProfile user = userGateway.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado."));
 
-        List<InterestPost> myInterests = interestGateway.findByOwnerIdOrderByCreatedAtDesc(userId);
+        List<InterestPost> myInterests = interestGateway.findByOwnerIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .filter(this::isNotExpired)
+                .collect(Collectors.toList());
         Map<String, InterestPost> interestsById = myInterests.stream()
                 .collect(Collectors.toMap(InterestPost::getId, Function.identity()));
 
@@ -54,6 +62,7 @@ public class DashboardService implements DashboardUseCase {
         Map<String, ConversationMessage> latestMessagesByOfferId = latestMessagesByOfferId(offersReceived, offersSent);
         Map<String, InterestPost> referencedInterests = interestGateway.findAll()
                 .stream()
+                .filter(this::isNotExpired)
                 .collect(Collectors.toMap(InterestPost::getId, Function.identity()));
 
         return PersonalDashboardView.builder()
@@ -115,5 +124,14 @@ public class DashboardService implements DashboardUseCase {
                 .latestMessageSenderId(latestMessage == null ? null : latestMessage.getSenderId())
                 .latestMessageAt(latestMessage == null ? null : latestMessage.getCreatedAt())
                 .build();
+    }
+
+    private boolean isNotExpired(InterestPost interest) {
+        Instant expiration = interest.getExpiresAt() != null
+                ? interest.getExpiresAt()
+                : interest.getCreatedAt() == null
+                ? null
+                : interest.getCreatedAt().plus(Math.max(1, listingExpirationDays), ChronoUnit.DAYS);
+        return expiration == null || expiration.isAfter(Instant.now());
     }
 }
