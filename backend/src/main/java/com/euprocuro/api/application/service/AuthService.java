@@ -304,7 +304,7 @@ public class AuthService implements AuthUseCase {
                 .anyMatch(allowedEmail -> allowedEmail.equals(email));
 
         if (!allowed) {
-            throw new BusinessException("Este ambiente de homologacao e restrito.");
+            throw new BusinessException("Ambiente restrito! Entre em contato com um administrador.");
         }
     }
 
