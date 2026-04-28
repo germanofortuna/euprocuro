@@ -44,4 +44,5 @@ public class InterestPostDocument {
     private InterestStatus status;
     private Instant createdAt;
     private Instant updatedAt;
+    private Instant expiresAt;
 }

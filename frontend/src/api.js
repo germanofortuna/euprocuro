@@ -224,6 +224,12 @@ export async function updateInterest(interestId, payload) {
   });
 }
 
+export async function renewInterest(interestId) {
+  return request(`/interests/${interestId}/renew`, {
+    method: "PATCH"
+  });
+}
+
 export async function closeInterest(interestId) {
   return request(`/interests/${interestId}/close`, {
     method: "PATCH"

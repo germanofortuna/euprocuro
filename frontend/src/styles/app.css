@@ -917,6 +917,8 @@ textarea:focus {
 
 .interest-card__summary-copy {
   min-width: 0;
+  display: grid;
+  gap: 6px;
 }
 
 .interest-card__summary-copy strong {
@@ -926,6 +928,11 @@ textarea:focus {
   color: var(--ink);
   font-size: 1rem;
   line-height: 1.2;
+}
+
+.interest-card__summary-copy small {
+  color: var(--accent-strong);
+  font-weight: 800;
 }
 
 .load-more-button {
@@ -1068,6 +1075,50 @@ textarea:focus {
 .tag-cluster--compact span {
   padding: 6px 10px;
   font-size: 0.85rem;
+}
+
+.expiry-note,
+.expiry-pill {
+  border: 1px solid rgba(30, 111, 242, 0.16);
+  background: rgba(237, 245, 255, 0.94);
+  color: var(--accent-strong);
+}
+
+.expiry-note {
+  padding: 12px 14px;
+  border-radius: 16px;
+  font-weight: 700;
+}
+
+.expiry-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.expiry-pill--warning {
+  border-color: rgba(202, 138, 4, 0.26);
+  background: #fff7cc;
+  color: #9a6700;
+}
+
+.expiry-pill--inline {
+  margin-top: 2px;
+  margin-bottom: 10px;
+}
+
+.expiry-renewal-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .share-card {
@@ -1333,6 +1384,20 @@ textarea:focus {
   margin: 0;
   color: var(--error);
   font-size: 0.9rem;
+}
+
+.password-status {
+  margin-top: -8px;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.password-status--invalid {
+  color: #b4233b;
+}
+
+.password-status--valid {
+  color: #0d8a4a;
 }
 
 .workspace-grid--wide {

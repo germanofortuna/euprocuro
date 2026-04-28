@@ -2,6 +2,7 @@ package com.euprocuro.api.application.service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -10,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -48,12 +50,16 @@ public class MarketplaceService implements MarketplaceUseCase {
     private final EmailGateway emailGateway;
     private final RealtimeMessageGateway realtimeMessageGateway;
 
+    @Value("${application.listings.expiration-days:30}")
+    private long listingExpirationDays = 30;
+
     @Override
     public InterestPost createInterest(String currentUserId, CreateInterestCommand command) {
         UserProfile owner = userGateway.findById(currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado."));
 
         validateBudgetRange(command.getBudgetMin(), command.getBudgetMax());
+        Instant now = Instant.now();
 
         InterestPost interestPost = InterestPost.builder()
                 .ownerId(owner.getId())
@@ -79,8 +85,9 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .preferredCondition(command.getPreferredCondition())
                 .preferredContactMode(command.getPreferredContactMode())
                 .status(InterestStatus.OPEN)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
+                .createdAt(now)
+                .updatedAt(now)
+                .expiresAt(expiresAt(now))
                 .build();
 
         InterestPost saved = interestGateway.save(interestPost);
@@ -171,9 +178,46 @@ public class MarketplaceService implements MarketplaceUseCase {
     }
 
     @Override
+    public InterestPost renewInterest(String currentUserId, String interestId) {
+        InterestPost existingInterest = getInterest(interestId);
+        if (!Objects.equals(existingInterest.getOwnerId(), currentUserId)) {
+            throw new ForbiddenException("Apenas o dono do interesse pode renovar esse anuncio.");
+        }
+
+        UserProfile owner = userGateway.findById(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado."));
+        int availableCredits = owner.getSellerCredits() == null ? 0 : owner.getSellerCredits();
+        if (availableCredits <= 0) {
+            throw new BusinessException("Voce precisa de um credito para renovar este anuncio.");
+        }
+
+        userGateway.save(owner.toBuilder()
+                .sellerCredits(availableCredits - 1)
+                .build());
+
+        Instant now = Instant.now();
+        Instant renewalBase = Optional.ofNullable(existingInterest.getExpiresAt())
+                .filter(expiration -> expiration.isAfter(now))
+                .orElse(now);
+        InterestPost renewedInterest = existingInterest.toBuilder()
+                .expiresAt(expiresAt(renewalBase))
+                .updatedAt(now)
+                .build();
+
+        InterestPost saved = interestGateway.save(renewedInterest);
+        eventPublisherGateway.publish("interest.renewed", Map.of(
+                "interestId", saved.getId(),
+                "ownerId", saved.getOwnerId(),
+                "expiresAt", saved.getExpiresAt()
+        ));
+        return saved;
+    }
+
+    @Override
     public List<InterestPost> listInterests(InterestSearchFilter filter) {
         return interestGateway.findAll()
                 .stream()
+                .filter(this::isNotExpired)
                 .filter(post -> filter.getCategory() == null || post.getCategory() == filter.getCategory())
                 .filter(post -> filter.getCity() == null || filter.getCity().isBlank()
                         || equalsIgnoreCase(post.getLocation() == null ? null : post.getLocation().getCity(), filter.getCity()))
@@ -196,13 +240,21 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .maxBudget(filter.getMaxBudget())
                 .query(filter.getQuery())
                 .openOnly(filter.isOpenOnly())
-                .build(), Math.max(0, offset), Math.max(1, Math.min(limit, 50)));
+                .build(), Math.max(0, offset), Math.max(1, Math.min(limit, 50)))
+                .stream()
+                .filter(this::isNotExpired)
+                .collect(Collectors.toList());
     }
 
     @Override
     public InterestPost getInterest(String id) {
-        return interestGateway.findById(id)
+        InterestPost interest = interestGateway.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Interesse nao encontrado."));
+        if (isExpired(interest)) {
+            interestGateway.deleteById(id);
+            throw new ResourceNotFoundException("Interesse expirado.");
+        }
+        return interest;
     }
 
     @Override
@@ -291,6 +343,27 @@ public class MarketplaceService implements MarketplaceUseCase {
         return post.isBoostEnabled()
                 && post.getBoostedUntil() != null
                 && post.getBoostedUntil().isAfter(Instant.now());
+    }
+
+    private boolean isNotExpired(InterestPost post) {
+        return !isExpired(post);
+    }
+
+    private boolean isExpired(InterestPost post) {
+        Instant expiration = resolveExpiresAt(post.getExpiresAt(), post.getCreatedAt());
+        return expiration != null && !expiration.isAfter(Instant.now());
+    }
+
+    private Instant expiresAt(Instant createdAt) {
+        return createdAt == null ? null : createdAt.plus(safeExpirationDays(), ChronoUnit.DAYS);
+    }
+
+    private Instant resolveExpiresAt(Instant expiresAt, Instant createdAt) {
+        return expiresAt != null ? expiresAt : expiresAt(createdAt);
+    }
+
+    private long safeExpirationDays() {
+        return Math.max(1, listingExpirationDays);
     }
 
     private String normalizeReferenceImage(String referenceImageUrl) {
