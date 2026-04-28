@@ -60,9 +60,26 @@ APP_AUTH_COOKIE_SAME_SITE=None
 APP_AUTH_EXPOSE_RESET_PREVIEW=false
 APP_AUTH_EXPOSE_SESSION_TOKEN=true
 APP_MONETIZATION_PROVIDER=LOCAL_MOCK
+APP_HML_ACCESS_ENABLED=true
+APP_HML_ALLOWED_EMAILS=voce@email.com,pessoa@email.com
 ```
 
 `APP_AUTH_EXPOSE_SESSION_TOKEN=true` facilita o HML quando frontend e backend ficam em dominios diferentes, como Vercel e Render.
+
+## Acesso restrito por e-mail
+
+O HML pode ficar protegido por uma allowlist de e-mails. Com `APP_HML_ACCESS_ENABLED=true`, apenas os e-mails informados em `APP_HML_ALLOWED_EMAILS` conseguem criar conta ou fazer login.
+
+Exemplo:
+
+```env
+APP_HML_ACCESS_ENABLED=true
+APP_HML_ALLOWED_EMAILS=seuemail@gmail.com,avaliador@gmail.com
+```
+
+Se a allowlist estiver ativa e vazia, ninguem consegue entrar. Isso ajuda a evitar que o ambiente de homologacao seja usado por pessoas nao liberadas.
+
+Importante: essa protecao restringe o uso autenticado da aplicacao e da API. A pagina publica da Vercel ainda pode abrir; para bloquear a visualizacao do frontend inteiro antes de carregar a aplicacao, use uma camada externa como Vercel Deployment Protection, Cloudflare Access ou outra protecao no dominio.
 
 ## Frontend na Vercel
 

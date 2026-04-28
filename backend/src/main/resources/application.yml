@@ -46,6 +46,10 @@ application:
     from: ${APP_EMAIL_FROM:no-reply@euprocuro.local}
   monetization:
     provider: ${APP_MONETIZATION_PROVIDER:LOCAL_MOCK}
+  hml:
+    access:
+      enabled: ${APP_HML_ACCESS_ENABLED:false}
+      allowed-emails: ${APP_HML_ALLOWED_EMAILS:}
   messaging:
     rabbit:
       exchange: ${APP_RABBIT_EXCHANGE:euprocuro.exchange}

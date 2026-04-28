@@ -4,6 +4,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -68,6 +69,12 @@ public class AuthService implements AuthUseCase {
     @Value("${application.auth.expose-reset-preview:true}")
     private boolean exposeResetPreview;
 
+    @Value("${application.hml.access.enabled:false}")
+    private boolean hmlAccessEnabled;
+
+    @Value("${application.hml.access.allowed-emails:}")
+    private String hmlAllowedEmails;
+
     @Override
     public AuthenticatedSessionView register(RegisterUserCommand command) {
         String normalizedName = normalizeName(command.getName());
@@ -77,6 +84,7 @@ public class AuthService implements AuthUseCase {
 
         validateName(normalizedName);
         validateEmail(normalizedEmail);
+        validateHmlAccess(normalizedEmail);
         validateDocument(normalizedDocument);
         validatePassword(command.getPassword());
 
@@ -117,7 +125,10 @@ public class AuthService implements AuthUseCase {
 
     @Override
     public AuthenticatedSessionView login(LoginCommand command) {
-        UserProfile user = userGateway.findByEmail(command.getEmail().trim().toLowerCase())
+        String normalizedEmail = normalizeEmail(command.getEmail());
+        validateHmlAccess(normalizedEmail);
+
+        UserProfile user = userGateway.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new UnauthorizedException("E-mail ou senha invalidos."));
 
         if (!StringUtils.hasText(user.getPasswordHash())
@@ -279,6 +290,21 @@ public class AuthService implements AuthUseCase {
         String domain = email.substring(atIndex + 1);
         if (DISPOSABLE_EMAIL_DOMAINS.contains(domain)) {
             throw new BusinessException("Use um e-mail permanente para criar a conta.");
+        }
+    }
+
+    private void validateHmlAccess(String email) {
+        if (!hmlAccessEnabled) {
+            return;
+        }
+
+        boolean allowed = Arrays.stream(Optional.ofNullable(hmlAllowedEmails).orElse("").split(","))
+                .map(this::normalizeEmail)
+                .filter(StringUtils::hasText)
+                .anyMatch(allowedEmail -> allowedEmail.equals(email));
+
+        if (!allowed) {
+            throw new BusinessException("Este ambiente de homologacao e restrito.");
         }
     }
 

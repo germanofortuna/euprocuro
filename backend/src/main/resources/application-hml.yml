@@ -10,3 +10,7 @@ application:
     cookie:
       secure: true
       same-site: None
+  hml:
+    access:
+      enabled: ${APP_HML_ACCESS_ENABLED:true}
+      allowed-emails: ${APP_HML_ALLOWED_EMAILS:}

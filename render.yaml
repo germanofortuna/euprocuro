@@ -25,3 +25,7 @@ services:
         value: "true"
       - key: APP_MONETIZATION_PROVIDER
         value: LOCAL_MOCK
+      - key: APP_HML_ACCESS_ENABLED
+        value: "true"
+      - key: APP_HML_ALLOWED_EMAILS
+        sync: false

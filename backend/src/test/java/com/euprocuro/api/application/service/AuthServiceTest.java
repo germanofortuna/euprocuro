@@ -64,6 +64,8 @@ class AuthServiceTest {
         ReflectionTestUtils.setField(authService, "passwordResetHours", 2L);
         ReflectionTestUtils.setField(authService, "resetBaseUrl", "https://app.euprocuro.com");
         ReflectionTestUtils.setField(authService, "exposeResetPreview", true);
+        ReflectionTestUtils.setField(authService, "hmlAccessEnabled", false);
+        ReflectionTestUtils.setField(authService, "hmlAllowedEmails", "");
     }
 
     @Test
@@ -196,6 +198,49 @@ class AuthServiceTest {
     }
 
     @Test
+    void registerShouldRejectEmailOutsideHmlAllowlistWhenEnabled() {
+        ReflectionTestUtils.setField(authService, "hmlAccessEnabled", true);
+        ReflectionTestUtils.setField(authService, "hmlAllowedEmails", "liberado@teste.com, outro@teste.com");
+
+        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
+                .name("Ana Silva")
+                .email("ana@teste.com")
+                .documentNumber("52998224725")
+                .password("Senha123")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("homologacao");
+    }
+
+    @Test
+    void registerShouldAcceptEmailInsideHmlAllowlistWhenEnabled() {
+        ReflectionTestUtils.setField(authService, "hmlAccessEnabled", true);
+        ReflectionTestUtils.setField(authService, "hmlAllowedEmails", "liberado@teste.com, ana@teste.com");
+
+        RegisterUserCommand command = RegisterUserCommand.builder()
+                .name("Ana Silva")
+                .email("ANA@TESTE.COM")
+                .documentNumber("529.982.247-25")
+                .password("Senha123")
+                .build();
+
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
+        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Senha123")).thenReturn("senha-hash");
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
+            UserProfile user = invocation.getArgument(0);
+            user.setId("user-allowlist");
+            return user;
+        });
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthenticatedSessionView result = authService.register(command);
+
+        assertThat(result.getUser().getEmail()).isEqualTo("ana@teste.com");
+        assertThat(result.getToken()).isNotBlank();
+    }
+
+    @Test
     void registerShouldRejectIncompleteName() {
         assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
                 .name("Ana")
@@ -240,6 +285,19 @@ class AuthServiceTest {
                 .build()))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessageContaining("invalidos");
+    }
+
+    @Test
+    void loginShouldRejectEmailOutsideHmlAllowlistWhenEnabled() {
+        ReflectionTestUtils.setField(authService, "hmlAccessEnabled", true);
+        ReflectionTestUtils.setField(authService, "hmlAllowedEmails", "liberado@teste.com");
+
+        assertThatThrownBy(() -> authService.login(LoginCommand.builder()
+                .email("ana@teste.com")
+                .password("123456")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("homologacao");
     }
 
     @Test
