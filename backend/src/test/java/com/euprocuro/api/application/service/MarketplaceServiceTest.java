@@ -36,6 +36,7 @@ import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
+import com.euprocuro.api.domain.model.InterestSearchCriteria;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.Offer;
@@ -376,6 +377,15 @@ class MarketplaceServiceTest {
     }
 
     @Test
+    void closeInterestShouldRejectDifferentOwner() {
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+
+        assertThatThrownBy(() -> marketplaceService.closeInterest("other-user", "interest-1"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("dono do interesse");
+    }
+
+    @Test
     void deleteInterestShouldRemoveOwnedInterest() {
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
 
@@ -383,6 +393,69 @@ class MarketplaceServiceTest {
 
         verify(interestGateway).deleteById("interest-1");
         verify(eventPublisherGateway).publish(eq("interest.deleted"), any(Map.class));
+    }
+
+    @Test
+    void deleteInterestShouldRejectDifferentOwner() {
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+
+        assertThatThrownBy(() -> marketplaceService.deleteInterest("other-user", "interest-1"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("dono do interesse");
+    }
+
+    @Test
+    void renewInterestShouldRejectDifferentOwner() {
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+
+        assertThatThrownBy(() -> marketplaceService.renewInterest("other-user", "interest-1"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("dono do interesse");
+    }
+
+    @Test
+    void renewInterestShouldRejectMissingOwner() {
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> marketplaceService.renewInterest("buyer-1", "interest-1"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Usuario nao encontrado");
+    }
+
+    @Test
+    void listInterestsWithPaginationShouldUseSearchGatewayAndRemoveExpiredResults() {
+        InterestPost active = baseInterest();
+        active.setId("active");
+        InterestPost expired = baseInterest();
+        expired.setId("expired");
+        expired.setExpiresAt(Instant.now().minus(1, ChronoUnit.HOURS));
+
+        when(interestGateway.search(any(InterestSearchCriteria.class), eq(0), eq(50)))
+                .thenReturn(List.of(active, expired));
+
+        List<InterestPost> result = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .category(InterestCategory.SERVICOS)
+                .city("Campinas")
+                .query("violao")
+                .maxBudget(new BigDecimal("500"))
+                .openOnly(true)
+                .build(), -5, 999);
+
+        assertThat(result).extracting(InterestPost::getId).containsExactly("active");
+    }
+
+    @Test
+    void createOfferShouldRejectMissingSeller() {
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
+                .message("Tenho um item")
+                .offeredPrice(new BigDecimal("400"))
+                .build()))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Vendedor nao encontrado");
     }
 
     private UserProfile baseBuyer() {

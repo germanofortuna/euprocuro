@@ -27,6 +27,7 @@ import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
 import com.euprocuro.api.application.exception.BusinessException;
+import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.exception.UnauthorizedException;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
@@ -111,6 +112,34 @@ class AuthServiceTest {
     }
 
     @Test
+    void registerShouldReturnVerificationSentMessageWhenEmailIsDelivered() {
+        RegisterUserCommand command = RegisterUserCommand.builder()
+                .name("Ana Silva")
+                .email("ana@teste.com")
+                .documentNumber("529.982.247-25")
+                .password("Senha123")
+                .city("Sao Paulo")
+                .state("SP")
+                .build();
+
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
+        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Senha123")).thenReturn("senha-hash");
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
+            UserProfile user = invocation.getArgument(0);
+            user.setId("user-1");
+            return user;
+        });
+        when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(emailGateway.sendEmailVerificationEmail(any(UserProfile.class), any(String.class))).thenReturn(true);
+
+        RegistrationView result = authService.register(command);
+
+        assertThat(result.isVerificationSentByEmail()).isTrue();
+        assertThat(result.getMessage()).contains("Enviamos um link");
+    }
+
+    @Test
     void registerShouldAcceptValidCnpj() {
         RegisterUserCommand command = RegisterUserCommand.builder()
                 .name("Loja Teste")
@@ -189,6 +218,43 @@ class AuthServiceTest {
                 .name("Ana Silva")
                 .email("ana@teste.com")
                 .documentNumber("111.111.111-11")
+                .password("Senha123")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("CPF ou CNPJ valido");
+    }
+
+    @Test
+    void registerShouldRejectInvalidEmailFormat() {
+        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
+                .name("Ana Silva")
+                .email("email-invalido")
+                .documentNumber("52998224725")
+                .password("Senha123")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("e-mail valido");
+    }
+
+    @Test
+    void registerShouldRejectStateWithMoreThanTwoLetters() {
+        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
+                .name("Ana Silva")
+                .email("ana@teste.com")
+                .documentNumber("52998224725")
+                .password("Senha123")
+                .state("SPO")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("UF com 2 letras");
+    }
+
+    @Test
+    void registerShouldRejectCnpjWithRepeatedDigits() {
+        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
+                .name("Loja Teste")
+                .email("loja@teste.com")
+                .documentNumber("11.111.111/1111-11")
                 .password("Senha123")
                 .build()))
                 .isInstanceOf(BusinessException.class)
@@ -466,6 +532,30 @@ class AuthServiceTest {
     }
 
     @Test
+    void resetPasswordShouldRejectBlankToken() {
+        assertThatThrownBy(() -> authService.resetPassword(ResetPasswordCommand.builder()
+                .token(" ")
+                .newPassword("nova1234")
+                .confirmPassword("nova1234")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Token de redefinicao invalido");
+    }
+
+    @Test
+    void resetPasswordShouldRejectUnknownToken() {
+        when(passwordResetTokenGateway.findByToken("missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.resetPassword(ResetPasswordCommand.builder()
+                .token("missing")
+                .newPassword("nova1234")
+                .confirmPassword("nova1234")
+                .build()))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Token de redefinicao nao encontrado");
+    }
+
+    @Test
     void resetPasswordShouldRejectExpiredToken() {
         PasswordResetToken resetToken = PasswordResetToken.builder()
                 .token("reset-123")
@@ -522,6 +612,54 @@ class AuthServiceTest {
     }
 
     @Test
+    void verifyEmailShouldRejectBlankToken() {
+        assertThatThrownBy(() -> authService.verifyEmail(" "))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Token de verificacao invalido");
+    }
+
+    @Test
+    void verifyEmailShouldRejectUnknownToken() {
+        when(emailVerificationTokenGateway.findByToken("missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.verifyEmail("missing"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Token de verificacao nao encontrado");
+    }
+
+    @Test
+    void verifyEmailShouldRejectUsedToken() {
+        EmailVerificationToken token = EmailVerificationToken.builder()
+                .token("verify-123")
+                .userId("user-1")
+                .usedAt(Instant.now())
+                .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+
+        when(emailVerificationTokenGateway.findByToken("verify-123")).thenReturn(Optional.of(token));
+
+        assertThatThrownBy(() -> authService.verifyEmail("verify-123"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ja foi verificado");
+    }
+
+    @Test
+    void verifyEmailShouldRejectMissingUser() {
+        EmailVerificationToken token = EmailVerificationToken.builder()
+                .token("verify-123")
+                .userId("missing-user")
+                .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+
+        when(emailVerificationTokenGateway.findByToken("verify-123")).thenReturn(Optional.of(token));
+        when(userGateway.findById("missing-user")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.verifyEmail("verify-123"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Usuario nao encontrado");
+    }
+
+    @Test
     void verifyEmailShouldRejectExpiredToken() {
         EmailVerificationToken token = EmailVerificationToken.builder()
                 .token("verify-123")
@@ -554,6 +692,30 @@ class AuthServiceTest {
                 .build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("ja foi utilizado");
+    }
+
+    @Test
+    void requireAuthenticatedUserShouldRejectBlankToken() {
+        assertThatThrownBy(() -> authService.requireAuthenticatedUser(" "))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("Sessao nao informada");
+    }
+
+    @Test
+    void requireAuthenticatedUserShouldRejectMissingUserForValidSession() {
+        AuthSession session = AuthSession.builder()
+                .token("token-123")
+                .userId("missing-user")
+                .createdAt(Instant.now())
+                .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+
+        when(authSessionGateway.findByToken("token-123")).thenReturn(Optional.of(session));
+        when(userGateway.findById("missing-user")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.requireAuthenticatedUser("token-123"))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("Sessao invalida");
     }
 
     private UserProfile baseUser() {

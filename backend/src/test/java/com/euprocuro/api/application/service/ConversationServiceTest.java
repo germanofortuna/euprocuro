@@ -81,6 +81,22 @@ class ConversationServiceTest {
     }
 
     @Test
+    void getOfferConversationShouldOmitInitialOfferMessageWhenOfferMessageIsBlank() {
+        Offer offer = baseOffer().toBuilder()
+                .message(" ")
+                .build();
+
+        when(offerGateway.findById("offer-1")).thenReturn(Optional.of(offer));
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        when(conversationMessageGateway.findByOfferIdOrderByCreatedAtAsc("offer-1")).thenReturn(List.of(baseMessage()));
+
+        OfferConversationView result = conversationService.getOfferConversation("buyer-1", "offer-1");
+
+        assertThat(result.getMessages()).hasSize(1);
+        assertThat(result.getMessages().get(0).getId()).isEqualTo("msg-1");
+    }
+
+    @Test
     void getOfferConversationShouldRejectNonParticipant() {
         when(offerGateway.findById("offer-1")).thenReturn(Optional.of(baseOffer()));
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));

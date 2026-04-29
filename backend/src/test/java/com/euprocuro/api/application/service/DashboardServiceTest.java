@@ -110,6 +110,84 @@ class DashboardServiceTest {
     }
 
     @Test
+    void getDashboardShouldHandleUserWithoutInterestsOrOffers() {
+        UserProfile user = UserProfile.builder().id("buyer-1").name("Ana").email("ana@teste.com").build();
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(user));
+        when(interestGateway.findByOwnerIdOrderByCreatedAtDesc("buyer-1")).thenReturn(List.of());
+        when(offerGateway.findBySellerIdOrderByCreatedAtDesc("buyer-1")).thenReturn(List.of());
+        when(interestGateway.findAll()).thenReturn(List.of());
+
+        PersonalDashboardView result = dashboardService.getDashboard("buyer-1");
+
+        assertThat(result.getTotalActiveInterests()).isZero();
+        assertThat(result.getOffersReceived()).isEmpty();
+        assertThat(result.getOffersSent()).isEmpty();
+    }
+
+    @Test
+    void getDashboardShouldKeepNewestMessagePerOfferAndFilterExpiredInterests() {
+        UserProfile user = UserProfile.builder().id("buyer-1").name("Ana").email("ana@teste.com").build();
+        InterestPost activeInterest = InterestPost.builder()
+                .id("interest-1")
+                .ownerId("buyer-1")
+                .ownerName("Ana")
+                .title("Quero um violao")
+                .status(InterestStatus.OPEN)
+                .createdAt(Instant.now().minus(1, ChronoUnit.DAYS))
+                .build();
+        InterestPost expiredInterest = InterestPost.builder()
+                .id("expired-interest")
+                .ownerId("buyer-1")
+                .ownerName("Ana")
+                .title("Interesse antigo")
+                .status(InterestStatus.OPEN)
+                .createdAt(Instant.now().minus(60, ChronoUnit.DAYS))
+                .build();
+        Offer receivedOffer = Offer.builder()
+                .id("offer-r1")
+                .interestPostId("interest-1")
+                .sellerId("seller-1")
+                .sellerName("Carlos")
+                .status(OfferStatus.SENT)
+                .createdAt(Instant.now())
+                .build();
+        Offer sentOffer = Offer.builder()
+                .id("offer-s1")
+                .interestPostId("interest-1")
+                .sellerId("buyer-1")
+                .sellerName("Ana")
+                .status(OfferStatus.SENT)
+                .createdAt(Instant.now())
+                .build();
+        ConversationMessage olderMessage = ConversationMessage.builder()
+                .offerId("offer-r1")
+                .senderId("seller-1")
+                .content("Mensagem antiga")
+                .createdAt(Instant.now().minus(2, ChronoUnit.HOURS))
+                .build();
+        ConversationMessage newestMessage = ConversationMessage.builder()
+                .offerId("offer-r1")
+                .senderId("buyer-1")
+                .content("Mensagem nova")
+                .createdAt(Instant.now())
+                .build();
+
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(user));
+        when(interestGateway.findByOwnerIdOrderByCreatedAtDesc("buyer-1")).thenReturn(List.of(activeInterest, expiredInterest));
+        when(offerGateway.findByInterestPostIdInOrderByCreatedAtDesc(List.of("interest-1"))).thenReturn(List.of(receivedOffer));
+        when(offerGateway.findBySellerIdOrderByCreatedAtDesc("buyer-1")).thenReturn(List.of(sentOffer));
+        when(conversationMessageGateway.findByOfferIdInOrderByCreatedAtAsc(List.of("offer-r1", "offer-s1")))
+                .thenReturn(List.of(olderMessage, newestMessage));
+        when(interestGateway.findAll()).thenReturn(List.of(activeInterest, expiredInterest));
+
+        PersonalDashboardView result = dashboardService.getDashboard("buyer-1");
+
+        assertThat(result.getMyInterests()).extracting(InterestPost::getId).containsExactly("interest-1");
+        assertThat(result.getOffersReceived().get(0).getLatestMessage()).isEqualTo("Mensagem nova");
+        assertThat(result.getOffersReceived().get(0).getLatestMessageSenderId()).isEqualTo("buyer-1");
+    }
+
+    @Test
     void getDashboardShouldRejectUnknownUser() {
         when(userGateway.findById("missing")).thenReturn(Optional.empty());
 

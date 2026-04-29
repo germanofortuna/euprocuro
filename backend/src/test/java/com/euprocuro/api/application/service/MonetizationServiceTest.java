@@ -9,7 +9,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
 
@@ -68,6 +70,19 @@ class MonetizationServiceTest {
 
     @Test
     void getAccountShouldReturnCreditsPlanAndProducts() {
+        PaymentOrder paymentOrder = PaymentOrder.builder()
+                .id("order-1")
+                .productCode("CREDITS_10")
+                .productName("10 propostas")
+                .amount(new BigDecimal("9.90"))
+                .paymentMethod("PIX")
+                .provider("LOCAL_MOCK")
+                .status(PaymentOrderStatus.APPROVED)
+                .providerPaymentId("provider-1")
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .approvedAt(Instant.now())
+                .build();
         UserProfile user = baseUser().toBuilder()
                 .sellerCredits(4)
                 .purchasedCreditsTotal(10)
@@ -75,6 +90,7 @@ class MonetizationServiceTest {
                 .subscriptionActiveUntil(Instant.now().plusSeconds(3600))
                 .build();
         when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+        when(paymentOrderGateway.findRecentByUserId("user-1")).thenReturn(java.util.List.of(paymentOrder));
 
         MonetizationAccountView result = monetizationService.getAccount("user-1");
 
@@ -82,6 +98,8 @@ class MonetizationServiceTest {
         assertThat(result.getPurchasedCreditsTotal()).isEqualTo(10);
         assertThat(result.isSubscriptionActive()).isTrue();
         assertThat(result.getProducts()).isNotEmpty();
+        assertThat(result.getPaymentHistory()).hasSize(1);
+        assertThat(result.getPaymentHistory().get(0).getProductName()).isEqualTo("10 propostas");
     }
 
     @Test
@@ -118,6 +136,25 @@ class MonetizationServiceTest {
 
         verify(userGateway).save(any(UserProfile.class));
         verify(emailGateway).sendPurchaseConfirmationEmail(any(UserProfile.class), eq("Plano vendedor Pro"), eq("CREDIT_CARD"));
+    }
+
+    @Test
+    void purchaseShouldExtendExistingActiveSubscription() {
+        UserProfile user = baseUser().toBuilder()
+                .subscriptionActiveUntil(Instant.now().plus(10, ChronoUnit.DAYS))
+                .build();
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        monetizationService.purchase("user-1", PurchaseProductCommand.builder()
+                .productCode("SELLER_PRO")
+                .paymentMethod("PIX")
+                .build());
+
+        verify(userGateway).save(org.mockito.ArgumentMatchers.argThat(savedUser ->
+                savedUser.getSubscriptionActiveUntil().isAfter(user.getSubscriptionActiveUntil().plus(29, ChronoUnit.DAYS))
+        ));
     }
 
     @Test
@@ -188,6 +225,26 @@ class MonetizationServiceTest {
         verify(userGateway, never()).save(any(UserProfile.class));
         verify(emailGateway, never()).sendPurchaseConfirmationEmail(any(), any(), any());
         verify(eventPublisherGateway).publish(eq("monetization.purchase.created"), any(Map.class));
+    }
+
+    @Test
+    void mercadoPagoPurchaseShouldMarkOrderRejectedWhenCheckoutGatewayFails() {
+        ReflectionTestUtils.setField(monetizationService, "checkoutProvider", "MERCADO_PAGO_CHECKOUT_PRO");
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+        when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentCheckoutGateway.createCheckout(any(UserProfile.class), any(), any(PaymentOrder.class)))
+                .thenThrow(new RuntimeException("gateway fora"));
+
+        assertThatThrownBy(() -> monetizationService.purchase("user-1", PurchaseProductCommand.builder()
+                .productCode("CREDITS_10")
+                .paymentMethod("PIX")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("gateway fora");
+
+        verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
+                order.getStatus() == PaymentOrderStatus.REJECTED
+        ));
     }
 
     @Test
@@ -297,6 +354,72 @@ class MonetizationServiceTest {
     }
 
     @Test
+    void confirmPaymentShouldRejectPaymentWithoutExternalReference() {
+        when(paymentStatusGateway.findPayment("123")).thenReturn(PaymentProviderStatus.builder()
+                .paymentId("123")
+                .status("approved")
+                .externalReference(" ")
+                .build());
+
+        assertThatThrownBy(() -> monetizationService.confirmPayment("123"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("referencia externa");
+    }
+
+    @Test
+    void confirmPaymentShouldMapCancelledProviderStatus() {
+        PaymentOrder paymentOrder = PaymentOrder.builder()
+                .id("order-1")
+                .userId("user-1")
+                .productCode("CREDITS_10")
+                .paymentMethod("PIX")
+                .provider("MERCADO_PAGO_CHECKOUT_PRO")
+                .status(PaymentOrderStatus.PENDING)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+        when(paymentStatusGateway.findPayment("123")).thenReturn(PaymentProviderStatus.builder()
+                .paymentId("123")
+                .status("cancelled")
+                .externalReference("order-1")
+                .build());
+        when(paymentOrderGateway.findById("order-1")).thenReturn(Optional.of(paymentOrder));
+
+        monetizationService.confirmPayment("123");
+
+        verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
+                order.getStatus() == PaymentOrderStatus.CANCELLED
+        ));
+    }
+
+    @Test
+    void confirmPaymentShouldMapUnknownProviderStatusAsPendingAndFallbackPaymentMethod() {
+        PaymentOrder paymentOrder = PaymentOrder.builder()
+                .id("order-1")
+                .userId("user-1")
+                .productCode("CREDITS_10")
+                .paymentMethod(null)
+                .provider("MERCADO_PAGO_CHECKOUT_PRO")
+                .status(PaymentOrderStatus.PENDING)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+        when(paymentStatusGateway.findPayment("123")).thenReturn(PaymentProviderStatus.builder()
+                .paymentId("123")
+                .status("in_process")
+                .externalReference("order-1")
+                .paymentMethod(" ")
+                .build());
+        when(paymentOrderGateway.findById("order-1")).thenReturn(Optional.of(paymentOrder));
+
+        monetizationService.confirmPayment("123");
+
+        verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
+                order.getStatus() == PaymentOrderStatus.PENDING && "PIX".equals(order.getPaymentMethod())
+        ));
+    }
+
+    @Test
     void confirmPaymentShouldOnlyUpdateOrderWhenPaymentIsRejected() {
         PaymentOrder paymentOrder = PaymentOrder.builder()
                 .id("order-1")
@@ -351,6 +474,30 @@ class MonetizationServiceTest {
     }
 
     @Test
+    void approveLocalCheckoutShouldOnlyUpdateAlreadyApprovedOrder() {
+        PaymentOrder paymentOrder = PaymentOrder.builder()
+                .id("order-1")
+                .userId("user-1")
+                .productCode("CREDITS_10")
+                .paymentMethod("pix")
+                .provider("LOCAL_CHECKOUT_MOCK")
+                .status(PaymentOrderStatus.APPROVED)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+        when(paymentOrderGateway.findById("order-1")).thenReturn(Optional.of(paymentOrder));
+
+        monetizationService.approveLocalCheckout("order-1");
+
+        verify(userGateway, never()).save(any(UserProfile.class));
+        verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
+                order.getStatus() == PaymentOrderStatus.APPROVED
+                        && "order-1".equals(order.getProviderPaymentId())
+                        && "PIX".equals(order.getPaymentMethod())
+        ));
+    }
+
+    @Test
     void boostInterestShouldExtendInterestBoost() {
         InterestPost interest = baseInterest();
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
@@ -366,6 +513,25 @@ class MonetizationServiceTest {
         assertThat(result.getBoostedUntil()).isAfter(Instant.now());
         verify(emailGateway).sendBoostActivatedEmail(any(UserProfile.class), eq("Quero um carro"), any(String.class));
         verify(eventPublisherGateway).publish(eq("interest.boosted"), any(Map.class));
+    }
+
+    @Test
+    void boostInterestShouldExtendExistingBoostWindow() {
+        InterestPost interest = baseInterest().toBuilder()
+                .boostEnabled(true)
+                .boostedUntil(Instant.now().plus(2, ChronoUnit.DAYS))
+                .build();
+        Instant previousBoostedUntil = interest.getBoostedUntil();
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+
+        InterestPost result = monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+                .boostCode("BOOST_3_DAYS")
+                .paymentMethod("PIX")
+                .build());
+
+        assertThat(result.getBoostedUntil()).isAfter(previousBoostedUntil.plus(2, ChronoUnit.DAYS));
     }
 
     @Test
