@@ -43,7 +43,9 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/auth/login",
                         "/api/auth/register",
                         "/api/auth/forgot-password",
-                        "/api/auth/reset-password"
+                        "/api/auth/reset-password",
+                        "/api/monetization/mercado-pago/webhook",
+                        "/api/monetization/local-checkout/approve/**"
                 );
     }
 

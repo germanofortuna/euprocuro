@@ -46,6 +46,39 @@ application:
     from: ${APP_EMAIL_FROM:no-reply@euprocuro.local}
   monetization:
     provider: ${APP_MONETIZATION_PROVIDER:LOCAL_MOCK}
+    local-checkout:
+      base-url: ${LOCAL_CHECKOUT_BASE_URL:http://localhost:8080/api/monetization/local-checkout/approve}
+      success-url: ${LOCAL_CHECKOUT_SUCCESS_URL:http://localhost:5173?payment=success}
+    mercado-pago:
+      access-token: ${MERCADO_PAGO_ACCESS_TOKEN:}
+      sandbox: ${MERCADO_PAGO_SANDBOX:true}
+      success-url: ${MERCADO_PAGO_SUCCESS_URL:http://localhost:5173?payment=success}
+      failure-url: ${MERCADO_PAGO_FAILURE_URL:http://localhost:5173?payment=failure}
+      pending-url: ${MERCADO_PAGO_PENDING_URL:http://localhost:5173?payment=pending}
+      notification-url: ${MERCADO_PAGO_NOTIFICATION_URL:}
+      webhook-secret: ${MERCADO_PAGO_WEBHOOK_SECRET:}
+      webhook-signature-required: ${MERCADO_PAGO_WEBHOOK_SIGNATURE_REQUIRED:true}
+    catalog:
+      credits-10:
+        price: ${APP_PRODUCT_CREDITS_10_PRICE:9.90}
+        credits: ${APP_PRODUCT_CREDITS_10_AMOUNT:10}
+        enabled: ${APP_PRODUCT_CREDITS_10_ENABLED:true}
+      credits-30:
+        price: ${APP_PRODUCT_CREDITS_30_PRICE:24.90}
+        credits: ${APP_PRODUCT_CREDITS_30_AMOUNT:30}
+        enabled: ${APP_PRODUCT_CREDITS_30_ENABLED:true}
+      seller-pro:
+        price: ${APP_PRODUCT_SELLER_PRO_PRICE:49.90}
+        duration-days: ${APP_PRODUCT_SELLER_PRO_DURATION_DAYS:30}
+        enabled: ${APP_PRODUCT_SELLER_PRO_ENABLED:true}
+      boost-3-days:
+        price: ${APP_PRODUCT_BOOST_3_DAYS_PRICE:9.90}
+        duration-days: ${APP_PRODUCT_BOOST_3_DAYS_DURATION_DAYS:3}
+        enabled: ${APP_PRODUCT_BOOST_3_DAYS_ENABLED:true}
+      boost-7-days:
+        price: ${APP_PRODUCT_BOOST_7_DAYS_PRICE:19.90}
+        duration-days: ${APP_PRODUCT_BOOST_7_DAYS_DURATION_DAYS:7}
+        enabled: ${APP_PRODUCT_BOOST_7_DAYS_ENABLED:true}
   listings:
     expiration-days: ${APP_LISTING_EXPIRATION_DAYS:5}
     cleanup:

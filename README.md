@@ -40,7 +40,7 @@ O backend segue uma separacao clara entre camadas:
 - Publicacao de interesses com imagem de referencia
 - Busca publica por texto, categoria, cidade e teto de orcamento
 - Monetizacao MVP com creditos para vendedores, plano Pro e boost de interesses
-- Checkout local simulado preparado para trocar por gateway real via webhook
+- Checkout local simulado e Checkout Pro Mercado Pago com confirmacao por webhook
 - E-mails transacionais para reset de senha, nova oferta, mensagem, compra e boost
 - Modais de feedback para mensagens de sucesso ou erro
 - RabbitMQ configurado para eventos de autenticacao, criacao de interesse e criacao de oferta
@@ -198,29 +198,93 @@ Eventos que ja disparam e-mail:
 
 ## Monetizacao e pagamentos
 
-O MVP ja possui produtos de monetizacao em [MonetizationCatalog.java](/C:/projetos/euprocuro/backend/src/main/java/com/euprocuro/api/application/service/MonetizationCatalog.java):
+O MVP ja possui produtos de monetizacao configuraveis por ambiente:
 
 - pacotes de creditos para vendedores enviarem propostas
 - plano vendedor Pro com propostas liberadas enquanto estiver ativo
 - boost de 3 ou 7 dias para destacar interesses na busca e na home
 
-Hoje o pagamento usa o provedor `LOCAL_MOCK`: a API simula aprovacao imediata para permitir testar produto, tela e regras de negocio sem dinheiro real. Para producao, o fluxo esperado e:
+Por padrao geral, o pagamento usa o provedor `LOCAL_MOCK`: a API simula aprovacao imediata para permitir testar produto, tela e regras de negocio sem dinheiro real.
 
-1. O usuario escolhe Pix ou cartao no frontend.
-2. O backend cria a cobranca/assinatura no gateway.
-3. O usuario paga no gateway.
-4. O gateway chama um webhook seguro no backend.
-5. Somente apos validar o webhook, a API libera creditos, plano ou boost.
-
-Variaveis planejadas para trocar o mock por gateway real:
+No profile `local`, o provedor padrao e `LOCAL_CHECKOUT_MOCK`. Ele cria um pedido pendente, redireciona para um checkout fake local e aprova o pedido automaticamente antes de voltar ao frontend. Assim da para testar o fluxo ponta-a-ponta sem ngrok e sem webhook real:
 
 ```bash
-APP_MONETIZATION_PROVIDER=ASAAS
-PAYMENT_GATEWAY_API_KEY=sua-chave
-PAYMENT_WEBHOOK_SECRET=segredo-do-webhook
+mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-Para o Brasil, a opcao mais simples para este MVP tende a ser o Asaas, porque trabalha com Pix, cartao, cobrancas recorrentes, API, webhooks e ambiente de sandbox. Mercado Pago tambem e uma boa alternativa, especialmente se voce preferir Checkout Pro/Bricks, mas a modelagem de assinatura + creditos costuma ficar um pouco mais trabalhosa.
+Com esse profile, ao comprar creditos no frontend:
+
+1. A API cria um pedido em `payment_orders`.
+2. O frontend redireciona para `/api/monetization/local-checkout/approve/{paymentOrderId}`.
+3. A API aprova o pedido localmente.
+4. A API redireciona de volta para `http://localhost:5173?payment=success`.
+5. Os creditos aparecem para o usuario.
+
+Para usar o Checkout Pro do Mercado Pago:
+
+```bash
+APP_MONETIZATION_PROVIDER=MERCADO_PAGO_CHECKOUT_PRO
+MERCADO_PAGO_ACCESS_TOKEN=TEST-...
+MERCADO_PAGO_SANDBOX=true
+MERCADO_PAGO_SUCCESS_URL=https://seu-front.vercel.app?payment=success
+MERCADO_PAGO_FAILURE_URL=https://seu-front.vercel.app?payment=failure
+MERCADO_PAGO_PENDING_URL=https://seu-front.vercel.app?payment=pending
+MERCADO_PAGO_NOTIFICATION_URL=https://sua-api.onrender.com/api/monetization/mercado-pago/webhook
+MERCADO_PAGO_WEBHOOK_SECRET=assinatura-secreta-do-webhook
+MERCADO_PAGO_WEBHOOK_SIGNATURE_REQUIRED=true
+```
+
+Para forcar o mock local mesmo fora do profile `local`:
+
+```bash
+APP_MONETIZATION_PROVIDER=LOCAL_CHECKOUT_MOCK
+LOCAL_CHECKOUT_BASE_URL=http://localhost:8080/api/monetization/local-checkout/approve
+LOCAL_CHECKOUT_SUCCESS_URL=http://localhost:5173?payment=success
+```
+
+Fluxo do Checkout Pro:
+
+1. O usuario escolhe Pix ou cartao no frontend.
+2. O backend cria uma preferencia de pagamento no Mercado Pago.
+3. O usuario paga no gateway.
+4. O Mercado Pago chama o webhook da API.
+5. A API consulta o pagamento no Mercado Pago usando o `payment_id`.
+6. Somente apos status `approved`, a API libera creditos ou plano.
+
+O endpoint publico do webhook e:
+
+```bash
+POST /api/monetization/mercado-pago/webhook
+```
+
+Mesmo sendo publico, o webhook valida a autenticidade da chamada com os headers `x-signature` e `x-request-id`, usando a assinatura secreta configurada no painel do Mercado Pago. Sem uma assinatura valida, a API responde `401` e nao consulta nem libera pagamento.
+
+### Precos configuraveis
+
+Os precos e quantidades nao ficam hardcoded. Use variaveis de ambiente para alterar sem mexer no codigo:
+
+```bash
+APP_PRODUCT_CREDITS_10_PRICE=9.90
+APP_PRODUCT_CREDITS_10_AMOUNT=10
+APP_PRODUCT_CREDITS_30_PRICE=24.90
+APP_PRODUCT_CREDITS_30_AMOUNT=30
+APP_PRODUCT_SELLER_PRO_PRICE=49.90
+APP_PRODUCT_SELLER_PRO_DURATION_DAYS=30
+APP_PRODUCT_BOOST_3_DAYS_PRICE=9.90
+APP_PRODUCT_BOOST_3_DAYS_DURATION_DAYS=3
+APP_PRODUCT_BOOST_7_DAYS_PRICE=19.90
+APP_PRODUCT_BOOST_7_DAYS_DURATION_DAYS=7
+```
+
+Tambem e possivel esconder produtos por ambiente:
+
+```bash
+APP_PRODUCT_CREDITS_10_ENABLED=true
+APP_PRODUCT_CREDITS_30_ENABLED=true
+APP_PRODUCT_SELLER_PRO_ENABLED=true
+APP_PRODUCT_BOOST_3_DAYS_ENABLED=true
+APP_PRODUCT_BOOST_7_DAYS_ENABLED=true
+```
 
 ## Seguranca para producao
 
@@ -256,6 +320,7 @@ O backend ja sobe com publisher pronto para RabbitMQ. Os principais eventos publ
 - `interest.updated`
 - `interest.boosted`
 - `offer.created`
+- `monetization.purchase.created`
 - `monetization.purchase.completed`
 
 Exchange e filas podem ser ajustadas por ambiente:
@@ -290,6 +355,7 @@ APP_RABBIT_AUTH_QUEUE=euprocuro.auth.events
 - `GET /api/monetization/account`
 - `POST /api/monetization/purchase`
 - `POST /api/monetization/interests/{interestId}/boost`
+- `POST /api/monetization/mercado-pago/webhook`
 
 ## Testes e cobertura
 

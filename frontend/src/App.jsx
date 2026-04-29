@@ -509,6 +509,7 @@ export default function App() {
   const [sharingSellerItemInterestId, setSharingSellerItemInterestId] = useState(null);
   const [isProcessingPurchase, setIsProcessingPurchase] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null);
+  const [selectedPurchaseProductCode, setSelectedPurchaseProductCode] = useState(null);
   const [feedbackModal, setFeedbackModal] = useState(null);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -542,6 +543,14 @@ export default function App() {
   const subscriptionProducts = useMemo(
     () => (monetizationAccount?.products ?? []).filter((product) => product.type === "SUBSCRIPTION"),
     [monetizationAccount?.products]
+  );
+  const purchaseProducts = useMemo(
+    () => [...creditProducts, ...subscriptionProducts],
+    [creditProducts, subscriptionProducts]
+  );
+  const selectedPurchaseProduct = useMemo(
+    () => purchaseProducts.find((product) => product.code === selectedPurchaseProductCode) ?? purchaseProducts[0] ?? null,
+    [purchaseProducts, selectedPurchaseProductCode]
   );
   const boostProducts = useMemo(
     () => (monetizationAccount?.products ?? []).filter((product) => product.type === "BOOST"),
@@ -1635,6 +1644,23 @@ export default function App() {
     setIsProcessingPurchase(true);
     try {
       const checkout = await purchaseProduct({ productCode, paymentMethod });
+      const checkoutUrl = checkout.checkoutUrl ?? "";
+      const isExternalCheckout = checkoutUrl && !checkoutUrl.startsWith("local://");
+
+      if (isExternalCheckout) {
+        setPaymentStatus({
+          productCode,
+          productName: product?.name ?? productCode,
+          paymentMethod: checkout.paymentMethod ?? paymentMethod,
+          provider: checkout.provider ?? "MERCADO_PAGO_CHECKOUT_PRO",
+          checkoutUrl,
+          step: "PAYMENT",
+          message: checkout.message || "Finalize o pagamento no Mercado Pago. Os creditos serao liberados apos a confirmacao."
+        });
+        openFeedback("success", "Checkout criado", "Voce sera direcionado para concluir o pagamento com seguranca.");
+        window.location.assign(checkoutUrl);
+        return;
+      }
       await refreshPrivateData();
       setPaymentStatus({
         productCode,
@@ -1642,6 +1668,7 @@ export default function App() {
         paymentMethod: checkout.paymentMethod ?? paymentMethod,
         provider: checkout.provider ?? "LOCAL_MOCK",
         step: "COMPLETED",
+        checkoutUrl,
         message: checkout.message || "Pagamento aprovado e créditos liberados."
       });
       openFeedback("success", "Pagamento aprovado", checkout.message || "Seu saldo foi atualizado.");
@@ -2571,6 +2598,11 @@ export default function App() {
         </div>
 
         <p>{paymentStatus.message}</p>
+        {paymentStatus.checkoutUrl && !paymentStatus.checkoutUrl.startsWith("local://") && (
+          <a className="primary-button primary-button--compact" href={paymentStatus.checkoutUrl}>
+            Abrir checkout
+          </a>
+        )}
       </div>
     );
   }
@@ -2607,7 +2639,84 @@ export default function App() {
 
         {renderPaymentTracker()}
 
-        <div className="purchase-grid">
+        <div className="purchase-flow">
+          <article className="purchase-column">
+            <span className="eyebrow">Escolha uma opção</span>
+            <h3>Créditos ou plano para enviar propostas</h3>
+            <div className="purchase-options">
+              {purchaseProducts.map((product) => {
+                const isSelected = selectedPurchaseProduct?.code === product.code;
+                const description = product.type === "SUBSCRIPTION"
+                  ? `Plano ativo por ${product.durationDays} dias para vendedores frequentes.`
+                  : `${product.credits} propostas para responder interesses de compradores.`;
+
+                return (
+                  <button
+                    key={product.code}
+                    type="button"
+                    className={`purchase-option ${isSelected ? "purchase-option--selected" : ""}`}
+                    onClick={() => setSelectedPurchaseProductCode(product.code)}
+                    aria-pressed={isSelected}
+                  >
+                    <span className="purchase-option__radio" aria-hidden="true" />
+                    <span className="purchase-option__content">
+                      <strong>{product.name}</strong>
+                      <small>{description}</small>
+                    </span>
+                    <span className="purchase-option__price">{currency(product.price)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </article>
+
+          <article className="purchase-column purchase-payment">
+            <span className="eyebrow">Pagamento</span>
+            <h3>{selectedPurchaseProduct ? selectedPurchaseProduct.name : "Selecione uma opção"}</h3>
+            <p>
+              {selectedPurchaseProduct
+                ? `Total selecionado: ${currency(selectedPurchaseProduct.price)}`
+                : "Escolha um pacote ou plano para continuar."}
+            </p>
+            <div className="product-chip__actions product-chip__actions--payment">
+              <button
+                type="button"
+                className="primary-button primary-button--compact payment-button"
+                disabled={isProcessingPurchase || !selectedPurchaseProduct}
+                onClick={() => selectedPurchaseProduct && handlePurchaseProduct(selectedPurchaseProduct.code, "PIX")}
+              >
+                <span className="payment-button__icon" aria-hidden="true">
+                  <svg className="payment-button__svg payment-button__svg--pix" viewBox="0 0 42 42" focusable="false">
+                    <path d="M21 7.5 29.5 16a7 7 0 0 1 0 10L21 34.5 12.5 26a7 7 0 0 1 0-10L21 7.5Z" />
+                    <path d="m10 19 5-5m12 14 5-5" />
+                  </svg>
+                </span>
+                <span className="payment-button__text">
+                  <strong>Pix</strong>
+                  <small>Aprovação imediata</small>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="ghost-button payment-button"
+                disabled={isProcessingPurchase || !selectedPurchaseProduct}
+                onClick={() => selectedPurchaseProduct && handlePurchaseProduct(selectedPurchaseProduct.code, "CREDIT_CARD")}
+              >
+                <span className="payment-button__icon" aria-hidden="true">
+                  <svg className="payment-button__svg payment-button__svg--card" viewBox="0 0 42 42" focusable="false">
+                    <rect x="10" y="13" width="22" height="16" rx="2.5" />
+                    <path d="M10 18h22M14 25h8" />
+                  </svg>
+                </span>
+                <span className="payment-button__text">
+                  <strong>Cartão</strong>
+                </span>
+              </button>
+            </div>
+          </article>
+        </div>
+
+        <div className="purchase-grid purchase-grid--legacy-hidden">
           <article className="purchase-column">
             <span className="eyebrow">Pacotes</span>
             <h3>Créditos para enviar propostas</h3>
@@ -2622,19 +2731,46 @@ export default function App() {
                   <div className="product-chip__actions">
                     <button
                       type="button"
-                      className="primary-button primary-button--compact"
+                      className="primary-button primary-button--compact payment-button"
                       disabled={isProcessingPurchase}
                       onClick={() => handlePurchaseProduct(product.code, "PIX")}
                     >
-                      Pagar com Pix
+                      <span className="payment-button__icon" aria-hidden="true">
+                        <svg
+                            className="payment-button__svg payment-button__svg--pix"
+                            viewBox="0 0 42 42"
+                            focusable="false"
+                        >
+                          <path
+                              className="payment-button__svg-pix-shape"
+                              d="M21 7.5 29.5 16a7 7 0 0 1 0 10L21 34.5 12.5 26a7 7 0 0 1 0-10L21 7.5Z"
+                          />
+                          <path
+                              className="payment-button__svg-pix-lines"
+                              d="m10 19 5-5m12 14 5-5"
+                          />
+                        </svg>
+                      </span>
+                      <span className="payment-button__text">
+                        <strong>Pix</strong>
+                        <small>Aprovação imediata</small>
+                      </span>
                     </button>
                     <button
                       type="button"
-                      className="ghost-button"
+                      className="ghost-button payment-button"
                       disabled={isProcessingPurchase}
                       onClick={() => handlePurchaseProduct(product.code, "CREDIT_CARD")}
                     >
-                      Cartão
+                      <span className="payment-button__icon" aria-hidden="true">
+                        <svg className="payment-button__svg payment-button__svg--card" viewBox="0 0 42 42" focusable="false">
+                          <rect x="10" y="13" width="22" height="16" rx="2.5" />
+                          <path d="M10 18h22M14 25h8" />
+                        </svg>
+                      </span>
+                      <span className="payment-button__text">
+                        <strong>Cartão</strong>
+                      </span>
                     </button>
                   </div>
                 </article>
@@ -2656,19 +2792,36 @@ export default function App() {
                   <div className="product-chip__actions">
                     <button
                       type="button"
-                      className="primary-button primary-button--compact"
+                      className="primary-button primary-button--compact payment-button"
                       disabled={isProcessingPurchase}
                       onClick={() => handlePurchaseProduct(product.code, "PIX")}
                     >
-                      Pagar com Pix
+                      <span className="payment-button__icon" aria-hidden="true">
+                        <svg className="payment-button__svg payment-button__svg--pix" viewBox="0 0 42 42" focusable="false">
+                          <path d="M21 7.5 29.5 16a7 7 0 0 1 0 10L21 34.5 12.5 26a7 7 0 0 1 0-10L21 7.5Z" />
+                          <path d="m10 19 5-5m12 14 5-5" />
+                        </svg>
+                      </span>
+                      <span className="payment-button__text">
+                        <strong>Pix</strong>
+                        <small>Aprovação imediata</small>
+                      </span>
                     </button>
                     <button
                       type="button"
-                      className="ghost-button"
+                      className="ghost-button payment-button"
                       disabled={isProcessingPurchase}
                       onClick={() => handlePurchaseProduct(product.code, "CREDIT_CARD")}
                     >
-                      Cartão
+                      <span className="payment-button__icon" aria-hidden="true">
+                        <svg className="payment-button__svg payment-button__svg--card" viewBox="0 0 42 42" focusable="false">
+                          <rect x="10" y="13" width="22" height="16" rx="2.5" />
+                          <path d="M10 18h22M14 25h8" />
+                        </svg>
+                      </span>
+                      <span className="payment-button__text">
+                        <strong>Cartão</strong>
+                      </span>
                     </button>
                   </div>
                 </article>
