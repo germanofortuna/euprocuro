@@ -5,9 +5,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import com.euprocuro.api.application.command.BoostInterestCommand;
 import com.euprocuro.api.application.command.PurchaseProductCommand;
@@ -18,12 +20,18 @@ import com.euprocuro.api.application.usecase.MonetizationUseCase;
 import com.euprocuro.api.application.view.CheckoutView;
 import com.euprocuro.api.application.view.MonetizationAccountView;
 import com.euprocuro.api.application.view.MonetizationProductView;
-import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
+import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
+import com.euprocuro.api.domain.gateway.PaymentCheckoutGateway;
+import com.euprocuro.api.domain.gateway.PaymentOrderGateway;
+import com.euprocuro.api.domain.gateway.PaymentStatusGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.MonetizationProductType;
+import com.euprocuro.api.domain.model.PaymentOrder;
+import com.euprocuro.api.domain.model.PaymentOrderStatus;
+import com.euprocuro.api.domain.model.PaymentProviderStatus;
 import com.euprocuro.api.domain.model.UserProfile;
 
 import lombok.RequiredArgsConstructor;
@@ -36,13 +44,19 @@ public class MonetizationService implements MonetizationUseCase {
     private final InterestGateway interestGateway;
     private final EventPublisherGateway eventPublisherGateway;
     private final EmailGateway emailGateway;
+    private final MonetizationCatalog monetizationCatalog;
+    private final PaymentOrderGateway paymentOrderGateway;
+    private final PaymentCheckoutGateway paymentCheckoutGateway;
+    private final PaymentStatusGateway paymentStatusGateway;
 
     @Value("${application.monetization.provider:LOCAL_MOCK}")
     private String checkoutProvider = "LOCAL_MOCK";
+    @Value("${application.monetization.local-checkout.base-url:http://localhost:8080/api/monetization/local-checkout/approve}")
+    private String localCheckoutBaseUrl;
 
     @Override
     public List<MonetizationProductView> listProducts() {
-        return MonetizationCatalog.products();
+        return monetizationCatalog.products();
     }
 
     @Override
@@ -67,6 +81,10 @@ public class MonetizationService implements MonetizationUseCase {
             throw new BusinessException("Boost deve ser ativado diretamente no interesse.");
         }
 
+        if (isCheckoutProviderWithPendingOrder()) {
+            return createPendingCheckout(user, product, normalizePaymentMethod(command.getPaymentMethod()));
+        }
+
         UserProfile updatedUser = applyProductToUser(user, product);
         updatedUser = userGateway.save(updatedUser);
         emailGateway.sendPurchaseConfirmationEmail(
@@ -86,9 +104,57 @@ public class MonetizationService implements MonetizationUseCase {
                 .provider(checkoutProvider)
                 .paymentMethod(normalizePaymentMethod(command.getPaymentMethod()))
                 .productCode(product.getCode())
+                .status("APPROVED")
                 .checkoutUrl("local://checkout/" + product.getCode())
                 .message("Pagamento simulado aprovado. Em producao, este fluxo sera confirmado por webhook do gateway.")
                 .build();
+    }
+
+    @Override
+    public void confirmPayment(String providerPaymentId) {
+        if (!StringUtils.hasText(providerPaymentId)) {
+            return;
+        }
+
+        PaymentProviderStatus providerStatus = paymentStatusGateway.findPayment(providerPaymentId);
+        if (!StringUtils.hasText(providerStatus.getExternalReference())) {
+            throw new BusinessException("Pagamento recebido sem referencia externa.");
+        }
+
+        PaymentOrder paymentOrder = paymentOrderGateway.findById(providerStatus.getExternalReference())
+                .orElseThrow(() -> new ResourceNotFoundException("Pedido de pagamento nao encontrado."));
+        PaymentOrderStatus status = mapProviderStatus(providerStatus.getStatus());
+
+        PaymentOrder updatedOrder = paymentOrder.toBuilder()
+                .providerPaymentId(providerStatus.getPaymentId())
+                .status(status)
+                .updatedAt(Instant.now())
+                .approvedAt(status == PaymentOrderStatus.APPROVED ? Instant.now() : paymentOrder.getApprovedAt())
+                .build();
+
+        if (paymentOrder.getStatus() == PaymentOrderStatus.APPROVED) {
+            paymentOrderGateway.save(updatedOrder);
+            return;
+        }
+
+        if (status == PaymentOrderStatus.APPROVED) {
+            approvePaymentOrder(paymentOrder, providerStatus.getPaymentId());
+            return;
+        }
+
+        paymentOrderGateway.save(updatedOrder);
+    }
+
+    @Override
+    public void approveLocalCheckout(String paymentOrderId) {
+        PaymentOrder paymentOrder = paymentOrderGateway.findById(paymentOrderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pedido de pagamento nao encontrado."));
+
+        if (!isLocalCheckoutProvider(paymentOrder.getProvider())) {
+            throw new ForbiddenException("Este pedido nao pertence ao checkout local.");
+        }
+
+        approvePaymentOrder(paymentOrder, paymentOrder.getId());
     }
 
     @Override
@@ -153,8 +219,130 @@ public class MonetizationService implements MonetizationUseCase {
     }
 
     private MonetizationProductView requireProduct(String productCode) {
-        return MonetizationCatalog.findByCode(productCode)
+        return monetizationCatalog.findByCode(productCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Produto de monetizacao nao encontrado."));
+    }
+
+    private CheckoutView createPendingCheckout(UserProfile user, MonetizationProductView product, String paymentMethod) {
+        Instant now = Instant.now();
+        PaymentOrder paymentOrder = PaymentOrder.builder()
+                .id(UUID.randomUUID().toString())
+                .userId(user.getId())
+                .userEmail(user.getEmail())
+                .productCode(product.getCode())
+                .productName(product.getName())
+                .amount(product.getPrice())
+                .paymentMethod(paymentMethod)
+                .provider(checkoutProvider)
+                .status(PaymentOrderStatus.CREATED)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+
+        paymentOrder = paymentOrderGateway.save(paymentOrder);
+        CheckoutView checkout = isLocalCheckoutProvider()
+                ? createLocalCheckout(product, paymentOrder)
+                : createMercadoPagoCheckout(user, product, paymentOrder);
+
+        paymentOrderGateway.save(paymentOrder.toBuilder()
+                .providerPreferenceId(checkout.getProviderPreferenceId())
+                .checkoutUrl(checkout.getCheckoutUrl())
+                .status(PaymentOrderStatus.PENDING)
+                .updatedAt(Instant.now())
+                .build());
+
+        eventPublisherGateway.publish("monetization.purchase.created", Map.of(
+                "userId", user.getId(),
+                "productCode", product.getCode(),
+                "paymentMethod", paymentMethod,
+                "provider", checkoutProvider,
+                "paymentOrderId", paymentOrder.getId()
+        ));
+
+        return checkout;
+    }
+
+    private CheckoutView createMercadoPagoCheckout(UserProfile user, MonetizationProductView product, PaymentOrder paymentOrder) {
+        try {
+            return paymentCheckoutGateway.createCheckout(user, product, paymentOrder);
+        } catch (RuntimeException exception) {
+            paymentOrderGateway.save(paymentOrder.toBuilder()
+                    .status(PaymentOrderStatus.REJECTED)
+                    .updatedAt(Instant.now())
+                    .build());
+            throw new BusinessException(exception.getMessage());
+        }
+    }
+
+    private CheckoutView createLocalCheckout(MonetizationProductView product, PaymentOrder paymentOrder) {
+        return CheckoutView.builder()
+                .provider(paymentOrder.getProvider())
+                .paymentMethod(paymentOrder.getPaymentMethod())
+                .productCode(product.getCode())
+                .paymentOrderId(paymentOrder.getId())
+                .providerPreferenceId("local-" + paymentOrder.getId())
+                .checkoutUrl(localCheckoutBaseUrl + "/" + paymentOrder.getId())
+                .status("PENDING")
+                .message("Checkout local criado. Ao abrir o link, o pagamento sera aprovado automaticamente.")
+                .build();
+    }
+
+    private boolean isCheckoutProviderWithPendingOrder() {
+        return isLocalCheckoutProvider()
+                || "MERCADO_PAGO_CHECKOUT_PRO".equalsIgnoreCase(checkoutProvider)
+                || "MERCADO_PAGO".equalsIgnoreCase(checkoutProvider)
+                || "MERCADOPAGO".equalsIgnoreCase(checkoutProvider);
+    }
+
+    private boolean isLocalCheckoutProvider() {
+        return isLocalCheckoutProvider(checkoutProvider);
+    }
+
+    private boolean isLocalCheckoutProvider(String provider) {
+        return "LOCAL_CHECKOUT_MOCK".equalsIgnoreCase(provider)
+                || "MERCADO_PAGO_LOCAL_MOCK".equalsIgnoreCase(provider);
+    }
+
+    private PaymentOrderStatus mapProviderStatus(String status) {
+        if ("approved".equalsIgnoreCase(status)) {
+            return PaymentOrderStatus.APPROVED;
+        }
+        if ("cancelled".equalsIgnoreCase(status)) {
+            return PaymentOrderStatus.CANCELLED;
+        }
+        if ("rejected".equalsIgnoreCase(status)) {
+            return PaymentOrderStatus.REJECTED;
+        }
+        return PaymentOrderStatus.PENDING;
+    }
+
+    private void approvePaymentOrder(PaymentOrder paymentOrder, String providerPaymentId) {
+        if (paymentOrder.getStatus() == PaymentOrderStatus.APPROVED) {
+            paymentOrderGateway.save(paymentOrder.toBuilder()
+                    .providerPaymentId(providerPaymentId)
+                    .updatedAt(Instant.now())
+                    .build());
+            return;
+        }
+
+        MonetizationProductView product = requireProduct(paymentOrder.getProductCode());
+        UserProfile user = requireUser(paymentOrder.getUserId());
+        UserProfile updatedUser = userGateway.save(applyProductToUser(user, product));
+        emailGateway.sendPurchaseConfirmationEmail(updatedUser, product.getName(), paymentOrder.getPaymentMethod());
+        eventPublisherGateway.publish("monetization.purchase.completed", Map.of(
+                "userId", paymentOrder.getUserId(),
+                "productCode", product.getCode(),
+                "paymentMethod", paymentOrder.getPaymentMethod(),
+                "provider", paymentOrder.getProvider(),
+                "paymentOrderId", paymentOrder.getId()
+        ));
+
+        paymentOrderGateway.save(paymentOrder.toBuilder()
+                .providerPaymentId(providerPaymentId)
+                .status(PaymentOrderStatus.APPROVED)
+                .updatedAt(Instant.now())
+                .approvedAt(Instant.now())
+                .build());
     }
 
     private UserProfile requireUser(String userId) {

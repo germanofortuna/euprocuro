@@ -2,3 +2,10 @@ spring:
   data:
     mongodb:
       uri: mongodb://localhost:27017/euprocuro
+
+application:
+  monetization:
+    provider: ${APP_MONETIZATION_PROVIDER:LOCAL_CHECKOUT_MOCK}
+    local-checkout:
+      base-url: ${LOCAL_CHECKOUT_BASE_URL:http://localhost:8080/api/monetization/local-checkout/approve}
+      success-url: ${LOCAL_CHECKOUT_SUCCESS_URL:http://localhost:5173?payment=success}

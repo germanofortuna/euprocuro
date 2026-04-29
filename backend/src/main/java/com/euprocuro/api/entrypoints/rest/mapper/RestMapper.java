@@ -234,7 +234,10 @@ public final class RestMapper {
                 .provider(view.getProvider())
                 .paymentMethod(view.getPaymentMethod())
                 .productCode(view.getProductCode())
+                .paymentOrderId(view.getPaymentOrderId())
+                .providerPreferenceId(view.getProviderPreferenceId())
                 .checkoutUrl(view.getCheckoutUrl())
+                .status(view.getStatus())
                 .message(view.getMessage())
                 .build();
     }

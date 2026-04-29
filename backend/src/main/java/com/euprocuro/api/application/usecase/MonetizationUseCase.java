@@ -17,4 +17,8 @@ public interface MonetizationUseCase {
     CheckoutView purchase(String userId, PurchaseProductCommand command);
 
     InterestPost boostInterest(String userId, String interestId, BoostInterestCommand command);
+
+    void confirmPayment(String providerPaymentId);
+
+    void approveLocalCheckout(String paymentOrderId);
 }
