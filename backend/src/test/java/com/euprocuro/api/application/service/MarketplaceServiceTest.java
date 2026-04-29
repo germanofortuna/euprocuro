@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.euprocuro.api.application.command.CreateInterestCommand;
 import com.euprocuro.api.application.command.CreateOfferCommand;
@@ -144,6 +145,8 @@ class MarketplaceServiceTest {
     void renewInterestShouldConsumeOneCreditAndExtendExpiration() {
         InterestPost existingInterest = baseInterest();
         existingInterest.setExpiresAt(Instant.now().plus(5, ChronoUnit.DAYS));
+        ReflectionTestUtils.setField(marketplaceService, "listingExpirationDays", 5L);
+        ReflectionTestUtils.setField(marketplaceService, "listingRenewalDays", 30L);
         UserProfile owner = baseBuyer().toBuilder()
                 .sellerCredits(2)
                 .build();

@@ -3261,10 +3261,12 @@ export default function App() {
                     {isListingExpiringSoon(selectedInterest) ? (
                       <button
                         type="button"
-                        className="text-button"
+                        className="renewal-button"
                         onClick={() => handleRenewInterest(selectedInterest.id)}
+                        title="Usa 1 crédito para adicionar mais 30 dias ao anúncio"
                       >
-                        Renovar por 1 crédito
+                        <span className="renewal-button__icon" aria-hidden="true">↻</span>
+                        <span>Renovar por 1 crédito</span>
                       </button>
                     ) : null}
                   </div>

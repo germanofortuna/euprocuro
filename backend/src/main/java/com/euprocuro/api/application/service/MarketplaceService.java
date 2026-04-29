@@ -52,6 +52,8 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     @Value("${application.listings.expiration-days:30}")
     private long listingExpirationDays = 30;
+    @Value("${application.listings.renewal-days:30}")
+    private long listingRenewalDays = 30;
 
     @Override
     public InterestPost createInterest(String currentUserId, CreateInterestCommand command) {
@@ -200,7 +202,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .filter(expiration -> expiration.isAfter(now))
                 .orElse(now);
         InterestPost renewedInterest = existingInterest.toBuilder()
-                .expiresAt(expiresAt(renewalBase))
+                .expiresAt(renewalExpiresAt(renewalBase))
                 .updatedAt(now)
                 .build();
 
@@ -358,12 +360,20 @@ public class MarketplaceService implements MarketplaceUseCase {
         return createdAt == null ? null : createdAt.plus(safeExpirationDays(), ChronoUnit.DAYS);
     }
 
+    private Instant renewalExpiresAt(Instant renewalBase) {
+        return renewalBase == null ? null : renewalBase.plus(safeRenewalDays(), ChronoUnit.DAYS);
+    }
+
     private Instant resolveExpiresAt(Instant expiresAt, Instant createdAt) {
         return expiresAt != null ? expiresAt : expiresAt(createdAt);
     }
 
     private long safeExpirationDays() {
         return Math.max(1, listingExpirationDays);
+    }
+
+    private long safeRenewalDays() {
+        return Math.max(1, listingRenewalDays);
     }
 
     private String normalizeReferenceImage(String referenceImageUrl) {
