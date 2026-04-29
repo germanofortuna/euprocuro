@@ -10,6 +10,7 @@ import javax.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.view.RedirectView;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +25,7 @@ import com.euprocuro.api.application.usecase.MonetizationUseCase;
 import com.euprocuro.api.application.exception.UnauthorizedException;
 import com.euprocuro.api.entrypoints.rest.dto.request.BoostInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.PurchaseProductRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.SyncPaymentRequest;
 import com.euprocuro.api.entrypoints.rest.dto.response.CheckoutResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.InterestResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.MonetizationAccountResponse;
@@ -58,6 +60,11 @@ public class MonetizationController {
         return RestMapper.toResponse(monetizationUseCase.getAccount(CurrentUserContext.userId(request)));
     }
 
+    @DeleteMapping("/subscription")
+    public MonetizationAccountResponse cancelSubscription(HttpServletRequest request) {
+        return RestMapper.toResponse(monetizationUseCase.cancelSubscription(CurrentUserContext.userId(request)));
+    }
+
     @PostMapping("/purchase")
     public CheckoutResponse purchase(
             HttpServletRequest request,
@@ -66,6 +73,12 @@ public class MonetizationController {
         return RestMapper.toResponse(
                 monetizationUseCase.purchase(CurrentUserContext.userId(request), RestMapper.toCommand(requestBody))
         );
+    }
+
+    @PostMapping("/payments/sync")
+    public ResponseEntity<Void> syncPayment(@Valid @RequestBody SyncPaymentRequest requestBody) {
+        monetizationUseCase.confirmPayment(requestBody.getPaymentId());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/interests/{interestId}/boost")

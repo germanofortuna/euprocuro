@@ -16,6 +16,8 @@ public interface MonetizationUseCase {
 
     CheckoutView purchase(String userId, PurchaseProductCommand command);
 
+    MonetizationAccountView cancelSubscription(String userId);
+
     InterestPost boostInterest(String userId, String interestId, BoostInterestCommand command);
 
     void confirmPayment(String providerPaymentId);
