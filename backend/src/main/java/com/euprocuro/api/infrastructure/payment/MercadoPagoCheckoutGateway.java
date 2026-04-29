@@ -32,8 +32,6 @@ public class MercadoPagoCheckoutGateway implements PaymentCheckoutGateway {
 
     @Value("${application.monetization.mercado-pago.access-token:}")
     private String accessToken;
-    @Value("${application.monetization.mercado-pago.sandbox:true}")
-    private boolean sandbox;
     @Value("${application.monetization.mercado-pago.success-url:http://localhost:5173?payment=success}")
     private String successUrl;
     @Value("${application.monetization.mercado-pago.failure-url:http://localhost:5173?payment=failure}")
@@ -67,9 +65,8 @@ public class MercadoPagoCheckoutGateway implements PaymentCheckoutGateway {
             ).getBody();
 
             String preferenceId = valueAsString(response, "id");
-            String checkoutUrl = sandbox
-                    ? Optional.ofNullable(valueAsString(response, "sandbox_init_point")).orElse(valueAsString(response, "init_point"))
-                    : Optional.ofNullable(valueAsString(response, "init_point")).orElse(valueAsString(response, "sandbox_init_point"));
+            String checkoutUrl = Optional.ofNullable(valueAsString(response, "init_point"))
+                    .orElse(valueAsString(response, "sandbox_init_point"));
 
             if (!StringUtils.hasText(preferenceId) || !StringUtils.hasText(checkoutUrl)) {
                 throw new IllegalStateException("Mercado Pago nao retornou link de checkout.");
