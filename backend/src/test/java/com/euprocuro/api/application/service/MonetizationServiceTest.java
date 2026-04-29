@@ -119,6 +119,35 @@ class MonetizationServiceTest {
     }
 
     @Test
+    void cancelSubscriptionShouldEndActivePlan() {
+        UserProfile user = baseUser().toBuilder()
+                .subscriptionPlan("SELLER_PRO")
+                .subscriptionActiveUntil(Instant.now().plusSeconds(3600))
+                .build();
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MonetizationAccountView result = monetizationService.cancelSubscription("user-1");
+
+        assertThat(result.isSubscriptionActive()).isFalse();
+        verify(userGateway).save(org.mockito.ArgumentMatchers.argThat(savedUser ->
+                savedUser.getSubscriptionPlan() == null
+                        && savedUser.getSubscriptionActiveUntil().isBefore(Instant.now().plusSeconds(5))
+        ));
+        verify(eventPublisherGateway).publish(eq("monetization.subscription.cancelled"), any(Map.class));
+    }
+
+    @Test
+    void cancelSubscriptionShouldRejectUserWithoutActivePlan() {
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+
+        assertThatThrownBy(() -> monetizationService.cancelSubscription("user-1"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Nenhum plano ativo");
+        verify(userGateway, never()).save(any(UserProfile.class));
+    }
+
+    @Test
     void purchaseShouldRejectBoostProduct() {
         when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
 

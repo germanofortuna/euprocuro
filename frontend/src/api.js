@@ -175,8 +175,21 @@ export async function fetchMonetizationAccount() {
   return request("/monetization/account");
 }
 
+export async function cancelSubscription() {
+  return request("/monetization/subscription", {
+    method: "DELETE"
+  });
+}
+
 export async function purchaseProduct(payload) {
   return request("/monetization/purchase", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function syncPayment(payload) {
+  return request("/monetization/payments/sync", {
     method: "POST",
     body: JSON.stringify(payload)
   });

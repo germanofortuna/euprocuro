@@ -111,6 +111,34 @@ public class MonetizationService implements MonetizationUseCase {
     }
 
     @Override
+    public MonetizationAccountView cancelSubscription(String userId) {
+        UserProfile user = requireUser(userId);
+        if (!hasActiveSubscription(user)) {
+            throw new BusinessException("Nenhum plano ativo para cancelar.");
+        }
+
+        UserProfile updatedUser = userGateway.save(user.toBuilder()
+                .subscriptionPlan(null)
+                .subscriptionActiveUntil(Instant.now())
+                .build());
+
+        eventPublisherGateway.publish("monetization.subscription.cancelled", Map.of(
+                "userId", userId,
+                "previousPlan", user.getSubscriptionPlan(),
+                "activeUntil", user.getSubscriptionActiveUntil()
+        ));
+
+        return MonetizationAccountView.builder()
+                .sellerCredits(sellerCredits(updatedUser))
+                .purchasedCreditsTotal(purchasedCreditsTotal(updatedUser))
+                .subscriptionPlan(updatedUser.getSubscriptionPlan())
+                .subscriptionActiveUntil(updatedUser.getSubscriptionActiveUntil())
+                .subscriptionActive(false)
+                .products(listProducts())
+                .build();
+    }
+
+    @Override
     public void confirmPayment(String providerPaymentId) {
         if (!StringUtils.hasText(providerPaymentId)) {
             return;
