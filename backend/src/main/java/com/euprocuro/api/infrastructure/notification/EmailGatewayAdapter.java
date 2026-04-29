@@ -28,6 +28,20 @@ public class EmailGatewayAdapter implements EmailGateway {
     }
 
     @Override
+    public boolean sendEmailVerificationEmail(UserProfile user, String verificationLink) {
+        return sendEmail(
+                user,
+                "Eu Procuro - confirme seu e-mail",
+                "Ola, " + user.getName() + "!\n\n"
+                        + "Confirme seu e-mail para aumentar a seguranca da sua conta.\n"
+                        + "Use o link abaixo para verificar seu cadastro:\n"
+                        + verificationLink + "\n\n"
+                        + "Se voce nao criou essa conta, ignore este e-mail.",
+                "Link de verificacao: " + verificationLink
+        );
+    }
+
+    @Override
     public boolean sendPasswordResetEmail(UserProfile user, String resetLink) {
         return sendEmail(
                 user,
@@ -117,7 +131,13 @@ public class EmailGatewayAdapter implements EmailGateway {
             mailSender.send(message);
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("Falha ao enviar e-mail para {}. Assunto: {}", user.getEmail(), subject);
+            LOGGER.warn(
+                    "Falha ao enviar e-mail para {}. Assunto: {}. Motivo: {}",
+                    user.getEmail(),
+                    subject,
+                    exception.getMessage(),
+                    exception
+            );
             return false;
         }
     }

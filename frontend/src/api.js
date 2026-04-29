@@ -167,6 +167,11 @@ export async function resetPassword(payload) {
   });
 }
 
+export async function verifyEmail(token) {
+  const params = new URLSearchParams({ token });
+  return request(`/auth/verify-email?${params.toString()}`);
+}
+
 export async function fetchDashboard() {
   return request("/dashboard");
 }

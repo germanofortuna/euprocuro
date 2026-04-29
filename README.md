@@ -174,22 +174,46 @@ VITE_API_BASE=https://api.seudominio.com/api
 
 ## Configuracao de e-mail
 
-Para envio real de e-mail, configure variaveis como:
+No ambiente local, o profile `local` carrega automaticamente um arquivo `.env.local` na raiz do projeto.
+Esse arquivo fica ignorado pelo Git, entao pode conter credenciais locais sem ir para o repositorio.
+
+Para preparar sua maquina:
+
+1. Copie `.env.local.example` para `.env.local`, se o arquivo ainda nao existir.
+2. Preencha as credenciais do SMTP sandbox, como Mailtrap, Ethereal ou MailerSend.
+3. Reinicie o backend com o profile `local` pelo IntelliJ ou terminal.
+
+Exemplo de `.env.local`:
 
 ```bash
-MAIL_HOST=smtp.seuprovedor.com
-MAIL_PORT=587
-MAIL_USERNAME=seu-usuario
-MAIL_PASSWORD=sua-senha
-APP_EMAIL_FROM=no-reply@seudominio.com
+SPRING_PROFILES_ACTIVE=local
+MAIL_HOST=sandbox.smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=usuario-do-mailtrap
+MAIL_PASSWORD=senha-do-mailtrap
+MAIL_SMTP_AUTH=true
+MAIL_SMTP_STARTTLS=true
+APP_EMAIL_FROM=no-reply@euprocuro.local
 APP_RESET_BASE_URL=http://localhost:5173
 ```
 
-Sem SMTP configurado, a API responde com um `previewResetLink` para facilitar o teste local do fluxo.
-No profile `prod`, esse preview fica desabilitado por padrao.
+Para MailerSend, use exatamente o `Username` e `Password` do usuario SMTP, nao o login da conta nem o API token. O `APP_EMAIL_FROM` precisa ser um e-mail do dominio validado ou do dominio de teste do MailerSend, por exemplo `no-reply@seu-dominio.mlsender.net`.
+
+Sem SMTP valido, a API registra no log o link de verificacao/redefinicao como fallback local.
+No profile `prod`, o preview de reset fica desabilitado por padrao.
+
+Para testar a verificacao de e-mail localmente:
+
+1. Rode o backend com o profile `local`.
+2. Rode o frontend em `http://localhost:5173`.
+3. Crie uma conta nova.
+4. Abra o e-mail no inbox do SMTP sandbox.
+5. Clique no link `?mode=verify-email&token=...`.
+6. A aplicacao marcara o usuario como `emailVerified=true`.
 
 Eventos que ja disparam e-mail:
 
+- verificacao de e-mail no cadastro
 - link de redefinicao de senha
 - nova oferta recebida em um interesse
 - nova mensagem na conversa

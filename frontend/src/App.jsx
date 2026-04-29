@@ -33,7 +33,8 @@ import {
   syncPayment,
   updateInterest,
   updateSellerItem,
-  storeSession
+  storeSession,
+  verifyEmail
 } from "./api";
 import logo from "./assets/eu-procuro-logo.png";
 import mercadoPagoLogo from "./assets/mercado-pago.svg";
@@ -452,6 +453,7 @@ export default function App() {
   const initialSharedInterestId = useMemo(() => createInitialSharedInterestId(), []);
   const sharedInterestIdRef = useRef(initialSharedInterestId);
   const paymentReturnHandledRef = useRef(false);
+  const emailVerificationHandledRef = useRef(false);
   const notificationButtonRef = useRef(null);
   const publicRequestSeq = useRef(0);
   const detailRequestSeq = useRef(0);
@@ -474,6 +476,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState(initialResetState.mode);
   const [isAuthModalVisible, setIsAuthModalVisible] = useState(initialResetState.mode === "reset");
   const [loginForm, setLoginForm] = useState(initialLoginForm);
+  const [loginInlineError, setLoginInlineError] = useState("");
   const [registerForm, setRegisterForm] = useState(initialRegisterForm);
   const [forgotForm, setForgotForm] = useState(initialForgotForm);
   const [resetForm, setResetForm] = useState({
@@ -1152,6 +1155,59 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (emailVerificationHandledRef.current) {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    const mode = url.searchParams.get("mode");
+    const token = url.searchParams.get("token");
+
+    if (mode !== "verify-email" || !token) {
+      return;
+    }
+
+    emailVerificationHandledRef.current = true;
+
+    verifyEmail(token)
+      .then((response) => {
+        openFeedback(
+          "success",
+          "E-mail verificado",
+          response?.message ?? "Seu e-mail foi verificado com sucesso."
+        );
+
+        if (!session) {
+          return null;
+        }
+
+        return fetchMe()
+          .then((me) => {
+            const nextSession = {
+              expiresAt: me.expiresAt,
+              token: me.token ?? session.token ?? null,
+              user: me.user
+            };
+            storeSession(nextSession);
+            setSession(nextSession);
+            return null;
+          });
+      })
+      .catch((requestError) => {
+        openFeedback(
+          "error",
+          "Não foi possível verificar",
+          requestError.message || "O link de verificação pode ter expirado."
+        );
+      })
+      .finally(() => {
+        url.searchParams.delete("mode");
+        url.searchParams.delete("token");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      });
+  }, [session?.token]);
+
+  useEffect(() => {
     if (!session) {
       setIsLoadingPrivate(false);
       setDashboard(null);
@@ -1450,6 +1506,7 @@ export default function App() {
   async function handleLoginSubmit(event) {
     event.preventDefault();
     setIsSubmittingAuth(true);
+    setLoginInlineError("");
 
     try {
       const authResponse = await login(loginForm);
@@ -1466,7 +1523,12 @@ export default function App() {
       closeAuthModal();
       openFeedback("success", "Login realizado", "Você entrou com sucesso na plataforma.");
     } catch (requestError) {
-      openFeedback("error", "Não foi possível entrar", requestError.message || "Confira seu e-mail e senha.");
+      const message = requestError.message || "Confira seu e-mail e senha.";
+      if (message.toLowerCase().includes("confirme seu e-mail")) {
+        setLoginInlineError(message);
+      } else {
+        openFeedback("error", "Não foi possível entrar", message);
+      }
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -1477,20 +1539,16 @@ export default function App() {
     setIsSubmittingAuth(true);
 
     try {
-      const authResponse = await register(registerForm);
-      const nextSession = {
-        expiresAt: authResponse.expiresAt,
-        token: authResponse.token ?? null,
-        user: authResponse.user
-      };
-
-      storeSession(nextSession);
-      setSession(nextSession);
+      const response = await register(registerForm);
       setRegisterForm(initialRegisterForm);
       setHomeMatchFilter(null);
-      setLoggedSection(loggedSections.EXPLORE);
-      closeAuthModal();
-      openFeedback("success", "Conta criada", "Sua conta foi criada e você já está na Home.");
+      setLoginForm((current) => ({ ...current, email: registerForm.email, password: "" }));
+      setAuthMode("login");
+      openFeedback(
+        "success",
+        "Confirme seu e-mail",
+        response?.message ?? "Sua conta foi criada. Confirme seu e-mail para entrar."
+      );
     } catch (requestError) {
       openFeedback("error", "Não foi possível criar a conta", requestError.message || "Revise os dados e tente novamente.");
     } finally {
@@ -3697,10 +3755,14 @@ export default function App() {
         registerForm={registerForm}
         forgotForm={forgotForm}
         resetForm={resetForm}
+        loginInlineError={loginInlineError}
         passwordRecoveryPreview={passwordRecoveryPreview}
         onClose={closeAuthModal}
         onModeChange={setAuthMode}
-        onLoginChange={setLoginForm}
+        onLoginChange={(updater) => {
+          setLoginInlineError("");
+          setLoginForm(updater);
+        }}
         onRegisterChange={setRegisterForm}
         onForgotChange={setForgotForm}
         onResetChange={setResetForm}

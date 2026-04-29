@@ -30,12 +30,15 @@ import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.UnauthorizedException;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
+import com.euprocuro.api.application.view.RegistrationView;
 import com.euprocuro.api.domain.gateway.AuthSessionGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
+import com.euprocuro.api.domain.gateway.EmailVerificationTokenGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.PasswordResetTokenGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.AuthSession;
+import com.euprocuro.api.domain.model.EmailVerificationToken;
 import com.euprocuro.api.domain.model.PasswordResetToken;
 import com.euprocuro.api.domain.model.UserProfile;
 
@@ -48,6 +51,8 @@ class AuthServiceTest {
     private AuthSessionGateway authSessionGateway;
     @Mock
     private PasswordResetTokenGateway passwordResetTokenGateway;
+    @Mock
+    private EmailVerificationTokenGateway emailVerificationTokenGateway;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
@@ -62,6 +67,7 @@ class AuthServiceTest {
     void setUp() {
         ReflectionTestUtils.setField(authService, "sessionHours", 24L);
         ReflectionTestUtils.setField(authService, "passwordResetHours", 2L);
+        ReflectionTestUtils.setField(authService, "emailVerificationHours", 24L);
         ReflectionTestUtils.setField(authService, "resetBaseUrl", "https://app.euprocuro.com");
         ReflectionTestUtils.setField(authService, "exposeResetPreview", true);
         ReflectionTestUtils.setField(authService, "hmlAccessEnabled", false);
@@ -69,7 +75,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void registerShouldCreateEncodedUserAndSession() {
+    void registerShouldCreateUnverifiedUserAndSendVerificationEmail() {
         RegisterUserCommand command = RegisterUserCommand.builder()
                 .name("Ana Silva")
                 .email("ana@teste.com")
@@ -88,16 +94,19 @@ class AuthServiceTest {
             user.setId("user-1");
             return user;
         });
-        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AuthenticatedSessionView result = authService.register(command);
+        RegistrationView result = authService.register(command);
 
-        assertThat(result.getUser().getId()).isEqualTo("user-1");
-        assertThat(result.getUser().getEmail()).isEqualTo("ana@teste.com");
-        assertThat(result.getUser().getDocumentNumber()).isEqualTo("52998224725");
-        assertThat(result.getUser().getDocumentType()).isEqualTo("CPF");
-        assertThat(result.getToken()).isNotBlank();
-        assertThat(result.getExpiresAt()).isAfter(Instant.now());
+        assertThat(result.isVerificationSentByEmail()).isFalse();
+        assertThat(result.getMessage()).contains("Conta criada");
+        ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
+        verify(userGateway).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().getEmail()).isEqualTo("ana@teste.com");
+        assertThat(userCaptor.getValue().getDocumentNumber()).isEqualTo("52998224725");
+        assertThat(userCaptor.getValue().getDocumentType()).isEqualTo("CPF");
+        assertThat(userCaptor.getValue().isEmailVerified()).isFalse();
+        verify(emailGateway).sendEmailVerificationEmail(any(UserProfile.class), any(String.class));
         verify(eventPublisherGateway).publish(eq("user.registered"), any(Map.class));
     }
 
@@ -120,15 +129,16 @@ class AuthServiceTest {
             user.setId("user-cnpj");
             return user;
         });
-        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AuthenticatedSessionView result = authService.register(command);
+        RegistrationView result = authService.register(command);
 
-        assertThat(result.getUser().getId()).isEqualTo("user-cnpj");
-        assertThat(result.getUser().getDocumentNumber()).isEqualTo("11222333000181");
-        assertThat(result.getUser().getDocumentType()).isEqualTo("CNPJ");
-        assertThat(result.getUser().getState()).isEqualTo("RS");
-        assertThat(result.getToken()).isNotBlank();
+        assertThat(result.getMessage()).contains("Conta criada");
+        ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
+        verify(userGateway).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().getDocumentNumber()).isEqualTo("11222333000181");
+        assertThat(userCaptor.getValue().getDocumentType()).isEqualTo("CNPJ");
+        assertThat(userCaptor.getValue().getState()).isEqualTo("RS");
         verify(eventPublisherGateway).publish(eq("user.registered"), any(Map.class));
     }
 
@@ -232,12 +242,14 @@ class AuthServiceTest {
             user.setId("user-allowlist");
             return user;
         });
-        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AuthenticatedSessionView result = authService.register(command);
+        RegistrationView result = authService.register(command);
 
-        assertThat(result.getUser().getEmail()).isEqualTo("ana@teste.com");
-        assertThat(result.getToken()).isNotBlank();
+        assertThat(result.getMessage()).contains("Conta criada");
+        ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
+        verify(userGateway).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().getEmail()).isEqualTo("ana@teste.com");
     }
 
     @Test
@@ -256,6 +268,7 @@ class AuthServiceTest {
     void loginShouldReturnSessionWhenCredentialsAreValid() {
         UserProfile user = baseUser();
         user.setPasswordHash("hash");
+        user.setEmailVerified(true);
 
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
@@ -275,6 +288,7 @@ class AuthServiceTest {
     void loginShouldRejectInvalidPassword() {
         UserProfile user = baseUser();
         user.setPasswordHash("hash");
+        user.setEmailVerified(true);
 
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("errada", "hash")).thenReturn(false);
@@ -285,6 +299,23 @@ class AuthServiceTest {
                 .build()))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessageContaining("invalidos");
+    }
+
+    @Test
+    void loginShouldRejectUnverifiedEmail() {
+        UserProfile user = baseUser();
+        user.setPasswordHash("hash");
+        user.setEmailVerified(false);
+
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("123456", "hash")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login(LoginCommand.builder()
+                .email("ana@teste.com")
+                .password("123456")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Confirme seu e-mail");
     }
 
     @Test
@@ -462,6 +493,47 @@ class AuthServiceTest {
                 .build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("confirmacao");
+    }
+
+    @Test
+    void verifyEmailShouldMarkUserAsVerifiedAndUseToken() {
+        EmailVerificationToken token = EmailVerificationToken.builder()
+                .token("verify-123")
+                .userId("user-1")
+                .createdAt(Instant.now())
+                .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+        UserProfile user = baseUser().toBuilder()
+                .emailVerified(false)
+                .build();
+
+        when(emailVerificationTokenGateway.findByToken("verify-123")).thenReturn(Optional.of(token));
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        authService.verifyEmail("verify-123");
+
+        ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
+        verify(userGateway).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().isEmailVerified()).isTrue();
+        verify(emailVerificationTokenGateway).save(any(EmailVerificationToken.class));
+        verify(eventPublisherGateway).publish(eq("auth.email-verified"), any(Map.class));
+    }
+
+    @Test
+    void verifyEmailShouldRejectExpiredToken() {
+        EmailVerificationToken token = EmailVerificationToken.builder()
+                .token("verify-123")
+                .userId("user-1")
+                .expiresAt(Instant.now().minus(1, ChronoUnit.MINUTES))
+                .build();
+
+        when(emailVerificationTokenGateway.findByToken("verify-123")).thenReturn(Optional.of(token));
+
+        assertThatThrownBy(() -> authService.verifyEmail("verify-123"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("expirou");
     }
 
     @Test

@@ -26,12 +26,15 @@ import com.euprocuro.api.application.exception.UnauthorizedException;
 import com.euprocuro.api.application.usecase.AuthUseCase;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
+import com.euprocuro.api.application.view.RegistrationView;
 import com.euprocuro.api.domain.gateway.AuthSessionGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
+import com.euprocuro.api.domain.gateway.EmailVerificationTokenGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.PasswordResetTokenGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.AuthSession;
+import com.euprocuro.api.domain.model.EmailVerificationToken;
 import com.euprocuro.api.domain.model.PasswordResetToken;
 import com.euprocuro.api.domain.model.UserProfile;
 
@@ -53,6 +56,7 @@ public class AuthService implements AuthUseCase {
     private final UserGateway userGateway;
     private final AuthSessionGateway authSessionGateway;
     private final PasswordResetTokenGateway passwordResetTokenGateway;
+    private final EmailVerificationTokenGateway emailVerificationTokenGateway;
     private final PasswordEncoder passwordEncoder;
     private final EmailGateway emailGateway;
     private final EventPublisherGateway eventPublisherGateway;
@@ -62,6 +66,9 @@ public class AuthService implements AuthUseCase {
 
     @Value("${application.auth.password-reset-hours:2}")
     private long passwordResetHours;
+
+    @Value("${application.auth.email-verification-hours:24}")
+    private long emailVerificationHours;
 
     @Value("${application.auth.reset-base-url:http://localhost:5173}")
     private String resetBaseUrl;
@@ -76,7 +83,7 @@ public class AuthService implements AuthUseCase {
     private String hmlAllowedEmails;
 
     @Override
-    public AuthenticatedSessionView register(RegisterUserCommand command) {
+    public RegistrationView register(RegisterUserCommand command) {
         String normalizedName = normalizeName(command.getName());
         String normalizedEmail = normalizeEmail(command.getEmail());
         String normalizedDocument = normalizeDocument(command.getDocumentNumber());
@@ -104,22 +111,33 @@ public class AuthService implements AuthUseCase {
                 .city(normalizeText(command.getCity()))
                 .state(normalizeState(command.getState()))
                 .bio(Optional.ofNullable(command.getBio()).orElse(""))
+                .emailVerified(false)
                 .buyerRating(4.8)
                 .sellerRating(4.8)
                 .sellerCredits(3)
                 .purchasedCreditsTotal(0)
                 .build());
 
+        EmailVerificationToken verificationToken = emailVerificationTokenGateway.save(EmailVerificationToken.builder()
+                .token(UUID.randomUUID().toString().replace("-", ""))
+                .userId(user.getId())
+                .createdAt(Instant.now())
+                .expiresAt(Instant.now().plus(emailVerificationHours, ChronoUnit.HOURS))
+                .build());
+        String verificationLink = buildEmailVerificationLink(verificationToken.getToken());
+        boolean verificationSent = emailGateway.sendEmailVerificationEmail(user, verificationLink);
+
         eventPublisherGateway.publish("user.registered", Map.of(
                 "userId", user.getId(),
-                "email", user.getEmail()
+                "email", user.getEmail(),
+                "verificationSentByEmail", verificationSent
         ));
 
-        AuthSession session = createSession(user);
-        return AuthenticatedSessionView.builder()
-                .token(session.getToken())
-                .expiresAt(session.getExpiresAt())
-                .user(user)
+        return RegistrationView.builder()
+                .verificationSentByEmail(verificationSent)
+                .message(verificationSent
+                        ? "Conta criada. Enviamos um link para confirmar seu e-mail antes do login."
+                        : "Conta criada, mas nao conseguimos enviar o e-mail de confirmacao. Verifique a configuracao SMTP.")
                 .build();
     }
 
@@ -134,6 +152,10 @@ public class AuthService implements AuthUseCase {
         if (!StringUtils.hasText(user.getPasswordHash())
                 || !passwordEncoder.matches(command.getPassword(), user.getPasswordHash())) {
             throw new UnauthorizedException("E-mail ou senha invalidos.");
+        }
+
+        if (!user.isEmailVerified()) {
+            throw new BusinessException("Confirme seu e-mail antes de entrar.");
         }
 
         AuthSession session = createSession(user);
@@ -238,6 +260,40 @@ public class AuthService implements AuthUseCase {
                 .build());
 
         eventPublisherGateway.publish("auth.password-reset-completed", Map.of(
+                "userId", user.getId(),
+                "email", user.getEmail()
+        ));
+    }
+
+    @Override
+    public void verifyEmail(String token) {
+        if (!StringUtils.hasText(token)) {
+            throw new BusinessException("Token de verificacao invalido.");
+        }
+
+        EmailVerificationToken verificationToken = emailVerificationTokenGateway.findByToken(token)
+                .orElseThrow(() -> new ResourceNotFoundException("Token de verificacao nao encontrado."));
+
+        if (verificationToken.getUsedAt() != null) {
+            throw new BusinessException("Este e-mail ja foi verificado.");
+        }
+
+        if (verificationToken.getExpiresAt().isBefore(Instant.now())) {
+            throw new BusinessException("Este token de verificacao expirou.");
+        }
+
+        UserProfile user = userGateway.findById(verificationToken.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado."));
+
+        userGateway.save(user.toBuilder()
+                .emailVerified(true)
+                .build());
+
+        emailVerificationTokenGateway.save(verificationToken.toBuilder()
+                .usedAt(Instant.now())
+                .build());
+
+        eventPublisherGateway.publish("auth.email-verified", Map.of(
                 "userId", user.getId(),
                 "email", user.getEmail()
         ));
@@ -400,5 +456,10 @@ public class AuthService implements AuthUseCase {
     private String buildResetLink(String token) {
         String normalizedBase = resetBaseUrl.endsWith("/") ? resetBaseUrl.substring(0, resetBaseUrl.length() - 1) : resetBaseUrl;
         return normalizedBase + "?mode=reset&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
+    }
+
+    private String buildEmailVerificationLink(String token) {
+        String normalizedBase = resetBaseUrl.endsWith("/") ? resetBaseUrl.substring(0, resetBaseUrl.length() - 1) : resetBaseUrl;
+        return normalizedBase + "?mode=verify-email&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
     }
 }

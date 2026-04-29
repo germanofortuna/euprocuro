@@ -21,6 +21,7 @@ public class UserProfile {
     private String city;
     private String state;
     private String bio;
+    private boolean emailVerified;
     private double buyerRating;
     private double sellerRating;
     private Integer sellerCredits;

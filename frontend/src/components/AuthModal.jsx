@@ -52,6 +52,7 @@ export default function AuthModal({
   mode,
   isSubmitting,
   loginForm,
+  loginInlineError,
   registerForm,
   forgotForm,
   resetForm,
@@ -133,6 +134,11 @@ export default function AuthModal({
               onChange={(event) => handleChange(onLoginChange, "password", event.target.value)}
               required
             />
+            {loginInlineError ? (
+              <span className="form-inline-error">
+                {loginInlineError}
+              </span>
+            ) : null}
             <button
               type="button"
               className="text-button"

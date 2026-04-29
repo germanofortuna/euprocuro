@@ -29,6 +29,7 @@ public class UserDocument {
     private String city;
     private String state;
     private String bio;
+    private Boolean emailVerified;
     private double buyerRating;
     private double sellerRating;
     private Integer sellerCredits;

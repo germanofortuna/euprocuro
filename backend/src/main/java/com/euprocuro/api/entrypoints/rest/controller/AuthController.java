@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -39,8 +40,8 @@ public class AuthController {
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public AuthResponse register(@Valid @RequestBody RegisterRequest request, HttpServletResponse response) {
-        return toCookieAuthResponse(authUseCase.register(RestMapper.toCommand(request)), response);
+    public ActionMessageResponse register(@Valid @RequestBody RegisterRequest request) {
+        return RestMapper.toResponse(authUseCase.register(RestMapper.toCommand(request)));
     }
 
     @PostMapping("/login")
@@ -69,6 +70,14 @@ public class AuthController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authUseCase.resetPassword(RestMapper.toCommand(request));
+    }
+
+    @GetMapping("/verify-email")
+    public ActionMessageResponse verifyEmail(@RequestParam String token) {
+        authUseCase.verifyEmail(token);
+        return ActionMessageResponse.builder()
+                .message("E-mail verificado com sucesso.")
+                .build();
     }
 
     private AuthResponse toCookieAuthResponse(

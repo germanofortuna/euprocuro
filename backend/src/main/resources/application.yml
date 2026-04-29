@@ -1,4 +1,8 @@
 spring:
+  config:
+    import:
+      - optional:file:.env.local[.properties]
+      - optional:file:../.env.local[.properties]
   data:
     mongodb:
       uri: ${MONGO_URI:mongodb://localhost:27017/euprocuro}
@@ -34,6 +38,7 @@ application:
   auth:
     session-hours: ${APP_AUTH_SESSION_HOURS:168}
     password-reset-hours: ${APP_AUTH_PASSWORD_RESET_HOURS:2}
+    email-verification-hours: ${APP_AUTH_EMAIL_VERIFICATION_HOURS:24}
     reset-base-url: ${APP_RESET_BASE_URL:http://localhost:5173}
     expose-reset-preview: ${APP_AUTH_EXPOSE_RESET_PREVIEW:true}
     expose-session-token: ${APP_AUTH_EXPOSE_SESSION_TOKEN:true}

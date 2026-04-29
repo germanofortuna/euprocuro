@@ -26,6 +26,7 @@ import com.euprocuro.api.application.view.MonetizationProductView;
 import com.euprocuro.api.application.view.OfferConversationView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.PersonalDashboardView;
+import com.euprocuro.api.application.view.RegistrationView;
 import com.euprocuro.api.application.view.SellerItemMatchesView;
 import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
@@ -229,6 +230,12 @@ public final class RestMapper {
                 .build();
     }
 
+    public static ActionMessageResponse toResponse(RegistrationView view) {
+        return ActionMessageResponse.builder()
+                .message(view.getMessage())
+                .build();
+    }
+
     public static CheckoutResponse toResponse(CheckoutView view) {
         return CheckoutResponse.builder()
                 .provider(view.getProvider())
@@ -273,6 +280,7 @@ public final class RestMapper {
                 .city(domain.getCity())
                 .state(domain.getState())
                 .bio(domain.getBio())
+                .emailVerified(domain.isEmailVerified())
                 .buyerRating(domain.getBuyerRating())
                 .sellerRating(domain.getSellerRating())
                 .sellerCredits(domain.getSellerCredits())

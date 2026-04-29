@@ -1644,6 +1644,13 @@ textarea:focus {
   color: #0d8a4a;
 }
 
+.form-inline-error {
+  margin-top: -8px;
+  color: #b4233b;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
 .workspace-grid--wide {
   margin-top: 22px;
 }
