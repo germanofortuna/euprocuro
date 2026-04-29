@@ -15,4 +15,5 @@ public class MonetizationAccountView {
     Instant subscriptionActiveUntil;
     boolean subscriptionActive;
     List<MonetizationProductView> products;
+    List<PaymentOrderView> paymentHistory;
 }

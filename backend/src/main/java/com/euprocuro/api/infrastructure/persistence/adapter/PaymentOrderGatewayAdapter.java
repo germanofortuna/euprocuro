@@ -1,6 +1,8 @@
 package com.euprocuro.api.infrastructure.persistence.adapter;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
@@ -27,5 +29,13 @@ public class PaymentOrderGatewayAdapter implements PaymentOrderGateway {
     @Override
     public Optional<PaymentOrder> findById(String paymentOrderId) {
         return repository.findById(paymentOrderId).map(PaymentOrderPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public List<PaymentOrder> findRecentByUserId(String userId) {
+        return repository.findTop20ByUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(PaymentOrderPersistenceMapper::toDomain)
+                .collect(Collectors.toList());
     }
 }

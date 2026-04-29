@@ -15,4 +15,5 @@ public class MonetizationAccountResponse {
     Instant subscriptionActiveUntil;
     boolean subscriptionActive;
     List<MonetizationProductResponse> products;
+    List<PaymentOrderResponse> paymentHistory;
 }

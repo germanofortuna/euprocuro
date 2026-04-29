@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import com.euprocuro.api.application.usecase.MonetizationUseCase;
 import com.euprocuro.api.application.view.CheckoutView;
 import com.euprocuro.api.application.view.MonetizationAccountView;
 import com.euprocuro.api.application.view.MonetizationProductView;
+import com.euprocuro.api.application.view.PaymentOrderView;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
@@ -69,6 +71,7 @@ public class MonetizationService implements MonetizationUseCase {
                 .subscriptionActiveUntil(user.getSubscriptionActiveUntil())
                 .subscriptionActive(hasActiveSubscription(user))
                 .products(listProducts())
+                .paymentHistory(paymentHistory(userId))
                 .build();
     }
 
@@ -87,6 +90,7 @@ public class MonetizationService implements MonetizationUseCase {
 
         UserProfile updatedUser = applyProductToUser(user, product);
         updatedUser = userGateway.save(updatedUser);
+        PaymentOrder approvedOrder = saveApprovedLocalOrder(updatedUser, product, normalizePaymentMethod(command.getPaymentMethod()));
         emailGateway.sendPurchaseConfirmationEmail(
                 updatedUser,
                 product.getName(),
@@ -97,7 +101,8 @@ public class MonetizationService implements MonetizationUseCase {
                 "userId", userId,
                 "productCode", product.getCode(),
                 "paymentMethod", normalizePaymentMethod(command.getPaymentMethod()),
-                "provider", checkoutProvider
+                "provider", checkoutProvider,
+                "paymentOrderId", approvedOrder.getId()
         ));
 
         return CheckoutView.builder()
@@ -105,7 +110,8 @@ public class MonetizationService implements MonetizationUseCase {
                 .paymentMethod(normalizePaymentMethod(command.getPaymentMethod()))
                 .productCode(product.getCode())
                 .status("APPROVED")
-                .checkoutUrl("local://checkout/" + product.getCode())
+                .paymentOrderId(approvedOrder.getId())
+                .checkoutUrl("local://checkout/" + approvedOrder.getId())
                 .message("Pagamento simulado aprovado. Em producao, este fluxo sera confirmado por webhook do gateway.")
                 .build();
     }
@@ -135,6 +141,7 @@ public class MonetizationService implements MonetizationUseCase {
                 .subscriptionActiveUntil(updatedUser.getSubscriptionActiveUntil())
                 .subscriptionActive(false)
                 .products(listProducts())
+                .paymentHistory(paymentHistory(userId))
                 .build();
     }
 
@@ -155,6 +162,7 @@ public class MonetizationService implements MonetizationUseCase {
 
         PaymentOrder updatedOrder = paymentOrder.toBuilder()
                 .providerPaymentId(providerStatus.getPaymentId())
+                .paymentMethod(normalizePaymentMethod(firstText(providerStatus.getPaymentMethod(), paymentOrder.getPaymentMethod())))
                 .status(status)
                 .updatedAt(Instant.now())
                 .approvedAt(status == PaymentOrderStatus.APPROVED ? Instant.now() : paymentOrder.getApprovedAt())
@@ -166,7 +174,11 @@ public class MonetizationService implements MonetizationUseCase {
         }
 
         if (status == PaymentOrderStatus.APPROVED) {
-            approvePaymentOrder(paymentOrder, providerStatus.getPaymentId());
+            approvePaymentOrder(paymentOrder.toBuilder()
+                    .providerPaymentId(providerStatus.getPaymentId())
+                    .paymentMethod(normalizePaymentMethod(firstText(providerStatus.getPaymentMethod(), paymentOrder.getPaymentMethod())))
+                    .updatedAt(Instant.now())
+                    .build(), providerStatus.getPaymentId());
             return;
         }
 
@@ -345,28 +357,32 @@ public class MonetizationService implements MonetizationUseCase {
     }
 
     private void approvePaymentOrder(PaymentOrder paymentOrder, String providerPaymentId) {
+        String normalizedPaymentMethod = normalizePaymentMethod(paymentOrder.getPaymentMethod());
+
         if (paymentOrder.getStatus() == PaymentOrderStatus.APPROVED) {
             paymentOrderGateway.save(paymentOrder.toBuilder()
-                    .providerPaymentId(providerPaymentId)
-                    .updatedAt(Instant.now())
-                    .build());
+                .providerPaymentId(providerPaymentId)
+                .paymentMethod(normalizedPaymentMethod)
+                .updatedAt(Instant.now())
+                .build());
             return;
         }
 
         MonetizationProductView product = requireProduct(paymentOrder.getProductCode());
         UserProfile user = requireUser(paymentOrder.getUserId());
         UserProfile updatedUser = userGateway.save(applyProductToUser(user, product));
-        emailGateway.sendPurchaseConfirmationEmail(updatedUser, product.getName(), paymentOrder.getPaymentMethod());
+        emailGateway.sendPurchaseConfirmationEmail(updatedUser, product.getName(), normalizedPaymentMethod);
         eventPublisherGateway.publish("monetization.purchase.completed", Map.of(
                 "userId", paymentOrder.getUserId(),
                 "productCode", product.getCode(),
-                "paymentMethod", paymentOrder.getPaymentMethod(),
+                "paymentMethod", normalizedPaymentMethod,
                 "provider", paymentOrder.getProvider(),
                 "paymentOrderId", paymentOrder.getId()
         ));
 
         paymentOrderGateway.save(paymentOrder.toBuilder()
                 .providerPaymentId(providerPaymentId)
+                .paymentMethod(normalizedPaymentMethod)
                 .status(PaymentOrderStatus.APPROVED)
                 .updatedAt(Instant.now())
                 .approvedAt(Instant.now())
@@ -388,6 +404,59 @@ public class MonetizationService implements MonetizationUseCase {
 
     private boolean hasActiveSubscription(UserProfile user) {
         return user.getSubscriptionActiveUntil() != null && user.getSubscriptionActiveUntil().isAfter(Instant.now());
+    }
+
+    private List<PaymentOrderView> paymentHistory(String userId) {
+        return paymentOrderGateway.findRecentByUserId(userId)
+                .stream()
+                .map(this::toPaymentOrderView)
+                .collect(Collectors.toList());
+    }
+
+    private PaymentOrderView toPaymentOrderView(PaymentOrder paymentOrder) {
+        return PaymentOrderView.builder()
+                .id(paymentOrder.getId())
+                .productCode(paymentOrder.getProductCode())
+                .productName(paymentOrder.getProductName())
+                .amount(paymentOrder.getAmount())
+                .paymentMethod(paymentOrder.getPaymentMethod())
+                .provider(paymentOrder.getProvider())
+                .status(paymentOrder.getStatus())
+                .providerPaymentId(paymentOrder.getProviderPaymentId())
+                .createdAt(paymentOrder.getCreatedAt())
+                .updatedAt(paymentOrder.getUpdatedAt())
+                .approvedAt(paymentOrder.getApprovedAt())
+                .build();
+    }
+
+    private PaymentOrder saveApprovedLocalOrder(UserProfile user, MonetizationProductView product, String paymentMethod) {
+        Instant now = Instant.now();
+        String orderId = UUID.randomUUID().toString();
+        return paymentOrderGateway.save(PaymentOrder.builder()
+                .id(orderId)
+                .userId(user.getId())
+                .userEmail(user.getEmail())
+                .productCode(product.getCode())
+                .productName(product.getName())
+                .amount(product.getPrice())
+                .paymentMethod(paymentMethod)
+                .provider(checkoutProvider)
+                .status(PaymentOrderStatus.APPROVED)
+                .providerPaymentId(orderId)
+                .checkoutUrl("local://checkout/" + orderId)
+                .createdAt(now)
+                .updatedAt(now)
+                .approvedAt(now)
+                .build());
+    }
+
+    private String firstText(String... values) {
+        for (String value : values) {
+            if (StringUtils.hasText(value)) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private String normalizePaymentMethod(String paymentMethod) {

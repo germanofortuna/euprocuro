@@ -25,6 +25,7 @@ import com.euprocuro.api.application.view.MonetizationAccountView;
 import com.euprocuro.api.application.view.MonetizationProductView;
 import com.euprocuro.api.application.view.OfferConversationView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
+import com.euprocuro.api.application.view.PaymentOrderView;
 import com.euprocuro.api.application.view.PersonalDashboardView;
 import com.euprocuro.api.application.view.RegistrationView;
 import com.euprocuro.api.application.view.SellerItemMatchesView;
@@ -59,6 +60,7 @@ import com.euprocuro.api.entrypoints.rest.dto.response.MonetizationAccountRespon
 import com.euprocuro.api.entrypoints.rest.dto.response.MonetizationProductResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.OfferConversationResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.OfferResponse;
+import com.euprocuro.api.entrypoints.rest.dto.response.PaymentOrderResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.PersonalDashboardResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.SellerItemMatchesResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.SellerItemResponse;
@@ -257,6 +259,26 @@ public final class RestMapper {
                 .subscriptionActiveUntil(view.getSubscriptionActiveUntil())
                 .subscriptionActive(view.isSubscriptionActive())
                 .products(view.getProducts().stream().map(RestMapper::toResponse).collect(Collectors.toList()))
+                .paymentHistory(Optional.ofNullable(view.getPaymentHistory()).orElse(List.of())
+                        .stream()
+                        .map(RestMapper::toResponse)
+                        .collect(Collectors.toList()))
+                .build();
+    }
+
+    public static PaymentOrderResponse toResponse(PaymentOrderView view) {
+        return PaymentOrderResponse.builder()
+                .id(view.getId())
+                .productCode(view.getProductCode())
+                .productName(view.getProductName())
+                .amount(view.getAmount())
+                .paymentMethod(view.getPaymentMethod())
+                .provider(view.getProvider())
+                .status(view.getStatus())
+                .providerPaymentId(view.getProviderPaymentId())
+                .createdAt(view.getCreatedAt())
+                .updatedAt(view.getUpdatedAt())
+                .approvedAt(view.getApprovedAt())
                 .build();
     }
 

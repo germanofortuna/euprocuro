@@ -88,6 +88,7 @@ class MonetizationServiceTest {
     void purchaseShouldAddCreditsAndSendEmail() {
         when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
         when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CheckoutView result = monetizationService.purchase("user-1", PurchaseProductCommand.builder()
                 .productCode("CREDITS_10")
@@ -108,6 +109,7 @@ class MonetizationServiceTest {
     void purchaseShouldActivateSubscription() {
         when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
         when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         monetizationService.purchase("user-1", PurchaseProductCommand.builder()
                 .productCode("SELLER_PRO")
@@ -287,7 +289,9 @@ class MonetizationServiceTest {
                 user.getSellerCredits() == 10 && user.getPurchasedCreditsTotal() == 10
         ));
         verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
-                order.getStatus() == PaymentOrderStatus.APPROVED && "123".equals(order.getProviderPaymentId())
+                order.getStatus() == PaymentOrderStatus.APPROVED
+                        && "123".equals(order.getProviderPaymentId())
+                        && "PIX".equals(order.getPaymentMethod())
         ));
         verify(eventPublisherGateway).publish(eq("monetization.purchase.completed"), any(Map.class));
     }

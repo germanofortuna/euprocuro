@@ -151,6 +151,39 @@ function formatTimestamp(value) {
   }).format(new Date(value));
 }
 
+function paymentStatusLabel(status) {
+  const labels = {
+    APPROVED: "Aprovado",
+    PENDING: "Pendente",
+    CREATED: "Pendente",
+    REJECTED: "Reprovado",
+    CANCELLED: "Reprovado"
+  };
+  return labels[status] ?? "Pendente";
+}
+
+function paymentStatusTone(status) {
+  if (status === "APPROVED") {
+    return "approved";
+  }
+  if (status === "REJECTED" || status === "CANCELLED") {
+    return "rejected";
+  }
+  return "pending";
+}
+
+function paymentMethodLabel(method) {
+  const normalized = String(method ?? "").toUpperCase();
+  const labels = {
+    PIX: "Pix",
+    CREDIT_CARD: "Cartão de crédito",
+    DEBIT_CARD: "Cartão de débito",
+    ACCOUNT_MONEY: "Saldo Mercado Pago",
+    TICKET: "Boleto"
+  };
+  return labels[normalized] ?? (method || "Mercado Pago");
+}
+
 function listingExpiresAt(listing) {
   if (listing?.expiresAt) {
     return new Date(listing.expiresAt);
@@ -515,6 +548,7 @@ export default function App() {
   const [isSubmittingSellerItem, setIsSubmittingSellerItem] = useState(false);
   const [sharingSellerItemInterestId, setSharingSellerItemInterestId] = useState(null);
   const [isProcessingPurchase, setIsProcessingPurchase] = useState(false);
+  const [isPaymentReturnLoading, setIsPaymentReturnLoading] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [selectedPurchaseProductCode, setSelectedPurchaseProductCode] = useState(null);
   const [feedbackModal, setFeedbackModal] = useState(null);
@@ -1232,6 +1266,8 @@ export default function App() {
     }
 
     paymentReturnHandledRef.current = true;
+    setIsPaymentReturnLoading(true);
+    navigateTo(loggedSections.CREDITS);
     setPaymentStatus((current) => ({
       ...(current ?? {}),
       step: paymentResult === "failure" ? "FAILED" : "PAYMENT",
@@ -1248,7 +1284,9 @@ export default function App() {
             ? "O Mercado Pago retornou uma tentativa recusada."
             : "Pagamento sincronizado. Se aprovado, seus créditos já foram liberados."
         }));
-        if (paymentResult !== "failure") {
+        if (paymentResult === "failure") {
+          openFeedback("error", "Pagamento recusado", "O Mercado Pago retornou uma tentativa recusada.");
+        } else {
           openFeedback("success", "Pagamento sincronizado", "Atualizamos seu saldo com o status retornado pelo Mercado Pago.");
         }
       })
@@ -1278,6 +1316,7 @@ export default function App() {
           url.searchParams.delete(param);
         });
         window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+        setIsPaymentReturnLoading(false);
       });
   }, [session?.token]);
 
@@ -2750,6 +2789,55 @@ export default function App() {
     );
   }
 
+  function renderPaymentHistory() {
+    const history = monetizationAccount?.paymentHistory ?? [];
+
+    return (
+      <div className="payment-history">
+        <div className="payment-history__header">
+          <div>
+            <span className="eyebrow">Histórico</span>
+            <h3>Últimos pagamentos</h3>
+          </div>
+          <small>{history.length} registros</small>
+        </div>
+
+        {history.length === 0 ? (
+          <div className="payment-history__empty">
+            <strong>Nenhuma compra registrada</strong>
+            <p>Quando você comprar créditos ou um plano, os pagamentos aparecerão aqui.</p>
+          </div>
+        ) : (
+          <div className="payment-history__list">
+            {history.map((payment) => {
+              const tone = paymentStatusTone(payment.status);
+              return (
+                <article key={payment.id} className="payment-history__item">
+                  <div>
+                    <strong>{payment.productName ?? payment.productCode ?? "Compra de créditos"}</strong>
+                    <span>{formatTimestamp(payment.createdAt)}</span>
+                  </div>
+                  <div>
+                    <span>{paymentMethodLabel(payment.paymentMethod)}</span>
+                    <small>
+                      {payment.provider === "MERCADO_PAGO_CHECKOUT_PRO"
+                        ? "Mercado Pago"
+                        : payment.provider || "Mercado Pago"}
+                    </small>
+                  </div>
+                  <strong>{currency(payment.amount)}</strong>
+                  <span className={`payment-status-pill payment-status-pill--${tone}`}>
+                    {paymentStatusLabel(payment.status)}
+                  </span>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function renderCreditsPage() {
     const sellerCredits = monetizationAccount?.sellerCredits ?? 0;
     const purchasedCreditsTotal = monetizationAccount?.purchasedCreditsTotal ?? 0;
@@ -2781,6 +2869,7 @@ export default function App() {
         </div>
 
         {renderPaymentTracker()}
+        {renderPaymentHistory()}
 
         {monetizationAccount?.subscriptionActive ? (
           <div className="plan-active-card">
@@ -3790,6 +3879,18 @@ export default function App() {
         onMarkAllRead={handleMarkAllNotificationsRead}
         onSelect={handleNotificationSelect}
       />
+
+      {isPaymentReturnLoading ? (
+        <div className="modal-overlay">
+          <div className="payment-return-loading" role="status" aria-live="polite">
+            <span className="payment-return-loading__spinner" aria-hidden="true" />
+            <div>
+              <strong>Confirmando pagamento</strong>
+              <p>Estamos sincronizando seu retorno do Mercado Pago.</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <FeedbackModal modal={feedbackModal} onClose={() => setFeedbackModal(null)} />
 
