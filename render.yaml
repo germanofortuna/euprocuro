@@ -37,3 +37,5 @@ services:
         sync: false
       - key: RABBITMQ_PASSWORD
         sync: false
+      - key: RABBITMQ_VIRTUAL_HOST
+        sync: false
