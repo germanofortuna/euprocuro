@@ -29,3 +29,11 @@ services:
         value: "true"
       - key: APP_HML_ALLOWED_EMAILS
         sync: false
+      - key: RABBITMQ_HOST
+        sync: false
+      - key: RABBITMQ_PORT
+        sync: false
+      - key: RABBITMQ_USERNAME
+        sync: false
+      - key: RABBITMQ_PASSWORD
+        sync: false
