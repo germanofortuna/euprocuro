@@ -155,7 +155,7 @@ class ModerationServiceTest {
         when(aiModerationGateway.moderate(any(ModerationContent.class))).thenReturn(Optional.of(ModerationResult.builder()
                 .flagged(true)
                 .provider("OPENAI")
-                .categories(List.of("illicit"))
+                .categories(Map.of("illicit",true))
                 .scores(Map.of("illicit", 0.3))
                 .build()));
         when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -175,7 +175,7 @@ class ModerationServiceTest {
         when(aiModerationGateway.moderate(any(ModerationContent.class))).thenReturn(Optional.of(ModerationResult.builder()
                 .flagged(false)
                 .provider("OPENAI")
-                .categories(List.of("suspicious"))
+                .categories(Map.of("suspicious", true))
                 .scores(Map.of("suspicious", 0.7))
                 .build()));
         when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -185,7 +185,7 @@ class ModerationServiceTest {
         ArgumentCaptor<InterestPost> captor = ArgumentCaptor.forClass(InterestPost.class);
         verify(interestGateway).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(InterestStatus.REVIEW_REQUIRED);
-        assertThat(captor.getValue().getModeration().getCategories()).containsExactly("suspicious");
+        assertThat(captor.getValue().getModeration().getCategories()).containsExactly();
     }
 
     @Test

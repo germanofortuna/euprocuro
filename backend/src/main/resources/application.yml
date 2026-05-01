@@ -100,8 +100,8 @@ application:
     local:
       blocked-terms: ${APP_MODERATION_BLOCKED_TERMS:}
     ai:
-      review-threshold: ${APP_MODERATION_REVIEW_THRESHOLD:0.55}
-      reject-threshold: ${APP_MODERATION_REJECT_THRESHOLD:0.85}
+      review-threshold: ${APP_MODERATION_REVIEW_THRESHOLD:0.20}
+      reject-threshold: ${APP_MODERATION_REJECT_THRESHOLD:0.30}
     openai:
       enabled: ${APP_OPENAI_MODERATION_ENABLED:true}
       api-key: ${OPENAI_API_KEY:}

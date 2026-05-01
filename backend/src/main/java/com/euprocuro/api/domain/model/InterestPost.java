@@ -35,6 +35,7 @@ public class InterestPost {
     private String preferredContactMode;
     private InterestStatus status;
     private InterestModeration moderation;
+    private boolean flagged;
     private Instant createdAt;
     private Instant updatedAt;
     private Instant expiresAt;

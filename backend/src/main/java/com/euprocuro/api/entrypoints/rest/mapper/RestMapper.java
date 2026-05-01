@@ -1,6 +1,7 @@
 package com.euprocuro.api.entrypoints.rest.mapper;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -385,7 +386,7 @@ public final class RestMapper {
 
         return InterestModerationResponse.builder()
                 .riskLevel(domain.getRiskLevel())
-                .categories(Optional.ofNullable(domain.getCategories()).orElse(List.of()))
+                .categories(Optional.ofNullable(domain.getCategories()).orElse(Map.of()))
                 .scores(domain.getScores())
                 .reviewRequired(domain.isReviewRequired())
                 .provider(domain.getProvider())

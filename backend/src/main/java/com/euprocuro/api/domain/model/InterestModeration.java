@@ -1,7 +1,6 @@
 package com.euprocuro.api.domain.model;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 
 import lombok.AllArgsConstructor;
@@ -15,7 +14,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class InterestModeration {
     private ModerationRiskLevel riskLevel;
-    private List<String> categories;
+    private Map<String, Boolean> categories;
+    private boolean flagged;
     private Map<String, Double> scores;
     private boolean reviewRequired;
     private String provider;

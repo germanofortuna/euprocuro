@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +22,7 @@ import com.euprocuro.api.infrastructure.moderation.dto.OpenAiModerationResponse;
 
 import lombok.RequiredArgsConstructor;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class OpenAiModerationGatewayAdapter implements AiModerationGateway {
@@ -43,6 +45,7 @@ public class OpenAiModerationGatewayAdapter implements AiModerationGateway {
         }
 
         try {
+            log.info("AI moraderation request: {}", content.toString());
             OpenAiModerationResponse response = openAiModerationClient.moderate(
                     "Bearer " + apiKey,
                     requestBody(content)
@@ -54,12 +57,13 @@ public class OpenAiModerationGatewayAdapter implements AiModerationGateway {
             OpenAiModerationResponse.Result result = response.getResults().get(0);
             Map<String, Boolean> categories = result.getCategories();
             Map<String, Double> scores = result.getCategoryScores();
-            List<String> matchedCategories = Optional.ofNullable(categories).orElse(Map.of())
+            Map<String, Boolean> matchedCategories = Optional.ofNullable(categories).orElse(Map.of())
                     .entrySet()
                     .stream()
-                    .filter(entry -> Boolean.TRUE.equals(entry.getValue()))
-                    .map(Map.Entry::getKey)
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            entry -> Boolean.TRUE.equals(entry.getValue())
+                    ));
 
             return Optional.of(ModerationResult.builder()
                     .flagged(result.isFlagged())
@@ -76,7 +80,7 @@ public class OpenAiModerationGatewayAdapter implements AiModerationGateway {
     private ModerationResult unavailableResult() {
         return ModerationResult.builder()
                 .flagged(false)
-                .categories(List.of("openai_unavailable"))
+                .categories(Map.of("openai_unavailable", false))
                 .scores(Map.of("openai_unavailable", 0.55))
                 .provider("OPENAI_UNAVAILABLE")
                 .build();

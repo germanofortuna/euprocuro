@@ -10,7 +10,7 @@ import lombok.Value;
 @Builder
 public class ModerationResult {
     boolean flagged;
-    List<String> categories;
+    Map<String, Boolean> categories;
     Map<String, Double> scores;
     String provider;
 }

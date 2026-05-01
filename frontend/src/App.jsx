@@ -270,7 +270,7 @@ function expiryPillClass(listing) {
 function moderationStatusLabel(status) {
   const labels = {
     PENDING: "Em análise",
-    APPROVED: "Publicado",
+    APPROVED: "Aprovado",
     REVIEW_REQUIRED: "Em revisão",
     REJECTED: "Rejeitado",
     HIDDEN: "Oculto",

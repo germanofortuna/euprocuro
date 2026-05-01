@@ -21,6 +21,8 @@ import com.euprocuro.api.domain.model.SellerItem;
 
 import lombok.RequiredArgsConstructor;
 
+import static com.euprocuro.api.application.service.ModerationService.getModerationRules;
+
 @Component
 @RequiredArgsConstructor
 public class BlockedTermValidationGatewayAdapter implements BlockedTermValidationGateway {
@@ -58,18 +60,7 @@ public class BlockedTermValidationGatewayAdapter implements BlockedTermValidatio
     }
 
     private List<ModerationRule> allActiveRules() {
-        List<ModerationRule> persistedRules = moderationRuleGateway.findByActiveTrue();
-        List<ModerationRule> configuredRules = Arrays.stream(defaultBlockedTerms.split(","))
-                .map(String::trim)
-                .filter(value -> !value.isEmpty())
-                .map(term -> ModerationRule.builder()
-                        .term(term)
-                        .riskLevel(ModerationRiskLevel.HIGH)
-                        .active(true)
-                        .build())
-                .collect(Collectors.toList());
-        return java.util.stream.Stream.concat(persistedRules.stream(), configuredRules.stream())
-                .collect(Collectors.toList());
+        return getModerationRules(moderationRuleGateway, defaultBlockedTerms);
     }
 
     @Override

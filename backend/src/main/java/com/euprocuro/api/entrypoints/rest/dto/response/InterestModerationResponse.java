@@ -13,7 +13,7 @@ import lombok.Value;
 @Builder
 public class InterestModerationResponse {
     ModerationRiskLevel riskLevel;
-    List<String> categories;
+    Map<String, Boolean> categories;
     Map<String, Double> scores;
     boolean reviewRequired;
     String provider;

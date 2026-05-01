@@ -11,7 +11,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.regex.Pattern;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -36,6 +38,7 @@ import com.euprocuro.api.domain.model.ModerationRule;
 
 import lombok.RequiredArgsConstructor;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ModerationService implements ModerationUseCase {
@@ -52,10 +55,10 @@ public class ModerationService implements ModerationUseCase {
 
     @Value("${application.moderation.local.blocked-terms:}")
     private String defaultBlockedTerms;
-    @Value("${application.moderation.ai.review-threshold:0.55}")
-    private double reviewThreshold = 0.55;
-    @Value("${application.moderation.ai.reject-threshold:0.85}")
-    private double rejectThreshold = 0.85;
+    @Value("${application.moderation.ai.review-threshold:0.20}")
+    private double reviewThreshold = 0.20;
+    @Value("${application.moderation.ai.reject-threshold:0.30}")
+    private double rejectThreshold = 0.30;
 
     @Override
     public void processInterestModeration(String interestId) {
@@ -68,40 +71,42 @@ public class ModerationService implements ModerationUseCase {
         LocalRuleMatch localRuleMatch = findLocalRuleMatch(interest).orElse(null);
         if (localRuleMatch != null && localRuleMatch.riskLevel == ModerationRiskLevel.HIGH) {
             saveDecision(interest, InterestStatus.REJECTED, ModerationRiskLevel.HIGH, "LOCAL_RULE",
-                    List.of("local_rule"), Map.of(localRuleMatch.term, 1.0),
-                    localRuleMatch.reason);
+                    Map.of("local_rule", true), Map.of(localRuleMatch.term, 1.0),
+                    localRuleMatch.reason, false);
             return;
         }
 
         Optional<ModerationResult> aiResult = aiModerationGateway.moderate(toModerationContent(interest));
+        log.info("AI Moderation result of interest {}: {}", interestId, aiResult);
         if (aiResult.isEmpty()) {
             if (localRuleMatch != null) {
                 saveDecision(interest, InterestStatus.REVIEW_REQUIRED, ModerationRiskLevel.MEDIUM, "LOCAL_RULE",
-                        List.of("local_rule"), Map.of(localRuleMatch.term, 1.0),
-                        "Este anuncio precisa de revisao manual por uma regra local.");
+                        Map.of("local_rule", true), Map.of(localRuleMatch.term, 1.0),
+                        "Este anuncio precisa de revisao manual por uma regra local.", false);
                 return;
             }
             saveDecision(interest, InterestStatus.APPROVED, ModerationRiskLevel.LOW, "LOCAL_ONLY",
-                    List.of(), Map.of(), "Anuncio aprovado pelas regras locais.");
+                    Map.of(), Map.of(), "Anuncio aprovado pelas regras locais.", false);
             return;
         }
 
         ModerationResult result = aiResult.get();
         double highestScore = highestScore(result.getScores());
+        log.info("AI moderation was flagged? {}", result.isFlagged());
         if (result.isFlagged() || highestScore >= rejectThreshold) {
             saveDecision(interest, InterestStatus.REJECTED, ModerationRiskLevel.HIGH, result.getProvider(),
-                    result.getCategories(), result.getScores(), "A moderacao automatica rejeitou este anuncio.");
+                    result.getCategories(), result.getScores(), "A moderacao automatica rejeitou este anuncio.", result.isFlagged());
             return;
         }
 
         if (highestScore >= reviewThreshold || localRuleMatch != null) {
             saveDecision(interest, InterestStatus.REVIEW_REQUIRED, ModerationRiskLevel.MEDIUM, result.getProvider(),
-                    result.getCategories(), result.getScores(), "Este anuncio precisa de revisao manual.");
+                    result.getCategories(), result.getScores(), "Este anuncio precisa de revisao manual.", false);
             return;
         }
 
         saveDecision(interest, InterestStatus.APPROVED, ModerationRiskLevel.LOW, result.getProvider(),
-                result.getCategories(), result.getScores(), "Anuncio aprovado automaticamente.");
+                result.getCategories(), result.getScores(), "Anuncio aprovado automaticamente.", false);
     }
 
     @Override
@@ -125,8 +130,8 @@ public class ModerationService implements ModerationUseCase {
         interestGateway.save(interest.toBuilder()
                 .status(InterestStatus.REPORTED)
                 .updatedAt(Instant.now())
-                .moderation(mergeModeration(interest.getModeration(), InterestStatus.REPORTED, ModerationRiskLevel.MEDIUM,
-                        "USER_REPORT", "Este anuncio recebeu uma denuncia e sera analisado."))
+                .moderation(mergeModeration(interest.getModeration()
+                ))
                 .build());
         realtimeMessageGateway.publishInterestModerationUpdated(
                 interest.getOwnerId(),
@@ -142,16 +147,17 @@ public class ModerationService implements ModerationUseCase {
             InterestStatus status,
             ModerationRiskLevel riskLevel,
             String provider,
-            List<String> categories,
+            Map<String, Boolean> categories,
             Map<String, Double> scores,
-            String reason
-    ) {
+            String reason,
+            boolean flagged) {
         InterestPost saved = interestGateway.save(interest.toBuilder()
                 .status(status)
                 .updatedAt(Instant.now())
                 .moderation(InterestModeration.builder()
                         .riskLevel(riskLevel)
-                        .categories(categories == null ? List.of() : categories)
+                        .flagged(flagged)
+                        .categories(categories == null ? Map.of() : categories)
                         .scores(scores == null ? Map.of() : scores)
                         .reviewRequired(status == InterestStatus.REVIEW_REQUIRED)
                         .provider(provider)
@@ -162,21 +168,15 @@ public class ModerationService implements ModerationUseCase {
         realtimeMessageGateway.publishInterestModerationUpdated(saved.getOwnerId(), saved.getId(), status.name(), reason);
     }
 
-    private InterestModeration mergeModeration(
-            InterestModeration current,
-            InterestStatus status,
-            ModerationRiskLevel riskLevel,
-            String provider,
-            String reason
-    ) {
+    private InterestModeration mergeModeration(InterestModeration current) {
         InterestModeration.InterestModerationBuilder builder = current == null
                 ? InterestModeration.builder()
                 : current.toBuilder();
         return builder
-                .riskLevel(riskLevel)
-                .reviewRequired(status == InterestStatus.REVIEW_REQUIRED || status == InterestStatus.REPORTED)
-                .provider(provider)
-                .reason(reason)
+                .riskLevel(ModerationRiskLevel.MEDIUM)
+                .reviewRequired(true)
+                .provider("USER_REPORT")
+                .reason("Este anuncio recebeu uma denuncia e sera analisado.")
                 .checkedAt(Instant.now())
                 .build();
     }
@@ -202,6 +202,11 @@ public class ModerationService implements ModerationUseCase {
     }
 
     private List<ModerationRule> allActiveRules() {
+        return getModerationRules(moderationRuleGateway, defaultBlockedTerms);
+    }
+
+    @NonNull
+    public static List<ModerationRule> getModerationRules(ModerationRuleGateway moderationRuleGateway, String defaultBlockedTerms) {
         List<ModerationRule> persistedRules = moderationRuleGateway.findByActiveTrue();
         List<ModerationRule> configuredRules = Arrays.stream(defaultBlockedTerms.split(","))
                 .map(String::trim)

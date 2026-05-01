@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class InterestModerationDocument {
     private ModerationRiskLevel riskLevel;
-    private List<String> categories;
+    private Map<String, Boolean> categories;
     private Map<String, Double> scores;
     private boolean reviewRequired;
     private String provider;
