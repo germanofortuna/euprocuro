@@ -220,6 +220,36 @@ Eventos que ja disparam e-mail:
 - confirmacao de compra de creditos ou plano
 - confirmacao de boost ativado
 
+## Moderacao por IA
+
+A moderacao por OpenAI fica habilitada por padrao em todos os ambientes. Para que a chamada real aconteca, configure uma chave valida via variavel de ambiente, nunca dentro do `application.yml`.
+
+No ambiente local, inclua no `.env.local`:
+
+```bash
+APP_OPENAI_MODERATION_ENABLED=true
+OPENAI_API_KEY=sua-chave-openai
+APP_OPENAI_MODERATION_MODEL=omni-moderation-latest
+```
+
+No HML/Render, configure as mesmas variaveis em **Environment**:
+
+```bash
+APP_OPENAI_MODERATION_ENABLED=true
+OPENAI_API_KEY=sua-chave-openai
+APP_OPENAI_MODERATION_MODEL=omni-moderation-latest
+```
+
+Se a IA estiver habilitada mas a chave estiver ausente, invalida ou a OpenAI estiver indisponivel, o anuncio nao sera aprovado automaticamente: ele ficara como `REVIEW_REQUIRED` para revisao manual no painel admin.
+
+Para liberar o painel admin, configure tambem:
+
+```bash
+APP_ADMIN_ALLOWED_EMAILS=seu-email@dominio.com,outro-admin@dominio.com
+```
+
+Depois reinicie o backend local ou faca redeploy no Render. Ao logar com um e-mail liberado, a opcao `Moderacao` aparece na area logada.
+
 ## Monetizacao e pagamentos
 
 O MVP ja possui produtos de monetizacao configuraveis por ambiente:

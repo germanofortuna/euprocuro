@@ -156,7 +156,11 @@ public class InterestGatewayAdapter implements InterestGateway {
         ));
 
         if (searchCriteria.isOpenOnly()) {
-            criteria.add(Criteria.where("status").is(InterestStatus.OPEN));
+            criteria.add(Criteria.where("status").in(List.of(
+                    InterestStatus.OPEN,
+                    InterestStatus.APPROVED,
+                    InterestStatus.REPORTED
+            )));
         }
 
         if (searchCriteria.getCategory() != null) {

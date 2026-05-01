@@ -91,11 +91,12 @@ class MarketplaceServiceTest {
 
         assertThat(result.getId()).isEqualTo("interest-1");
         assertThat(result.getReferenceImageUrl()).isEqualTo("data:image/png;base64,abc");
-        assertThat(result.getStatus()).isEqualTo(InterestStatus.OPEN);
+        assertThat(result.getStatus()).isEqualTo(InterestStatus.PENDING);
         assertThat(result.getLocation().getCity()).isEqualTo("Campinas");
         assertThat(result.getExpiresAt()).isAfter(result.getCreatedAt().plus(29, ChronoUnit.DAYS));
         assertThat(result.getExpiresAt()).isBefore(result.getCreatedAt().plus(31, ChronoUnit.DAYS));
         verify(eventPublisherGateway).publish(eq("interest.created"), any(Map.class));
+        verify(eventPublisherGateway).publish(eq("interest.moderation.requested"), any(Map.class));
     }
 
     @Test
@@ -139,7 +140,9 @@ class MarketplaceServiceTest {
         assertThat(result.getTitle()).isEqualTo("Quero um violao eletrico");
         assertThat(result.getReferenceImageUrl()).isEqualTo("imagem");
         assertThat(result.isBoostEnabled()).isTrue();
+        assertThat(result.getStatus()).isEqualTo(InterestStatus.PENDING);
         verify(eventPublisherGateway).publish(eq("interest.updated"), any(Map.class));
+        verify(eventPublisherGateway).publish(eq("interest.moderation.requested"), any(Map.class));
     }
 
     @Test

@@ -7,6 +7,7 @@ import java.util.List;
 import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
 
 import com.euprocuro.api.domain.model.InterestCategory;
 
@@ -15,9 +16,11 @@ import lombok.Data;
 @Data
 public class UpdateInterestRequest {
     @NotBlank
+    @Size(max = 80)
     private String title;
 
     @NotBlank
+    @Size(max = 120)
     private String description;
 
     private String referenceImageUrl;

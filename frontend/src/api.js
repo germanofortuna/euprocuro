@@ -271,6 +271,13 @@ export async function createOffer(interestId, payload) {
   });
 }
 
+export async function reportInterest(interestId, payload) {
+  return request(`/interests/${interestId}/reports`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function fetchOfferConversation(offerId) {
   return request(`/offers/${offerId}/conversation`);
 }
@@ -309,6 +316,31 @@ export async function deactivateSellerItem(itemId) {
 
 export async function shareSellerItemOffer(itemId, interestId, payload) {
   return request(`/seller-items/${itemId}/interests/${interestId}/offer`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function fetchAdminModeration() {
+  return request("/admin/moderation");
+}
+
+export async function saveModerationRule(ruleId, payload) {
+  const path = ruleId ? `/admin/moderation/rules/${ruleId}` : "/admin/moderation/rules";
+  return request(path, {
+    method: ruleId ? "PUT" : "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteModerationRule(ruleId) {
+  return request(`/admin/moderation/rules/${ruleId}`, {
+    method: "DELETE"
+  });
+}
+
+export async function decideInterestModeration(interestId, payload) {
+  return request(`/admin/moderation/interests/${interestId}/decision`, {
     method: "POST",
     body: JSON.stringify(payload)
   });

@@ -67,7 +67,7 @@ public class DashboardService implements DashboardUseCase {
 
         return PersonalDashboardView.builder()
                 .user(user)
-                .totalActiveInterests(myInterests.stream().filter(post -> post.getStatus() == InterestStatus.OPEN).count())
+                .totalActiveInterests(myInterests.stream().filter(this::countsAsUserInterest).count())
                 .totalOffersSent(offersSent.size())
                 .totalOffersReceived(offersReceived.size())
                 .myInterests(myInterests)
@@ -133,5 +133,10 @@ public class DashboardService implements DashboardUseCase {
                 ? null
                 : interest.getCreatedAt().plus(Math.max(1, listingExpirationDays), ChronoUnit.DAYS);
         return expiration == null || expiration.isAfter(Instant.now());
+    }
+
+    private boolean countsAsUserInterest(InterestPost interest) {
+        return interest.getStatus() != InterestStatus.CLOSED
+                && interest.getStatus() != InterestStatus.HIDDEN;
     }
 }

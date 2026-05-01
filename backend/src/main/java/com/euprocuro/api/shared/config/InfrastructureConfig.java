@@ -57,6 +57,13 @@ public class InfrastructureConfig {
     }
 
     @Bean
+    public Queue interestModerationQueue(
+            @Value("${application.messaging.rabbit.interest-moderation-queue:euprocuro.interest.moderation}") String queueName
+    ) {
+        return new Queue(queueName, true);
+    }
+
+    @Bean
     public Binding interestCreatedBinding(
             @Qualifier("interestCreatedQueue") Queue interestCreatedQueue,
             TopicExchange euProcuroExchange
@@ -86,6 +93,14 @@ public class InfrastructureConfig {
             TopicExchange euProcuroExchange
     ) {
         return BindingBuilder.bind(authQueue).to(euProcuroExchange).with("auth.*");
+    }
+
+    @Bean
+    public Binding interestModerationBinding(
+            @Qualifier("interestModerationQueue") Queue interestModerationQueue,
+            TopicExchange euProcuroExchange
+    ) {
+        return BindingBuilder.bind(interestModerationQueue).to(euProcuroExchange).with("interest.moderation.requested");
     }
 
     @Bean

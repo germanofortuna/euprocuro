@@ -94,10 +94,24 @@ application:
     access:
       enabled: ${APP_HML_ACCESS_ENABLED:false}
       allowed-emails: ${APP_HML_ALLOWED_EMAILS:}
+  admin:
+    allowed-emails: ${APP_ADMIN_ALLOWED_EMAILS:gfortuna@outlook.com}
+  moderation:
+    local:
+      blocked-terms: ${APP_MODERATION_BLOCKED_TERMS:}
+    ai:
+      review-threshold: ${APP_MODERATION_REVIEW_THRESHOLD:0.55}
+      reject-threshold: ${APP_MODERATION_REJECT_THRESHOLD:0.85}
+    openai:
+      enabled: ${APP_OPENAI_MODERATION_ENABLED:true}
+      api-key: ${OPENAI_API_KEY:}
+      model: ${APP_OPENAI_MODERATION_MODEL:omni-moderation-latest}
+      base-url: ${APP_OPENAI_BASE_URL:https://api.openai.com}
   messaging:
     rabbit:
       exchange: ${APP_RABBIT_EXCHANGE:euprocuro.exchange}
       interest-created-queue: ${APP_RABBIT_INTEREST_CREATED_QUEUE:euprocuro.interest.created}
+      interest-moderation-queue: ${APP_RABBIT_INTEREST_MODERATION_QUEUE:euprocuro.interest.moderation}
       offer-created-queue: ${APP_RABBIT_OFFER_CREATED_QUEUE:euprocuro.offer.created}
       conversation-message-created-queue: ${APP_RABBIT_CONVERSATION_MESSAGE_CREATED_QUEUE:euprocuro.conversation.message.created}
       auth-queue: ${APP_RABBIT_AUTH_QUEUE:euprocuro.auth.events}

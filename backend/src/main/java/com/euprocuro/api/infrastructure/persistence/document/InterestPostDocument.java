@@ -42,6 +42,7 @@ public class InterestPostDocument {
     private String preferredCondition;
     private String preferredContactMode;
     private InterestStatus status;
+    private InterestModerationDocument moderation;
     private Instant createdAt;
     private Instant updatedAt;
     private Instant expiresAt;
