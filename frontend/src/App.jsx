@@ -857,6 +857,10 @@ export default function App() {
       return null;
     }
 
+    if (!["APPROVED", "OPEN"].includes(selectedInterest?.status)) {
+      return null;
+    }
+
     return (
       <div className="share-card">
         <div>
@@ -3992,57 +3996,64 @@ export default function App() {
                       Excluir anúncio
                     </button>
                   </div>
-
-                  <div className="boost-box">
-                    <div>
-                      <strong>Impulsionar interesse</strong>
-                      <p>
-                        {selectedInterest.boostedUntil
-                          ? `Destaque ativo até ${formatTimestamp(selectedInterest.boostedUntil)}`
-                          : "Apareça com prioridade na busca e na home."}
-                      </p>
-                    </div>
-                    <div className="boost-box__actions">
-                      {boostProducts.map((product) => (
-                        <article key={product.code} className="product-chip product-chip--boost">
+                  {["APPROVED", "OPEN"].includes(selectedInterest?.status) && (
+                      <>
+                        <div className="boost-box">
                           <div>
-                            <strong>{product.name}</strong>
-                            <span>{currency(product.price)}</span>
+                            <strong>Impulsionar interesse</strong>
+                            <p>
+                              {selectedInterest.boostedUntil
+                                  ? `Destaque ativo até ${formatTimestamp(selectedInterest.boostedUntil)}`
+                                  : "Apareça com prioridade na busca e na home."}
+                            </p>
                           </div>
-                          <div className="product-chip__actions">
-                            <button
-                              type="button"
-                              className="text-button"
-                              disabled={isProcessingPurchase}
-                              onClick={() => handleBoostInterest(product.code, selectedInterest.id, "MERCADO_PAGO")}
-                            >
-                              Pague com Mercado Pago
-                            </button>
+
+                          <div className="boost-box__actions">
+                            {boostProducts.map((product) => (
+                                <article key={product.code} className="product-chip product-chip--boost">
+                                  <div>
+                                    <strong>{product.name}</strong>
+                                    <span>{currency(product.price)}</span>
+                                  </div>
+
+                                  <div className="product-chip__actions">
+                                    <button
+                                        type="button"
+                                        className="text-button"
+                                        disabled={isProcessingPurchase}
+                                        onClick={() =>
+                                            handleBoostInterest(product.code, selectedInterest.id, "MERCADO_PAGO")
+                                        }
+                                    >
+                                      Pague com Mercado Pago
+                                    </button>
+                                  </div>
+                                </article>
+                            ))}
                           </div>
-                        </article>
-                      ))}
-                    </div>
-                  </div>
+                        </div>
 
-                  <div className="offers">
-                    <div className="offers__header">
-                      <span className="eyebrow">Ofertas recebidas</span>
-                      <strong>{offers.length}</strong>
-                    </div>
+                        <div className="offers">
+                          <div className="offers__header">
+                            <span className="eyebrow">Ofertas recebidas</span>
+                            <strong>{offers.length}</strong>
+                          </div>
 
-                    {offers.length === 0 ? (
-                      <EmptyState
-                        title="Ainda sem ofertas"
-                        description="Quando alguém responder ao seu interesse, as mensagens aparecerão aqui."
-                      />
-                    ) : (
-                      <div className="accordion-list">
-                        {offers.map((offer) =>
-                          renderOfferListItem(offer, "right", selectedInterest.referenceImageUrl)
-                        )}
-                      </div>
-                    )}
-                  </div>
+                          {offers.length === 0 ? (
+                              <EmptyState
+                                  title="Ainda sem ofertas"
+                                  description="Quando alguém responder ao seu interesse, as mensagens aparecerão aqui."
+                              />
+                          ) : (
+                              <div className="accordion-list">
+                                {offers.map((offer) =>
+                                    renderOfferListItem(offer, "right", selectedInterest.referenceImageUrl)
+                                )}
+                              </div>
+                          )}
+                        </div>
+                      </>
+                  )}
                 </>
               ) : (
                 <EmptyState
