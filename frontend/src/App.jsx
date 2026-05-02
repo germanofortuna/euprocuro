@@ -2664,6 +2664,8 @@ export default function App() {
                   />
                 ) : null}
 
+                <p className="detail-description">{selectedInterest.description}</p>
+
                 <div className="detail-block">
                   <div className="detail-row">
                     <span>Categoria</span>
@@ -2715,8 +2717,6 @@ export default function App() {
                     </div>
                   ) : null}
                 </div>
-
-                <p className="detail-description">{selectedInterest.description}</p>
 
                 <div className="tag-cluster">
                   {selectedInterest.tags?.map((tag) => (
