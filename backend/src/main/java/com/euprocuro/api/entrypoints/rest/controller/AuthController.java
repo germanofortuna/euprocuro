@@ -95,6 +95,8 @@ public class AuthController {
     ) {
         authCookieManager.writeSessionCookie(response, session.getToken(), session.getExpiresAt());
 
+        response.addHeader("X-Auth-Expose-Session-Token", String.valueOf(exposeSessionToken));
+
         return AuthResponse.builder()
                 .token(exposeSessionToken ? session.getToken() : null)
                 .expiresAt(session.getExpiresAt())
