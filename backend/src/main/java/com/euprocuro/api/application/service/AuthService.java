@@ -173,14 +173,13 @@ public class AuthService implements AuthUseCase {
     }
 
     @Override
-    public AuthenticatedSessionView me(String token) {
-        UserProfile user = requireAuthenticatedUser(token);
-        AuthSession session = getValidSession(token);
-        return AuthenticatedSessionView.builder()
-                .token(session.getToken())
-                .expiresAt(session.getExpiresAt())
-                .user(user)
-                .build();
+    public UserProfile meByUserId(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            throw new UnauthorizedException("Usuario nao autenticado.");
+        }
+
+        return userGateway.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Usuario nao encontrado."));
     }
 
     @Override
@@ -191,6 +190,24 @@ public class AuthService implements AuthUseCase {
                 "userId", user.getId(),
                 "email", user.getEmail()
         ));
+    }
+
+    @Override
+    public void logoutIfPresent(String token) {
+        if (!StringUtils.hasText(token)) {
+            return;
+        }
+
+        authSessionGateway.findByToken(token)
+                .ifPresent(session -> {
+                    authSessionGateway.deleteByToken(token);
+
+                    userGateway.findById(session.getUserId())
+                            .ifPresent(user -> eventPublisherGateway.publish(
+                                    "auth.logout",
+                                    Map.of("userId", user.getId(),"email", user.getEmail())
+                            ));
+                });
     }
 
     @Override

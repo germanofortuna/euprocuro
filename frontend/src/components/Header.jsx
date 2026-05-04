@@ -21,6 +21,7 @@ export default function Header({
   onRegisterClick,
   onLogout
 }) {
+  const authenticated = Boolean(isLoggedIn && user?.id);
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? "";
   const hasNoCredits = !subscriptionActive && (sellerCredits ?? 0) <= 0;
 
@@ -37,7 +38,7 @@ export default function Header({
         </div>
       </button>
 
-      {isLoggedIn ? (
+      {authenticated ? (
         <div className="topbar__actions">
           <nav className="topbar__nav">
             <button

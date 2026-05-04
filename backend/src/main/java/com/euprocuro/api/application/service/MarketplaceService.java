@@ -424,7 +424,7 @@ public class MarketplaceService implements MarketplaceUseCase {
     }
 
     private boolean equalsIgnoreCase(String left, String right) {
-        return left != null && right != null && left.equalsIgnoreCase(right);
+        return left != null && left.equalsIgnoreCase(right);
     }
 
     private String safe(String value) {

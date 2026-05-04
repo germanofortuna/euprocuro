@@ -4,14 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import com.euprocuro.api.application.exception.BusinessException;
+import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -47,6 +48,9 @@ class SellerItemServiceTest {
     private UserGateway userGateway;
     @Mock
     private MarketplaceUseCase marketplaceUseCase;
+    @Mock
+    private BlockedTermValidationGateway blockedTermValidationGateway;
+
 
     @InjectMocks
     private SellerItemService sellerItemService;
@@ -76,6 +80,30 @@ class SellerItemServiceTest {
         assertThat(result.getReferenceImageUrl()).isEqualTo("foto");
         assertThat(result.getOwnerName()).isEqualTo("Carlos Seller");
         assertThat(result.getLocation().getCity()).isEqualTo("Erechim");
+    }
+
+    @Test
+    void updateItemShouldRejectBlockedTermsBeforeSaving() {
+        when(sellerItemGateway.findById("item-1"))
+                .thenReturn(Optional.of(baseSellerItem()));
+
+        doThrow(new BusinessException("Termo bloqueado"))
+                .when(blockedTermValidationGateway)
+                .validateBlockedTerms(any(SellerItem.class));
+
+        assertThatThrownBy(() -> sellerItemService.updateItem(
+                "seller-1",
+                "item-1",
+                UpdateSellerItemCommand.builder()
+                        .title("Produto bloqueado")
+                        .description("Descricao")
+                        .category(InterestCategory.AUTOMOVEIS)
+                        .build()
+        ))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Termo bloqueado");
+
+        verify(sellerItemGateway, never()).save(any(SellerItem.class));
     }
 
     @Test

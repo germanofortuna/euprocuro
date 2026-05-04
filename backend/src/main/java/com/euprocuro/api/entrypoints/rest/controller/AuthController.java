@@ -4,6 +4,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import com.euprocuro.api.entrypoints.rest.dto.response.MeResponse;
+import com.euprocuro.api.entrypoints.rest.security.AuthTokenResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,12 +33,14 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Tag(name = "Auth", description = "Endpoints relacionados a autenticacao e gerenciamento de conta do usuario.")
 public class AuthController {
 
     private final AuthUseCase authUseCase;
     private final AuthCookieManager authCookieManager;
+    private final AuthTokenResolver authTokenResolver;
 
-    @Value("${application.auth.expose-session-token:true}")
+    @Value("${application.auth.expose-session-token:false}")
     private boolean exposeSessionToken;
 
     @PostMapping("/register")
@@ -50,14 +55,18 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public AuthResponse me(HttpServletRequest request) {
-        return RestMapper.toResponse(authUseCase.me(CurrentUserContext.token(request)));
+    public MeResponse me(HttpServletRequest request) {
+        String userId = CurrentUserContext.userId(request);
+
+        return RestMapper.toMeResponse(authUseCase.meByUserId(userId));
     }
 
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(HttpServletRequest request, HttpServletResponse response) {
-        authUseCase.logout(CurrentUserContext.token(request));
+        authTokenResolver.resolve(request)
+                .ifPresent(authUseCase::logoutIfPresent);
+
         authCookieManager.clearSessionCookie(response);
     }
 

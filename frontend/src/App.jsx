@@ -1182,11 +1182,7 @@ export default function App() {
         fetchMonetizationAccount(),
         fetchSellerItems({ includeInactive: showInactiveSellerItems })
       ]);
-      const nextSession = {
-        expiresAt: me.expiresAt,
-        token: me.token ?? session.token ?? null,
-        user: me.user
-      };
+      const nextSession = buildSessionFromMeResponse(me, session);
 
       setSession(nextSession);
       storeSession(nextSession);
@@ -1301,11 +1297,7 @@ export default function App() {
           return;
         }
 
-        const nextSession = {
-          expiresAt: me.expiresAt,
-          token: me.token ?? null,
-          user: me.user
-        };
+        const nextSession = buildSessionFromMeResponse(me, getStoredSession());
 
         storeSession(nextSession);
         setSession(nextSession);
@@ -1370,11 +1362,7 @@ export default function App() {
 
         return fetchMe()
           .then((me) => {
-            const nextSession = {
-              expiresAt: me.expiresAt,
-              token: me.token ?? session.token ?? null,
-              user: me.user
-            };
+            const nextSession = buildSessionFromMeResponse(me, session);
             storeSession(nextSession);
             setSession(nextSession);
             return null;
@@ -1987,6 +1975,32 @@ export default function App() {
     } catch (requestError) {
       openFeedback("error", "Não foi possível excluir", requestError.message || "Tente novamente.");
     }
+  }
+
+  function buildSessionFromMeResponse(me, previousSession = null) {
+    if (!me) {
+      return previousSession;
+    }
+
+    const user = me.user ?? (
+        me.id
+            ? {
+              id: me.id,
+              name: me.name,
+              email: me.email,
+              city: me.city,
+              state: me.state,
+              sellerCredits: me.credits,
+              credits: me.credits
+            }
+            : null
+    );
+
+    return {
+      expiresAt: me.expiresAt ?? previousSession?.expiresAt ?? null,
+      token: me.token ?? previousSession?.token ?? null,
+      user
+    };
   }
 
   function openReportModal(interest) {

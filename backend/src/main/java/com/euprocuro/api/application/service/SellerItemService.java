@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -179,8 +180,7 @@ public class SellerItemService implements SellerItemUseCase {
     }
 
     private List<String> tokens(String value) {
-        return List.of(safe(value).toLowerCase(Locale.ROOT).split("\\s+"))
-                .stream()
+        return Stream.of(safe(value).toLowerCase(Locale.ROOT).split("\\s+"))
                 .map(String::trim)
                 .filter(token -> token.length() >= 3)
                 .collect(Collectors.toList());

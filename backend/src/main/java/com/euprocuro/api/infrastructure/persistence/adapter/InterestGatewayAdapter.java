@@ -189,9 +189,7 @@ public class InterestGatewayAdapter implements InterestGateway {
             ));
         }
 
-        return criteria.isEmpty()
-                ? new Criteria()
-                : new Criteria().andOperator(criteria.toArray(new Criteria[0]));
+        return new Criteria().andOperator(criteria.toArray(new Criteria[0]));
     }
 
     private String exactRegex(String value) {

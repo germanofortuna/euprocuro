@@ -386,6 +386,69 @@ APP_RABBIT_OFFER_CREATED_QUEUE=euprocuro.offer.created
 APP_RABBIT_AUTH_QUEUE=euprocuro.auth.events
 ```
 
+## Documentacao da API com Swagger/OpenAPI
+
+A API possui documentacao interativa gerada automaticamente com Swagger (Springdoc OpenAPI).
+
+### Acessar o Swagger
+
+Com o backend rodando em `http://localhost:8080`, acesse:
+
+- **UI Interativa**: `http://localhost:8080/swagger-ui.html`
+- **JSON OpenAPI**: `http://localhost:8080/v3/api-docs`
+- **YAML OpenAPI**: `http://localhost:8080/v3/api-docs.yaml`
+
+### No Swagger voce consegue:
+
+- Visualizar todos os endpoints da API
+- Ver os parametros, request bodies e responses de cada endpoint
+- Testar endpoints diretamente pelo navegador (Try it out)
+- Consultar os schemas dos DTOs
+- Filtrar endpoints por tag (Auth, Interests, Offers, etc.)
+
+### Configuracao
+
+A dependencia `springdoc-openapi-ui` ja esta adicionada no `pom.xml`. A configuracao padrao esta em `application.yml`:
+
+```yaml
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    doc-expansion: none
+```
+
+### Anotacoes nos Controllers
+
+Para melhorar a documentacao, os controllers usam anotacoes Swagger:
+
+```java
+@RestController
+@RequestMapping("/api/auth")
+@Tag(name = "Auth", description = "Endpoints relacionados a autenticacao...")
+public class AuthController {
+
+    @PostMapping("/login")
+    @Operation(summary = "Autenticar usuario", description = "Realiza login...")
+    @ApiResponse(responseCode = "200", description = "Login realizado com sucesso")
+    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
+        // ...
+    }
+}
+```
+
+As anotacoes sao importadas de:
+
+```java
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+```
+
 ## Endpoints principais
 
 - `POST /api/auth/register`

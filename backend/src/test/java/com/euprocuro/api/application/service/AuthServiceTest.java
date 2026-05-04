@@ -398,22 +398,15 @@ class AuthServiceTest {
     }
 
     @Test
-    void meShouldReturnCurrentSessionData() {
+    void meByUserIdShouldReturnCurrentUserData() {
         UserProfile user = baseUser();
-        AuthSession session = AuthSession.builder()
-                .token("token-123")
-                .userId("user-1")
-                .createdAt(Instant.now())
-                .expiresAt(Instant.now().plus(2, ChronoUnit.HOURS))
-                .build();
 
-        when(authSessionGateway.findByToken("token-123")).thenReturn(Optional.of(session));
         when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
 
-        AuthenticatedSessionView result = authService.me("token-123");
+        UserProfile result = authService.meByUserId("user-1");
 
-        assertThat(result.getToken()).isEqualTo("token-123");
-        assertThat(result.getUser().getEmail()).isEqualTo("ana@teste.com");
+        assertThat(result.getId()).isEqualTo("user-1");
+        assertThat(result.getEmail()).isEqualTo("ana@teste.com");
     }
 
     @Test

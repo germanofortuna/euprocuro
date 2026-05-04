@@ -24,6 +24,16 @@ spring:
           starttls:
             enable: ${MAIL_SMTP_STARTTLS:true}
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    doc-expansion: none
+
 server:
   port: ${PORT:8080}
   forward-headers-strategy: framework
@@ -41,7 +51,7 @@ application:
     email-verification-hours: ${APP_AUTH_EMAIL_VERIFICATION_HOURS:24}
     reset-base-url: ${APP_RESET_BASE_URL:http://localhost:5173}
     expose-reset-preview: ${APP_AUTH_EXPOSE_RESET_PREVIEW:true}
-    expose-session-token: ${APP_AUTH_EXPOSE_SESSION_TOKEN:true}
+    expose-session-token: ${APP_AUTH_EXPOSE_SESSION_TOKEN:false}
     cookie:
       name: ${APP_AUTH_COOKIE_NAME:EU_PROCURO_SESSION}
       secure: ${APP_AUTH_COOKIE_SECURE:false}

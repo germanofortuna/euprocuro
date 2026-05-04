@@ -185,7 +185,14 @@ class ModerationServiceTest {
         ArgumentCaptor<InterestPost> captor = ArgumentCaptor.forClass(InterestPost.class);
         verify(interestGateway).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(InterestStatus.REVIEW_REQUIRED);
-        assertThat(captor.getValue().getModeration().getCategories()).containsExactly();
+        assertThat(captor.getValue().getModeration().getCategories())
+                .containsEntry("suspicious", true);
+
+        assertThat(captor.getValue().getModeration().getScores())
+                .containsEntry("suspicious", 0.7);
+
+        assertThat(captor.getValue().getModeration().isReviewRequired()).isTrue();
+        assertThat(captor.getValue().getModeration().getProvider()).isEqualTo("OPENAI");
     }
 
     @Test

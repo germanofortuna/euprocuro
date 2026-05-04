@@ -2,6 +2,7 @@ package com.euprocuro.api.infrastructure.messaging;
 
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 
 @Component
+@Slf4j
 public class RabbitEventPublisherGatewayAdapter implements EventPublisherGateway {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RabbitEventPublisherGatewayAdapter.class);
@@ -31,9 +33,9 @@ public class RabbitEventPublisherGatewayAdapter implements EventPublisherGateway
         try {
             rabbitTemplate.convertAndSend(exchange, eventType, payload);
         } catch (Exception exception) {
-            LOGGER.warn(
-                    "Nao foi possivel publicar evento '{}' no RabbitMQ. Aplicacao seguira normalmente.",
-                    eventType
+            log.error(
+                    "Nao foi possivel publicar evento '{}' no RabbitMQ. Aplicacao seguira normalmente. {}",
+                    eventType, exception.getMessage()
             );
         }
     }

@@ -12,7 +12,7 @@ spring:
 application:
   auth:
     expose-reset-preview: false
-    expose-session-token: true
+    expose-session-token: false
     cookie:
       secure: true
       same-site: None

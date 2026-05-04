@@ -3,6 +3,7 @@ package com.euprocuro.api.entrypoints.rest.controller;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/admin/moderation")
 @RequiredArgsConstructor
+@Tag(name = "Admin Moderation", description = "Endpoints relacionados a moderacao de interesses e gerenciamento de regras de moderacao, acessiveis apenas por administradores.")
 public class AdminModerationController {
 
     private final AdminModerationUseCase adminModerationUseCase;

@@ -60,27 +60,7 @@ import com.euprocuro.api.entrypoints.rest.dto.request.SendConversationMessageReq
 import com.euprocuro.api.entrypoints.rest.dto.request.ShareSellerItemRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.UpdateInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.UpdateSellerItemRequest;
-import com.euprocuro.api.entrypoints.rest.dto.response.ActionMessageResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.AdminModerationResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.AuthResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.CategoryOptionResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.CheckoutResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.ConversationMessageResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.ContentReportResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.DashboardOfferResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.InterestModerationResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.InterestResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.LocationResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.MonetizationAccountResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.MonetizationProductResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.ModerationRuleResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.OfferConversationResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.OfferResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.PaymentOrderResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.PersonalDashboardResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.SellerItemMatchesResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.SellerItemResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.UserResponse;
+import com.euprocuro.api.entrypoints.rest.dto.response.*;
 
 public final class RestMapper {
 
@@ -273,6 +253,28 @@ public final class RestMapper {
     public static ActionMessageResponse toResponse(RegistrationView view) {
         return ActionMessageResponse.builder()
                 .message(view.getMessage())
+                .build();
+    }
+
+    public static MeResponse toMeResponse(AuthenticatedSessionView session) {
+        return MeResponse.builder()
+                .id(session.getUser().getId())
+                .name(session.getUser().getName())
+                .email(session.getUser().getEmail())
+                .city(session.getUser().getCity())
+                .state(session.getUser().getState())
+                .credits(session.getUser().getSellerCredits())
+                .build();
+    }
+
+    public static MeResponse toMeResponse(UserProfile user) {
+        return MeResponse.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .city(user.getCity())
+                .state(user.getState())
+                .credits(user.getSellerCredits())
                 .build();
     }
 

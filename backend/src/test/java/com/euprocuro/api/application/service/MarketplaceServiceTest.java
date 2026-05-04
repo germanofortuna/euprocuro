@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.euprocuro.api.domain.gateway.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -28,12 +29,6 @@ import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
-import com.euprocuro.api.domain.gateway.EventPublisherGateway;
-import com.euprocuro.api.domain.gateway.EmailGateway;
-import com.euprocuro.api.domain.gateway.InterestGateway;
-import com.euprocuro.api.domain.gateway.OfferGateway;
-import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
-import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestSearchCriteria;
@@ -58,6 +53,8 @@ class MarketplaceServiceTest {
     private EmailGateway emailGateway;
     @Mock
     private RealtimeMessageGateway realtimeMessageGateway;
+    @Mock
+    private BlockedTermValidationGateway blockedTermValidationGateway;
 
     @InjectMocks
     private MarketplaceService marketplaceService;

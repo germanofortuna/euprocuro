@@ -82,6 +82,7 @@ export function getStoredSession() {
 }
 
 export function storeSession(session) {
+  console.log('storeSession', session);
   if (!session) {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
     return;

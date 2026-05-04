@@ -1,12 +1,10 @@
 package com.euprocuro.api.infrastructure.gateway;
 
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -15,7 +13,6 @@ import org.springframework.util.StringUtils;
 import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
 import com.euprocuro.api.domain.gateway.ModerationRuleGateway;
 import com.euprocuro.api.domain.model.InterestPost;
-import com.euprocuro.api.domain.model.ModerationRiskLevel;
 import com.euprocuro.api.domain.model.ModerationRule;
 import com.euprocuro.api.domain.model.SellerItem;
 
