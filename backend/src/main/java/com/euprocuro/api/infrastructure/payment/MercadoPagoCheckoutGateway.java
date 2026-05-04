@@ -118,6 +118,19 @@ public class MercadoPagoCheckoutGateway implements PaymentCheckoutGateway {
         body.put("external_reference", paymentOrder.getId());
         body.put("metadata", metadata);
 
+
+        Map<String, Object> paymentMethods = new LinkedHashMap<>();
+
+        paymentMethods.put("excluded_payment_types", List.of(
+                Map.of("id", "prepaid_card"),
+                Map.of("id", "atm"),
+                Map.of("id", "digital_currency")
+        ));
+
+        paymentMethods.put("installments", 12);
+
+        body.put("payment_methods", paymentMethods);
+
         if (StringUtils.hasText(notificationUrl)) {
             body.put("notification_url", notificationUrl);
         }
