@@ -1170,6 +1170,13 @@ export default function App() {
       return;
     }
 
+    if (!session.token && !session.user?.id) {
+      clearSession();
+      setSession(null);
+      setIsLoadingPrivate(false);
+      return;
+    }
+
     const silent = Boolean(options.silent);
     if (!silent) {
       setIsLoadingPrivate(true);
