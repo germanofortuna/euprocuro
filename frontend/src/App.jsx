@@ -155,6 +155,8 @@ const FALLBACK_CATEGORIES = [
   { value: "INSTRUMENTOS", label: "Instrumentos" },
   { value: "OUTROS", label: "Outros" }
 ];
+const AUTH_SESSION_MODE = import.meta.env.VITE_AUTH_SESSION_MODE ?? "bearer";
+const SHOULD_RECOVER_SESSION_FROM_COOKIE = AUTH_SESSION_MODE === "cookie";
 
 function currency(value) {
   if (value === null || value === undefined || value === "") {
@@ -1292,8 +1294,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!SHOULD_RECOVER_SESSION_FROM_COOKIE) {
+      setIsLoadingPrivate(false);
+      return undefined;
+    }
+
     if (session) {
-      return;
+      return undefined;
     }
 
     let isCancelled = false;
@@ -1318,7 +1325,7 @@ export default function App() {
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     refreshPublicData({
@@ -1750,19 +1757,19 @@ export default function App() {
     try {
       const authResponse = await login(loginForm);
 
-      const me = await fetchMe();
-
-      const nextSession = buildSessionFromMeResponse(me, {
+      const nextSession = {
         expiresAt: authResponse.expiresAt,
         token: authResponse.token ?? null,
-        user: authResponse.user ?? null
-      });
+        user: authResponse.user
+      };
 
       storeSession(nextSession);
       setSession(nextSession);
+
       setPasswordRecoveryPreview(null);
       setLoginForm(initialLoginForm);
       closeAuthModal();
+
       openFeedback("success", "Login realizado", "Você entrou com sucesso na plataforma.");
     } catch (requestError) {
       clearSession();
