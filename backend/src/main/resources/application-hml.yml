@@ -10,6 +10,9 @@ spring:
     virtual-host: ${RABBITMQ_VIRTUAL_HOST:guest}
 
 application:
+  monetization:
+    mercado-pago:
+      sandbox: ${MERCADO_PAGO_SANDBOX:true}
   auth:
     expose-reset-preview: false
     expose-session-token: ${APP_AUTH_EXPOSE_SESSION_TOKEN:false}
