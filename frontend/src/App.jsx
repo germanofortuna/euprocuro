@@ -1749,11 +1749,14 @@ export default function App() {
 
     try {
       const authResponse = await login(loginForm);
-      const nextSession = {
+
+      const me = await fetchMe();
+
+      const nextSession = buildSessionFromMeResponse(me, {
         expiresAt: authResponse.expiresAt,
         token: authResponse.token ?? null,
-        user: authResponse.user
-      };
+        user: authResponse.user ?? null
+      });
 
       storeSession(nextSession);
       setSession(nextSession);
@@ -1762,6 +1765,9 @@ export default function App() {
       closeAuthModal();
       openFeedback("success", "Login realizado", "Você entrou com sucesso na plataforma.");
     } catch (requestError) {
+      clearSession();
+      setSession(null);
+
       const message = requestError.message || "Confira seu e-mail e senha.";
       if (message.toLowerCase().includes("confirme seu e-mail")) {
         setLoginInlineError(message);

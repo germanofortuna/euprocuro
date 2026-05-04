@@ -12,10 +12,10 @@ spring:
 application:
   auth:
     expose-reset-preview: false
-    expose-session-token: false
+    expose-session-token: ${APP_AUTH_EXPOSE_SESSION_TOKEN:false}
     cookie:
-      secure: true
-      same-site: None
+      secure: ${APP_AUTH_COOKIE_SECURE:true}
+      same-site: ${APP_AUTH_COOKIE_SAME_SITE:None}
   hml:
     access:
       enabled: ${APP_HML_ACCESS_ENABLED:true}
