@@ -28,4 +28,5 @@ public class UserProfile {
     private Integer purchasedCreditsTotal;
     private String subscriptionPlan;
     private Instant subscriptionActiveUntil;
+    private String ipAddress;
 }

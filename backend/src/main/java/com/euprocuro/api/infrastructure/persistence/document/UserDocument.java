@@ -36,4 +36,5 @@ public class UserDocument {
     private Integer purchasedCreditsTotal;
     private String subscriptionPlan;
     private Instant subscriptionActiveUntil;
+    private String ipAddress;
 }
