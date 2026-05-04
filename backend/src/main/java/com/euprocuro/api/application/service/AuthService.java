@@ -116,6 +116,7 @@ public class AuthService implements AuthUseCase {
                 .sellerRating(4.8)
                 .sellerCredits(3)
                 .purchasedCreditsTotal(0)
+                .ipAddress(command.getIpAddress())
                 .build());
 
         EmailVerificationToken verificationToken = emailVerificationTokenGateway.save(EmailVerificationToken.builder()

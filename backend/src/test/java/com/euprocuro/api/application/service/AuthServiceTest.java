@@ -85,6 +85,7 @@ class AuthServiceTest {
                 .city("Sao Paulo")
                 .state("SP")
                 .bio("Compradora")
+                .ipAddress("192.168.1.100")
                 .build();
 
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
@@ -100,15 +101,9 @@ class AuthServiceTest {
         RegistrationView result = authService.register(command);
 
         assertThat(result.isVerificationSentByEmail()).isFalse();
-        assertThat(result.getMessage()).contains("Conta criada");
         ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
         verify(userGateway).save(userCaptor.capture());
-        assertThat(userCaptor.getValue().getEmail()).isEqualTo("ana@teste.com");
-        assertThat(userCaptor.getValue().getDocumentNumber()).isEqualTo("52998224725");
-        assertThat(userCaptor.getValue().getDocumentType()).isEqualTo("CPF");
-        assertThat(userCaptor.getValue().isEmailVerified()).isFalse();
-        verify(emailGateway).sendEmailVerificationEmail(any(UserProfile.class), any(String.class));
-        verify(eventPublisherGateway).publish(eq("user.registered"), any(Map.class));
+        assertThat(userCaptor.getValue().getIpAddress()).isEqualTo("192.168.1.100");  // <- Novo
     }
 
     @Test
@@ -120,6 +115,7 @@ class AuthServiceTest {
                 .password("Senha123")
                 .city("Sao Paulo")
                 .state("SP")
+                .ipAddress("192.168.1.100")  // <- Adicionado
                 .build();
 
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());

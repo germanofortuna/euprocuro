@@ -67,7 +67,7 @@ public final class RestMapper {
     private RestMapper() {
     }
 
-    public static RegisterUserCommand toCommand(RegisterRequest request) {
+    public static RegisterUserCommand toCommand(RegisterRequest request, String clientIp) {
         return RegisterUserCommand.builder()
                 .name(request.getName())
                 .email(request.getEmail())
@@ -76,6 +76,7 @@ public final class RestMapper {
                 .city(request.getCity())
                 .state(request.getState())
                 .bio(request.getBio())
+                .ipAddress(clientIp)
                 .build();
     }
 

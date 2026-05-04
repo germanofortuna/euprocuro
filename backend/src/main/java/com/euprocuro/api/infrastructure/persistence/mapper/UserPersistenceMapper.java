@@ -30,6 +30,7 @@ public final class UserPersistenceMapper {
                 .purchasedCreditsTotal(document.getPurchasedCreditsTotal())
                 .subscriptionPlan(document.getSubscriptionPlan())
                 .subscriptionActiveUntil(document.getSubscriptionActiveUntil())
+                .ipAddress(document.getIpAddress())
                 .build();
     }
 
@@ -55,6 +56,7 @@ public final class UserPersistenceMapper {
                 .purchasedCreditsTotal(domain.getPurchasedCreditsTotal())
                 .subscriptionPlan(domain.getSubscriptionPlan())
                 .subscriptionActiveUntil(domain.getSubscriptionActiveUntil())
+                .ipAddress(domain.getIpAddress())
                 .build();
     }
 }

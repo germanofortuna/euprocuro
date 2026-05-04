@@ -7,15 +7,10 @@ import javax.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.euprocuro.api.entrypoints.rest.dto.response.MeResponse;
 import com.euprocuro.api.entrypoints.rest.security.AuthTokenResolver;
+import com.euprocuro.api.entrypoints.rest.security.ClientIpResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.euprocuro.api.application.usecase.AuthUseCase;
 import com.euprocuro.api.entrypoints.rest.dto.request.ForgotPasswordRequest;
@@ -39,14 +34,21 @@ public class AuthController {
     private final AuthUseCase authUseCase;
     private final AuthCookieManager authCookieManager;
     private final AuthTokenResolver authTokenResolver;
+    private final ClientIpResolver clientIpResolver;
 
     @Value("${application.auth.expose-session-token:false}")
     private boolean exposeSessionToken;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public ActionMessageResponse register(@Valid @RequestBody RegisterRequest request) {
-        return RestMapper.toResponse(authUseCase.register(RestMapper.toCommand(request)));
+    public ActionMessageResponse register(
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        String clientIp = clientIpResolver.resolve(httpRequest);
+        return RestMapper.toResponse(
+                authUseCase.register(RestMapper.toCommand(request, clientIp))
+        );
     }
 
     @PostMapping("/login")
@@ -57,7 +59,6 @@ public class AuthController {
     @GetMapping("/me")
     public MeResponse me(HttpServletRequest request) {
         String userId = CurrentUserContext.userId(request);
-
         return RestMapper.toMeResponse(authUseCase.meByUserId(userId));
     }
 
@@ -66,7 +67,6 @@ public class AuthController {
     public void logout(HttpServletRequest request, HttpServletResponse response) {
         authTokenResolver.resolve(request)
                 .ifPresent(authUseCase::logoutIfPresent);
-
         authCookieManager.clearSessionCookie(response);
     }
 
@@ -94,7 +94,6 @@ public class AuthController {
             HttpServletResponse response
     ) {
         authCookieManager.writeSessionCookie(response, session.getToken(), session.getExpiresAt());
-
         response.addHeader("X-Auth-Expose-Session-Token", String.valueOf(exposeSessionToken));
 
         return AuthResponse.builder()
