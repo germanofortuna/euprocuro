@@ -4,6 +4,8 @@ spring:
       uri: mongodb://localhost:27017/euprocuro
 
 application:
+  auth:
+    email-verification-required: ${APP_AUTH_EMAIL_VERIFICATION_REQUIRED:false}
   monetization:
     provider: ${APP_MONETIZATION_PROVIDER:LOCAL_CHECKOUT_MOCK}
     local-checkout:

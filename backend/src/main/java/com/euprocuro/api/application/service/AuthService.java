@@ -82,6 +82,9 @@ public class AuthService implements AuthUseCase {
     @Value("${application.hml.access.allowed-emails:}")
     private String hmlAllowedEmails;
 
+    @Value("${application.auth.email-verification-required:true}")
+    private boolean emailVerificationRequired;
+
     @Override
     public RegistrationView register(RegisterUserCommand command) {
         String normalizedName = normalizeName(command.getName());
@@ -133,11 +136,12 @@ public class AuthService implements AuthUseCase {
                 "verificationSentByEmail", verificationSent
         ));
 
+        String message = emailVerificationRequired ? (verificationSent ? "Conta criada. Enviamos um link para confirmar seu e-mail antes do login."
+                : "Conta criada, mas nao conseguimos enviar o e-mail de confirmacao. Verifique a configuracao SMTP.") : "Conta criada";
+
         return RegistrationView.builder()
                 .verificationSentByEmail(verificationSent)
-                .message(verificationSent
-                        ? "Conta criada. Enviamos um link para confirmar seu e-mail antes do login."
-                        : "Conta criada, mas nao conseguimos enviar o e-mail de confirmacao. Verifique a configuracao SMTP.")
+                .message(message)
                 .build();
     }
 
@@ -154,7 +158,7 @@ public class AuthService implements AuthUseCase {
             throw new UnauthorizedException("E-mail ou senha invalidos.");
         }
 
-        if (!user.isEmailVerified()) {
+        if (emailVerificationRequired && !user.isEmailVerified()) {
             throw new BusinessException("Confirme seu e-mail antes de entrar.");
         }
 
