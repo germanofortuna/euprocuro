@@ -28,7 +28,6 @@ import com.euprocuro.api.entrypoints.rest.dto.request.BoostInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.PurchaseProductRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.SyncPaymentRequest;
 import com.euprocuro.api.entrypoints.rest.dto.response.CheckoutResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.InterestResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.MonetizationAccountResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.MonetizationProductResponse;
 import com.euprocuro.api.entrypoints.rest.mapper.RestMapper;
@@ -84,7 +83,7 @@ public class MonetizationController {
     }
 
     @PostMapping("/interests/{interestId}/boost")
-    public InterestResponse boostInterest(
+    public CheckoutResponse boostInterest(
             @PathVariable String interestId,
             HttpServletRequest request,
             @Valid @RequestBody BoostInterestRequest requestBody

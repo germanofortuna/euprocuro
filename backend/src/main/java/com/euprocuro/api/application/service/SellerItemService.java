@@ -86,6 +86,11 @@ public class SellerItemService implements SellerItemUseCase {
                 .updatedAt(now)
                 .build();
 
+        blockedTermValidationGateway.validateBlockedTerms(item)
+                .ifPresent(validation -> {
+                    throw new BusinessException(validation.getReason());
+                });
+
         return sellerItemGateway.save(item);
     }
 

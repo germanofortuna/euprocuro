@@ -18,6 +18,7 @@ public class PaymentOrder {
     private String userEmail;
     private String productCode;
     private String productName;
+    private String boostInterestId;
     private BigDecimal amount;
     private String paymentMethod;
     private String provider;

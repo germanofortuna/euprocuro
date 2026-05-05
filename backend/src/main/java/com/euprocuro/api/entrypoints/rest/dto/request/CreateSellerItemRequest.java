@@ -21,6 +21,7 @@ public class CreateSellerItemRequest {
     @Size(max = 120)
     private String description;
 
+    @Size(max = 1500000)
     private String referenceImageUrl;
 
     @NotNull

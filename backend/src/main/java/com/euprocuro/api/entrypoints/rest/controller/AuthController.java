@@ -90,11 +90,10 @@ public class AuthController {
     }
 
     private AuthResponse toCookieAuthResponse(
-            com.euprocuro.api.application.view.AuthenticatedSessionView session,
-            HttpServletResponse response
+        com.euprocuro.api.application.view.AuthenticatedSessionView session,
+        HttpServletResponse response
     ) {
         authCookieManager.writeSessionCookie(response, session.getToken(), session.getExpiresAt());
-        response.addHeader("X-Auth-Expose-Session-Token", String.valueOf(exposeSessionToken));
 
         return AuthResponse.builder()
                 .token(exposeSessionToken ? session.getToken() : null)

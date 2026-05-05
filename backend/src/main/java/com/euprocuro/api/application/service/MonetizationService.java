@@ -198,7 +198,7 @@ public class MonetizationService implements MonetizationUseCase {
     }
 
     @Override
-    public InterestPost boostInterest(String userId, String interestId, BoostInterestCommand command) {
+    public CheckoutView boostInterest(String userId, String interestId, BoostInterestCommand command) {
         InterestPost interest = interestGateway.findById(interestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Interesse nao encontrado."));
         if (!Objects.equals(interest.getOwnerId(), userId)) {
@@ -210,29 +210,25 @@ public class MonetizationService implements MonetizationUseCase {
             throw new BusinessException("Produto informado nao e um boost.");
         }
 
-        Instant now = Instant.now();
-        Instant currentExpiration = interest.getBoostedUntil() != null && interest.getBoostedUntil().isAfter(now)
-                ? interest.getBoostedUntil()
-                : now;
-        Instant boostedUntil = currentExpiration.plus(product.getDurationDays(), ChronoUnit.DAYS);
-
-        InterestPost boosted = interest.toBuilder()
-                .boostedUntil(boostedUntil)
-                .updatedAt(now)
-                .build();
-
-        InterestPost saved = interestGateway.save(boosted);
         UserProfile owner = requireUser(userId);
-        emailGateway.sendBoostActivatedEmail(owner, saved.getTitle(), boostedUntil.toString());
-        eventPublisherGateway.publish("interest.boosted", Map.of(
-                "interestId", interestId,
-                "ownerId", userId,
-                "boostCode", product.getCode(),
-                "boostedUntil", boostedUntil,
-                "paymentMethod", normalizePaymentMethod(command.getPaymentMethod()),
-                "provider", checkoutProvider
-        ));
-        return saved;
+        String paymentMethod = normalizePaymentMethod(command.getPaymentMethod());
+
+        if (isCheckoutProviderWithPendingOrder()) {
+            return createPendingCheckout(owner, product, paymentMethod, interestId);
+        }
+
+        PaymentOrder approvedOrder = saveApprovedLocalOrder(owner, product, paymentMethod, interestId);
+        activateBoost(userId, interestId, product, paymentMethod, approvedOrder.getId());
+
+        return CheckoutView.builder()
+                .provider(checkoutProvider)
+                .paymentMethod(paymentMethod)
+                .productCode(product.getCode())
+                .status("APPROVED")
+                .paymentOrderId(approvedOrder.getId())
+                .checkoutUrl("local://checkout/" + approvedOrder.getId())
+                .message("Pagamento simulado aprovado. Boost ativado no interesse.")
+                .build();
     }
 
     private UserProfile applyProductToUser(UserProfile user, MonetizationProductView product) {
@@ -263,6 +259,15 @@ public class MonetizationService implements MonetizationUseCase {
     }
 
     private CheckoutView createPendingCheckout(UserProfile user, MonetizationProductView product, String paymentMethod) {
+        return createPendingCheckout(user, product, paymentMethod, null);
+    }
+
+    private CheckoutView createPendingCheckout(
+            UserProfile user,
+            MonetizationProductView product,
+            String paymentMethod,
+            String boostInterestId
+    ) {
         Instant now = Instant.now();
         PaymentOrder paymentOrder = PaymentOrder.builder()
                 .id(UUID.randomUUID().toString())
@@ -270,6 +275,7 @@ public class MonetizationService implements MonetizationUseCase {
                 .userEmail(user.getEmail())
                 .productCode(product.getCode())
                 .productName(product.getName())
+                .boostInterestId(boostInterestId)
                 .amount(product.getPrice())
                 .paymentMethod(paymentMethod)
                 .provider(checkoutProvider)
@@ -368,9 +374,14 @@ public class MonetizationService implements MonetizationUseCase {
         }
 
         MonetizationProductView product = requireProduct(paymentOrder.getProductCode());
-        UserProfile user = requireUser(paymentOrder.getUserId());
-        UserProfile updatedUser = userGateway.save(applyProductToUser(user, product));
-        emailGateway.sendPurchaseConfirmationEmail(updatedUser, product.getName(), normalizedPaymentMethod);
+        if (product.getType() == MonetizationProductType.BOOST) {
+            activateBoost(paymentOrder.getUserId(), paymentOrder.getBoostInterestId(), product, normalizedPaymentMethod, paymentOrder.getId());
+        } else {
+            UserProfile user = requireUser(paymentOrder.getUserId());
+            UserProfile updatedUser = userGateway.save(applyProductToUser(user, product));
+            emailGateway.sendPurchaseConfirmationEmail(updatedUser, product.getName(), normalizedPaymentMethod);
+        }
+
         eventPublisherGateway.publish("monetization.purchase.completed", Map.of(
                 "userId", paymentOrder.getUserId(),
                 "productCode", product.getCode(),
@@ -428,7 +439,58 @@ public class MonetizationService implements MonetizationUseCase {
                 .build();
     }
 
+    private InterestPost activateBoost(
+            String userId,
+            String interestId,
+            MonetizationProductView product,
+            String paymentMethod,
+            String paymentOrderId
+    ) {
+        if (!StringUtils.hasText(interestId)) {
+            throw new BusinessException("Pedido de boost sem interesse vinculado.");
+        }
+
+        InterestPost interest = interestGateway.findById(interestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Interesse nao encontrado."));
+        if (!Objects.equals(interest.getOwnerId(), userId)) {
+            throw new ForbiddenException("Pedido de boost nao pertence ao dono do interesse.");
+        }
+
+        Instant now = Instant.now();
+        Instant currentExpiration = interest.getBoostedUntil() != null && interest.getBoostedUntil().isAfter(now)
+                ? interest.getBoostedUntil()
+                : now;
+        Instant boostedUntil = currentExpiration.plus(product.getDurationDays(), ChronoUnit.DAYS);
+
+        InterestPost saved = interestGateway.save(interest.toBuilder()
+                .boostedUntil(boostedUntil)
+                .updatedAt(now)
+                .build());
+
+        UserProfile owner = requireUser(userId);
+        emailGateway.sendBoostActivatedEmail(owner, saved.getTitle(), boostedUntil.toString());
+        eventPublisherGateway.publish("interest.boosted", Map.of(
+                "interestId", interestId,
+                "ownerId", userId,
+                "boostCode", product.getCode(),
+                "boostedUntil", boostedUntil,
+                "paymentMethod", paymentMethod,
+                "provider", checkoutProvider,
+                "paymentOrderId", paymentOrderId
+        ));
+        return saved;
+    }
+
     private PaymentOrder saveApprovedLocalOrder(UserProfile user, MonetizationProductView product, String paymentMethod) {
+        return saveApprovedLocalOrder(user, product, paymentMethod, null);
+    }
+
+    private PaymentOrder saveApprovedLocalOrder(
+            UserProfile user,
+            MonetizationProductView product,
+            String paymentMethod,
+            String boostInterestId
+    ) {
         Instant now = Instant.now();
         String orderId = UUID.randomUUID().toString();
         return paymentOrderGateway.save(PaymentOrder.builder()
@@ -437,6 +499,7 @@ public class MonetizationService implements MonetizationUseCase {
                 .userEmail(user.getEmail())
                 .productCode(product.getCode())
                 .productName(product.getName())
+                .boostInterestId(boostInterestId)
                 .amount(product.getPrice())
                 .paymentMethod(paymentMethod)
                 .provider(checkoutProvider)

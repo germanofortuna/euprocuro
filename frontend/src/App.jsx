@@ -2458,11 +2458,30 @@ export default function App() {
       return;
     }
 
+    const product = boostProducts.find((item) => item.code === boostCode);
     setIsProcessingPurchase(true);
     try {
-      await boostInterest(interestId, { boostCode, paymentMethod });
-      await Promise.all([refreshPrivateData(), refreshPublicData()]);
-      openFeedback("success", "Boost ativado", "Seu interesse foi impulsionado com sucesso.");
+      const checkout = await boostInterest(interestId, { boostCode, paymentMethod });
+      const checkoutUrl = checkout.checkoutUrl ?? "";
+      const isExternalCheckout = checkoutUrl && !checkoutUrl.startsWith("local://");
+
+      if (isExternalCheckout) {
+        setPaymentStatus({
+          productCode: boostCode,
+          productName: product?.name ?? boostCode,
+          paymentMethod: checkout.paymentMethod ?? paymentMethod,
+          provider: checkout.provider ?? "MERCADO_PAGO_CHECKOUT_PRO",
+          checkoutUrl,
+          step: "PAYMENT",
+          message: checkout.message || "Finalize o pagamento para ativar o boost."
+        });
+        openFeedback("success", "Checkout criado", "Voce sera direcionado para concluir o pagamento do boost.");
+        window.location.assign(checkoutUrl);
+        return;
+      }
+
+      await Promise.all([refreshPrivateData(), refreshPublicData(), loadInterestDetail(interestId, { updateUrl: false })]);
+      openFeedback("success", "Boost ativado", checkout.message || "Seu interesse foi impulsionado com sucesso.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível impulsionar", requestError.message || "Tente novamente.");
     } finally {

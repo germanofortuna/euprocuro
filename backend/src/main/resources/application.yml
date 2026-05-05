@@ -51,7 +51,7 @@ application:
     email-verification-hours: ${APP_AUTH_EMAIL_VERIFICATION_HOURS:24}
     email-verification-required: ${APP_AUTH_EMAIL_VERIFICATION_REQUIRED:true}
     reset-base-url: ${APP_RESET_BASE_URL:http://localhost:5173}
-    expose-reset-preview: ${APP_AUTH_EXPOSE_RESET_PREVIEW:true}
+    expose-reset-preview: ${APP_AUTH_EXPOSE_RESET_PREVIEW:false}
     expose-session-token: ${APP_AUTH_EXPOSE_SESSION_TOKEN:false}
     cookie:
       name: ${APP_AUTH_COOKIE_NAME:EU_PROCURO_SESSION}
@@ -59,7 +59,24 @@ application:
       same-site: ${APP_AUTH_COOKIE_SAME_SITE:Lax}
       domain: ${APP_AUTH_COOKIE_DOMAIN:}
   email:
+    provider: ${APP_EMAIL_PROVIDER:SMTP}
     from: ${APP_EMAIL_FROM:no-reply@euprocuro.local}
+    from-name: ${APP_EMAIL_FROM_NAME:Eu Procuro}
+    app-url: ${APP_EMAIL_APP_URL:${APP_RESET_BASE_URL:http://localhost:5173}}
+    terms-url: ${APP_EMAIL_TERMS_URL:${APP_EMAIL_APP_URL:http://localhost:5173}#termos-de-uso}
+    privacy-url: ${APP_EMAIL_PRIVACY_URL:${APP_EMAIL_APP_URL:http://localhost:5173}#politica-de-privacidade}
+    support-url: ${APP_EMAIL_SUPPORT_URL:mailto:suporte@euprocuro.com}
+    mailersend:
+      api-url: ${MAILERSEND_API_URL:https://api.mailersend.com/v1/email}
+      api-key: ${MAILERSEND_API_KEY:}
+      template-id:
+        default: ${MAILERSEND_TEMPLATE_ID_DEFAULT:}
+        email-verification: ${MAILERSEND_TEMPLATE_ID_EMAIL_VERIFICATION:}
+        password-reset: ${MAILERSEND_TEMPLATE_ID_PASSWORD_RESET:}
+        offer-received: ${MAILERSEND_TEMPLATE_ID_OFFER_RECEIVED:}
+        conversation-message: ${MAILERSEND_TEMPLATE_ID_CONVERSATION_MESSAGE:}
+        purchase-confirmation: ${MAILERSEND_TEMPLATE_ID_PURCHASE_CONFIRMATION:}
+        boost-activated: ${MAILERSEND_TEMPLATE_ID_BOOST_ACTIVATED:}
   monetization:
     provider: ${APP_MONETIZATION_PROVIDER:LOCAL_MOCK}
     local-checkout:
@@ -74,6 +91,7 @@ application:
       notification-url: ${MERCADO_PAGO_NOTIFICATION_URL:}
       webhook-secret: ${MERCADO_PAGO_WEBHOOK_SECRET:}
       webhook-signature-required: ${MERCADO_PAGO_WEBHOOK_SIGNATURE_REQUIRED:true}
+      webhook-signature-max-age-seconds: ${MERCADO_PAGO_WEBHOOK_SIGNATURE_MAX_AGE_SECONDS:300}
   listings:
     expiration-days: ${APP_LISTING_EXPIRATION_DAYS:30}
     renewal-days: ${APP_LISTING_RENEWAL_DAYS:30}
@@ -85,7 +103,7 @@ application:
       enabled: ${APP_HML_ACCESS_ENABLED:false}
       allowed-emails: ${APP_HML_ALLOWED_EMAILS:}
   admin:
-    allowed-emails: ${APP_ADMIN_ALLOWED_EMAILS:gfortuna@outlook.com}
+    allowed-emails: ${APP_ADMIN_ALLOWED_EMAILS:}
   moderation:
     local:
       blocked-terms: ${APP_MODERATION_BLOCKED_TERMS:}
@@ -111,3 +129,4 @@ application:
       enabled: ${APP_RATE_LIMIT_ENABLED:true}
       window-seconds: ${APP_RATE_LIMIT_WINDOW_SECONDS:300}
       max-requests: ${APP_RATE_LIMIT_MAX_REQUESTS:25}
+      max-tracked-keys: ${APP_RATE_LIMIT_MAX_TRACKED_KEYS:10000}

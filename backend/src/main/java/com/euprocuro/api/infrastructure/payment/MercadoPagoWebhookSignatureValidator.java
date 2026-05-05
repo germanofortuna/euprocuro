@@ -2,6 +2,8 @@ package com.euprocuro.api.infrastructure.payment;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
@@ -26,6 +28,9 @@ public class MercadoPagoWebhookSignatureValidator {
     @Value("${application.monetization.mercado-pago.webhook-signature-required:true}")
     private boolean signatureRequired;
 
+    @Value("${application.monetization.mercado-pago.webhook-signature-max-age-seconds:300}")
+    private long signatureMaxAgeSeconds;
+
     public boolean isValid(String dataId, String requestId, String signatureHeader) {
         if (!signatureRequired && !StringUtils.hasText(webhookSecret)) {
             return true;
@@ -43,6 +48,9 @@ public class MercadoPagoWebhookSignatureValidator {
         String receivedSignature = signatureParts.get("v1");
 
         if (!StringUtils.hasText(timestamp) || !StringUtils.hasText(receivedSignature)) {
+            return false;
+        }
+        if (!isFreshTimestamp(timestamp)) {
             return false;
         }
 
@@ -63,6 +71,23 @@ public class MercadoPagoWebhookSignatureValidator {
                 .map(part -> part.split("=", 2))
                 .filter(parts -> parts.length == 2)
                 .collect(Collectors.toMap(parts -> parts[0], parts -> parts[1], (current, ignored) -> current));
+    }
+
+    private boolean isFreshTimestamp(String timestamp) {
+        if (signatureMaxAgeSeconds <= 0) {
+            return true;
+        }
+
+        try {
+            long parsedTimestamp = Long.parseLong(timestamp);
+            Instant signedAt = parsedTimestamp > 9_999_999_999L
+                    ? Instant.ofEpochMilli(parsedTimestamp)
+                    : Instant.ofEpochSecond(parsedTimestamp);
+            long ageSeconds = Math.abs(Duration.between(signedAt, Instant.now()).getSeconds());
+            return ageSeconds <= signatureMaxAgeSeconds;
+        } catch (RuntimeException exception) {
+            return false;
+        }
     }
 
     private String hmacSha256Hex(String value, String secret) {

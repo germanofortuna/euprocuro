@@ -198,7 +198,23 @@ APP_EMAIL_FROM=no-reply@euprocuro.local
 APP_RESET_BASE_URL=http://localhost:5173
 ```
 
-Para MailerSend, use exatamente o `Username` e `Password` do usuario SMTP, nao o login da conta nem o API token. O `APP_EMAIL_FROM` precisa ser um e-mail do dominio validado ou do dominio de teste do MailerSend, por exemplo `no-reply@seu-dominio.mlsender.net`.
+Para MailerSend via SMTP, use exatamente o `Username` e `Password` do usuario SMTP, nao o login da conta nem o API token. O `APP_EMAIL_FROM` precisa ser um e-mail do dominio validado ou do dominio de teste do MailerSend, por exemplo `no-reply@seu-dominio.mlsender.net`.
+
+Para usar templates HTML salvos no MailerSend, configure o envio pela API em vez do SMTP texto puro:
+
+```bash
+APP_EMAIL_PROVIDER=MAILERSEND_API
+APP_EMAIL_FROM=no-reply@seudominio.com
+APP_EMAIL_FROM_NAME=Eu Procuro
+APP_EMAIL_APP_URL=https://app.seudominio.com
+APP_EMAIL_TERMS_URL=https://app.seudominio.com#termos-de-uso
+APP_EMAIL_PRIVACY_URL=https://app.seudominio.com#politica-de-privacidade
+APP_EMAIL_SUPPORT_URL=mailto:suporte@euprocuro.com
+MAILERSEND_API_KEY=sua-chave-api-mailersend
+MAILERSEND_TEMPLATE_ID_DEFAULT=id-do-template-html
+```
+
+Tambem e possivel informar templates diferentes por evento com `MAILERSEND_TEMPLATE_ID_EMAIL_VERIFICATION`, `MAILERSEND_TEMPLATE_ID_PASSWORD_RESET`, `MAILERSEND_TEMPLATE_ID_OFFER_RECEIVED`, `MAILERSEND_TEMPLATE_ID_CONVERSATION_MESSAGE`, `MAILERSEND_TEMPLATE_ID_PURCHASE_CONFIRMATION` e `MAILERSEND_TEMPLATE_ID_BOOST_ACTIVATED`. Se essas variaveis ficarem vazias, a aplicacao usa `MAILERSEND_TEMPLATE_ID_DEFAULT`.
 
 Sem SMTP valido, a API registra no log o link de verificacao/redefinicao como fallback local.
 No profile `prod`, o preview de reset fica desabilitado por padrao.

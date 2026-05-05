@@ -27,6 +27,8 @@ public class PaymentOrderDocument {
     private String userEmail;
     private String productCode;
     private String productName;
+    @Indexed
+    private String boostInterestId;
     private BigDecimal amount;
     private String paymentMethod;
     private String provider;

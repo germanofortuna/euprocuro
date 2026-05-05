@@ -557,12 +557,21 @@ class MonetizationServiceTest {
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
         when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+        when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        InterestPost result = monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+        CheckoutView result = monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
                 .boostCode("BOOST_3_DAYS")
                 .paymentMethod("PIX")
                 .build());
-        assertThat(result.getBoostedUntil()).isAfter(Instant.now());
+
+        assertThat(result.getStatus()).isEqualTo("APPROVED");
+        assertThat(result.getProductCode()).isEqualTo("BOOST_3_DAYS");
+        verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
+                "BOOST_3_DAYS".equals(order.getProductCode()) && "interest-1".equals(order.getBoostInterestId())
+        ));
+        verify(interestGateway).save(org.mockito.ArgumentMatchers.argThat(savedInterest ->
+                savedInterest.getBoostedUntil().isAfter(Instant.now())
+        ));
         verify(emailGateway).sendBoostActivatedEmail(any(UserProfile.class), eq("Quero um carro"), any(String.class));
         verify(eventPublisherGateway).publish(eq("interest.boosted"), any(Map.class));
     }
@@ -576,13 +585,84 @@ class MonetizationServiceTest {
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
         when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+        when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        InterestPost result = monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+        monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
                 .boostCode("BOOST_3_DAYS")
                 .paymentMethod("PIX")
                 .build());
 
-        assertThat(result.getBoostedUntil()).isAfter(previousBoostedUntil.plus(2, ChronoUnit.DAYS));
+        verify(interestGateway).save(org.mockito.ArgumentMatchers.argThat(savedInterest ->
+                savedInterest.getBoostedUntil().isAfter(previousBoostedUntil.plus(2, ChronoUnit.DAYS))
+        ));
+    }
+
+    @Test
+    void boostInterestShouldCreateCheckoutAndWaitForPaymentWhenProviderIsExternal() {
+        ReflectionTestUtils.setField(monetizationService, "checkoutProvider", "MERCADO_PAGO_CHECKOUT_PRO");
+        InterestPost interest = baseInterest();
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+        when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentCheckoutGateway.createCheckout(any(UserProfile.class), any(MonetizationProductView.class), any(PaymentOrder.class)))
+                .thenAnswer(invocation -> {
+                    PaymentOrder order = invocation.getArgument(2);
+                    return CheckoutView.builder()
+                            .provider("MERCADO_PAGO_CHECKOUT_PRO")
+                            .paymentMethod(order.getPaymentMethod())
+                            .productCode(order.getProductCode())
+                            .paymentOrderId(order.getId())
+                            .providerPreferenceId("pref-1")
+                            .checkoutUrl("https://mercadopago.example/checkout")
+                            .status("PENDING")
+                            .message("Checkout criado.")
+                            .build();
+                });
+
+        CheckoutView result = monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+                .boostCode("BOOST_3_DAYS")
+                .paymentMethod("PIX")
+                .build());
+
+        assertThat(result.getCheckoutUrl()).contains("mercadopago");
+        verify(interestGateway, never()).save(any(InterestPost.class));
+        verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
+                "interest-1".equals(order.getBoostInterestId()) && order.getStatus() == PaymentOrderStatus.CREATED
+        ));
+    }
+
+    @Test
+    void confirmPaymentShouldActivateBoostAfterApprovedPayment() {
+        PaymentOrder paymentOrder = PaymentOrder.builder()
+                .id("order-boost")
+                .userId("user-1")
+                .productCode("BOOST_3_DAYS")
+                .boostInterestId("interest-1")
+                .paymentMethod("PIX")
+                .provider("MERCADO_PAGO_CHECKOUT_PRO")
+                .status(PaymentOrderStatus.PENDING)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+        when(paymentStatusGateway.findPayment("123")).thenReturn(PaymentProviderStatus.builder()
+                .paymentId("123")
+                .status("approved")
+                .externalReference("order-boost")
+                .paymentMethod("pix")
+                .build());
+        when(paymentOrderGateway.findById("order-boost")).thenReturn(Optional.of(paymentOrder));
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+
+        monetizationService.confirmPayment("123");
+
+        verify(interestGateway).save(org.mockito.ArgumentMatchers.argThat(savedInterest ->
+                savedInterest.getBoostedUntil().isAfter(Instant.now())
+        ));
+        verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
+                order.getStatus() == PaymentOrderStatus.APPROVED && "123".equals(order.getProviderPaymentId())
+        ));
     }
 
     @Test

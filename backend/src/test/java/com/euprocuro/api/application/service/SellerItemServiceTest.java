@@ -90,6 +90,29 @@ class SellerItemServiceTest {
     }
 
     @Test
+    void createItemShouldRejectBlockedTermsBeforeSaving() {
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(baseUser()));
+        when(blockedTermValidationGateway.validateBlockedTerms(any(SellerItem.class)))
+                .thenReturn(Optional.of(new BlockedTermValidationGateway.BlockedTermValidationResult(
+                        "bloqueado",
+                        "Termo bloqueado"
+                )));
+
+        assertThatThrownBy(() -> sellerItemService.createItem(
+                "seller-1",
+                CreateSellerItemCommand.builder()
+                        .title("Produto bloqueado")
+                        .description("Descricao")
+                        .category("AUTOMOVEIS")
+                        .build()
+        ))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Termo bloqueado");
+
+        verify(sellerItemGateway, never()).save(any(SellerItem.class));
+    }
+
+    @Test
     void updateItemShouldRejectBlockedTermsBeforeSaving() {
         when(sellerItemGateway.findById("item-1"))
                 .thenReturn(Optional.of(baseSellerItem()));

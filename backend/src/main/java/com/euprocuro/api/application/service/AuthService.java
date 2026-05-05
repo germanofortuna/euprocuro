@@ -74,7 +74,7 @@ public class AuthService implements AuthUseCase {
     @Value("${application.auth.reset-base-url:http://localhost:5173}")
     private String resetBaseUrl;
 
-    @Value("${application.auth.expose-reset-preview:true}")
+    @Value("${application.auth.expose-reset-preview:false}")
     private boolean exposeResetPreview;
 
     @Value("${application.hml.access.enabled:false}")
