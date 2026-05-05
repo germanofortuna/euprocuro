@@ -73,6 +73,7 @@ class AuthServiceTest {
         ReflectionTestUtils.setField(authService, "exposeResetPreview", true);
         ReflectionTestUtils.setField(authService, "hmlAccessEnabled", false);
         ReflectionTestUtils.setField(authService, "hmlAllowedEmails", "");
+        ReflectionTestUtils.setField(authService, "emailVerificationRequired", true);
     }
 
     @Test
