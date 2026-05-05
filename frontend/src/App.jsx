@@ -9,8 +9,11 @@ import {
   createInterest,
   createOffer,
   createSellerItem,
+  decideInterestModeration,
   deactivateSellerItem,
+  deleteModerationRule,
   deleteInterest,
+  fetchAdminModeration,
   fetchCategories,
   fetchInterest,
   fetchDashboard,
@@ -26,8 +29,10 @@ import {
   logout,
   purchaseProduct,
   register,
+  reportInterest,
   renewInterest,
   resetPassword,
+  saveModerationRule,
   sendOfferMessage,
   shareSellerItemOffer,
   syncPayment,
@@ -71,7 +76,6 @@ const initialOfferForm = {
   offeredPrice: "",
   sellerPhone: "",
   message: "",
-  offerImageUrl: "",
   includesDelivery: false,
   highlights: ""
 };
@@ -94,6 +98,18 @@ const initialSellerItemShareForm = {
   includesDelivery: false
 };
 
+const initialReportForm = {
+  reason: "",
+  message: ""
+};
+
+const initialModerationRuleForm = {
+  id: "",
+  term: "",
+  riskLevel: "HIGH",
+  active: true
+};
+
 const initialLoginForm = {
   email: "",
   password: ""
@@ -105,8 +121,7 @@ const initialRegisterForm = {
   documentNumber: "",
   password: "",
   city: "",
-  state: "",
-  bio: ""
+  state: ""
 };
 
 const initialForgotForm = {
@@ -120,6 +135,7 @@ const loggedSections = {
   RECEIVED_OFFERS: "RECEIVED_OFFERS",
   SELLER_ITEMS: "SELLER_ITEMS",
   CREDITS: "CREDITS",
+  ADMIN: "ADMIN",
   NEW_INTEREST: "NEW_INTEREST"
 };
 
@@ -127,7 +143,19 @@ const MESSAGE_SEEN_STORAGE_KEY = "eu-procuro-message-seen";
 const MAX_REFERENCE_IMAGE_SIZE = 1200;
 const REFERENCE_IMAGE_QUALITY = 0.78;
 const HOME_PAGE_SIZE = 10;
+const TITLE_MAX_LENGTH = 80;
+const DESCRIPTION_MAX_LENGTH = 120;
 const LISTING_EXPIRATION_DAYS = Number(import.meta.env.VITE_LISTING_EXPIRATION_DAYS ?? 30);
+const FALLBACK_CATEGORIES = [
+  { value: "AUTOMOVEIS", label: "Automóveis" },
+  { value: "IMOVEIS", label: "Imóveis" },
+  { value: "SERVICOS", label: "Serviços" },
+  { value: "ELETRONICOS", label: "Eletrônicos" },
+  { value: "INSTRUMENTOS", label: "Instrumentos" },
+  { value: "OUTROS", label: "Outros" }
+];
+const AUTH_SESSION_MODE = import.meta.env.VITE_AUTH_SESSION_MODE ?? "bearer";
+const SHOULD_RECOVER_SESSION_FROM_COOKIE = AUTH_SESSION_MODE === "cookie";
 
 function currency(value) {
   if (value === null || value === undefined || value === "") {
@@ -238,6 +266,42 @@ function isListingExpiringSoon(listing) {
 
 function expiryPillClass(listing) {
   return `expiry-pill ${isListingExpiringSoon(listing) ? "expiry-pill--warning" : ""}`;
+}
+
+function moderationStatusLabel(status) {
+  const labels = {
+    PENDING: "Em análise",
+    APPROVED: "Aprovado",
+    REVIEW_REQUIRED: "Em revisão",
+    REJECTED: "Rejeitado",
+    HIDDEN: "Oculto",
+    REPORTED: "Denunciado",
+    OPEN: "Publicado",
+    CLOSED: "Desativado"
+  };
+  return labels[status] ?? "Em análise";
+}
+
+function moderationStatusTone(status) {
+  const tones = {
+    APPROVED: "approved",
+    OPEN: "approved",
+    PENDING: "pending",
+    REVIEW_REQUIRED: "warning",
+    REPORTED: "warning",
+    REJECTED: "rejected",
+    HIDDEN: "rejected",
+    CLOSED: "neutral"
+  };
+  return tones[status] ?? "pending";
+}
+
+function limitText(value, maxLength) {
+  return String(value ?? "").slice(0, maxLength);
+}
+
+function hasLink(value) {
+  return /(https?:\/\/|www\.|\b[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+\b)/i.test(String(value ?? ""));
 }
 
 function firstName(value) {
@@ -461,6 +525,10 @@ function writeSeenMessages(userId, seenMap) {
   window.localStorage.setItem(`${MESSAGE_SEEN_STORAGE_KEY}:${userId}`, JSON.stringify(seenMap));
 }
 
+function adminReportNotificationId(report) {
+  return `admin-report:${report?.id ?? report?.contentId ?? "unknown"}`;
+}
+
 function latestIncomingMessageTimestamp(conversation, currentUserId) {
   return (conversation?.messages ?? [])
     .filter((message) => message.senderId !== currentUserId)
@@ -479,6 +547,14 @@ function useDebouncedValue(value, delayMs) {
   }, [value, delayMs]);
 
   return debouncedValue;
+}
+
+function FieldCounter({ value, max }) {
+  return (
+    <small className="field-counter">
+      {String(value ?? "").length}/{max}
+    </small>
+  );
 }
 
 export default function App() {
@@ -525,6 +601,12 @@ export default function App() {
   const [editingSellerItemId, setEditingSellerItemId] = useState(null);
   const [isSellerItemModalVisible, setIsSellerItemModalVisible] = useState(false);
   const [sellerItemShareForm, setSellerItemShareForm] = useState(initialSellerItemShareForm);
+  const [reportModal, setReportModal] = useState({ visible: false, interest: null, form: initialReportForm, isSubmitting: false });
+  const [adminModeration, setAdminModeration] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [moderationRuleForm, setModerationRuleForm] = useState(initialModerationRuleForm);
+  const [isSubmittingModerationRule, setIsSubmittingModerationRule] = useState(false);
+  const [isModerationActionLoading, setIsModerationActionLoading] = useState(false);
   const [expandedInterests, setExpandedInterests] = useState({});
   const [expandedOffers, setExpandedOffers] = useState({});
   const [filters, setFilters] = useState({
@@ -570,7 +652,7 @@ export default function App() {
   const currentUser = session?.user ?? null;
   const myInterests = useMemo(
     () => (dashboard?.myInterests ?? [])
-      .filter((interest) => interest.status === "OPEN")
+      .filter((interest) => !["CLOSED", "HIDDEN"].includes(interest.status))
       .slice()
       .sort(byNewest),
     [dashboard?.myInterests]
@@ -615,9 +697,40 @@ export default function App() {
   );
   const canSendOffer = Boolean(monetizationAccount?.subscriptionActive || (monetizationAccount?.sellerCredits ?? 0) > 0);
   const noCreditsTooltip = "Você não possui créditos ativos para enviar ofertas.";
+  const unreadAdminReportCount = useMemo(() => {
+    if (!isAdmin || !currentUser?.id) {
+      return 0;
+    }
+
+    const seenMap = readSeenMessages(currentUser.id);
+    return (adminModeration?.openReports ?? []).filter((report) => {
+      const createdAt = new Date(report.createdAt ?? 0).getTime();
+      return createdAt > Number(seenMap[adminReportNotificationId(report)] ?? 0);
+    }).length;
+  }, [isAdmin, currentUser?.id, adminModeration?.openReports, messageSyncKey]);
 
   function openFeedback(type, title, message) {
     setFeedbackModal({ type, title, message });
+  }
+
+  function markAdminReportsSeen() {
+    if (!currentUser?.id) {
+      return;
+    }
+
+    const openReports = adminModeration?.openReports ?? [];
+    if (!openReports.length) {
+      return;
+    }
+
+    const seenMap = readSeenMessages(currentUser.id);
+    const nextSeenMap = openReports.reduce((accumulator, report) => ({
+      ...accumulator,
+      [adminReportNotificationId(report)]: new Date(report.createdAt ?? Date.now()).getTime()
+    }), seenMap);
+
+    writeSeenMessages(currentUser.id, nextSeenMap);
+    setMessageSyncKey((current) => current + 1);
   }
 
   function updateInterestUrl(interestId, replace = false) {
@@ -645,9 +758,17 @@ export default function App() {
     const requestId = detailRequestSeq.current + 1;
     detailRequestSeq.current = requestId;
     const shouldUpdateUrl = options.updateUrl !== false;
+    const preservedScrollY = options.preserveScroll ? window.scrollY : null;
+    const restoreScroll = () => {
+      if (preservedScrollY === null) {
+        return;
+      }
+      window.requestAnimationFrame(() => window.scrollTo({ top: preservedScrollY, left: 0, behavior: "auto" }));
+    };
 
     if (options.summary) {
       setSelectedInterest(options.summary);
+      restoreScroll();
     }
 
     if (shouldUpdateUrl) {
@@ -668,6 +789,7 @@ export default function App() {
           ? current.map((item) => (item.id === interest.id ? { ...item, ...interest } : item))
           : [interest, ...current]
       ));
+      restoreScroll();
     } catch (requestError) {
       if (requestId === detailRequestSeq.current) {
         setSelectedInterest(null);
@@ -685,7 +807,8 @@ export default function App() {
     setLoggedSection(loggedSections.EXPLORE);
     loadInterestDetail(interest.id, {
       summary: interest,
-      replace: Boolean(options.replace)
+      replace: Boolean(options.replace),
+      preserveScroll: true
     }).catch(() => {});
   }
 
@@ -732,6 +855,10 @@ export default function App() {
 
   function renderInterestShareActions(interest) {
     if (!interest?.id) {
+      return null;
+    }
+
+    if (!["APPROVED", "OPEN"].includes(selectedInterest?.status)) {
       return null;
     }
 
@@ -1031,14 +1158,23 @@ export default function App() {
 
   async function refreshCategories() {
     try {
-      setCategories(await fetchCategories());
+      const loadedCategories = await fetchCategories();
+      setCategories(loadedCategories?.length ? loadedCategories : FALLBACK_CATEGORIES);
     } catch (requestError) {
+      setCategories(FALLBACK_CATEGORIES);
       openFeedback("error", "Falha ao carregar categorias", requestError.message || "Tente novamente.");
     }
   }
 
   async function refreshPrivateData(options = {}) {
     if (!session) {
+      return;
+    }
+
+    if (!session.token && !session.user?.id) {
+      clearSession();
+      setSession(null);
+      setIsLoadingPrivate(false);
       return;
     }
 
@@ -1054,11 +1190,7 @@ export default function App() {
         fetchMonetizationAccount(),
         fetchSellerItems({ includeInactive: showInactiveSellerItems })
       ]);
-      const nextSession = {
-        expiresAt: me.expiresAt,
-        token: me.token ?? session.token ?? null,
-        user: me.user
-      };
+      const nextSession = buildSessionFromMeResponse(me, session);
 
       setSession(nextSession);
       storeSession(nextSession);
@@ -1068,12 +1200,22 @@ export default function App() {
       setSelectedSellerItemId((current) =>
         sellerItemData.some((group) => group.item?.id === current) ? current : sellerItemData[0]?.item?.id ?? null
       );
+      try {
+        const moderationData = await fetchAdminModeration();
+        setAdminModeration(moderationData);
+        setIsAdmin(true);
+      } catch {
+        setAdminModeration(null);
+        setIsAdmin(false);
+      }
     } catch (requestError) {
       clearSession();
       setSession(null);
       setDashboard(null);
       setMonetizationAccount(null);
       setSellerItems([]);
+      setAdminModeration(null);
+      setIsAdmin(false);
       setLoggedSection(loggedSections.EXPLORE);
       openFeedback("error", "Sessão encerrada", requestError.message || "Entre novamente para continuar.");
     } finally {
@@ -1088,6 +1230,21 @@ export default function App() {
       refreshPrivateData({ silent: true }).then(() => {
         setMessageSyncKey((current) => current + 1);
       }).catch(() => {});
+      return;
+    }
+
+    if (envelope?.type === "interest.moderation.updated") {
+      refreshPrivateData({ silent: true }).then(() => {
+        setMessageSyncKey((current) => current + 1);
+      }).catch(() => {});
+
+      if (envelope.payload?.status === "REJECTED") {
+        openFeedback(
+          "error",
+          "Anúncio recusado pela moderação",
+          envelope.payload?.reason || "Seu anúncio foi recusado. Você pode editar e enviar novamente para análise."
+        );
+      }
       return;
     }
 
@@ -1136,8 +1293,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!SHOULD_RECOVER_SESSION_FROM_COOKIE) {
+      setIsLoadingPrivate(false);
+      return undefined;
+    }
+
     if (session) {
-      return;
+      return undefined;
     }
 
     let isCancelled = false;
@@ -1148,11 +1310,7 @@ export default function App() {
           return;
         }
 
-        const nextSession = {
-          expiresAt: me.expiresAt,
-          token: me.token ?? null,
-          user: me.user
-        };
+        const nextSession = buildSessionFromMeResponse(me, getStoredSession());
 
         storeSession(nextSession);
         setSession(nextSession);
@@ -1166,7 +1324,7 @@ export default function App() {
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     refreshPublicData({
@@ -1217,11 +1375,7 @@ export default function App() {
 
         return fetchMe()
           .then((me) => {
-            const nextSession = {
-              expiresAt: me.expiresAt,
-              token: me.token ?? session.token ?? null,
-              user: me.user
-            };
+            const nextSession = buildSessionFromMeResponse(me, session);
             storeSession(nextSession);
             setSession(nextSession);
             return null;
@@ -1503,7 +1657,7 @@ export default function App() {
       .filter(Boolean);
 
     const expiringInterestEntries = myInterests
-      .filter((interest) => interest.status === "OPEN" && isListingExpiringSoon(interest))
+      .filter((interest) => ["OPEN", "APPROVED"].includes(interest.status) && isListingExpiringSoon(interest))
       .map((interest) => {
         const expiresAt = listingExpiresAt(interest);
         const notificationId = `interest-expiring:${interest.id}:${expiresAt?.toISOString() ?? "unknown"}`;
@@ -1523,12 +1677,64 @@ export default function App() {
       })
       .filter(Boolean);
 
-    const unreadEntries = [...expiringInterestEntries, ...newOfferEntries, ...unreadMessageEntries, ...sellerItemEntries]
+    const moderationEntries = myInterests
+      .filter((interest) => ["REJECTED", "REVIEW_REQUIRED", "REPORTED"].includes(interest.status))
+      .map((interest) => {
+        const notificationId = `interest-moderation:${interest.id}:${interest.status}:${interest.updatedAt ?? ""}`;
+        if (seenMap[notificationId]) {
+          return null;
+        }
+
+        const rejected = interest.status === "REJECTED";
+        return {
+          id: notificationId,
+          type: "interest-moderation",
+          interestId: interest.id,
+          section: loggedSections.MY_INTERESTS,
+          title: rejected ? "Anúncio rejeitado" : "Anúncio em análise",
+          message: rejected
+            ? "Seu anúncio foi rejeitado. Você pode editar e enviar novamente para análise ou excluir."
+            : (interest.moderation?.reason ?? "Seu anúncio está aguardando revisão."),
+          createdAt: interest.updatedAt ?? new Date().toISOString()
+        };
+      })
+      .filter(Boolean);
+
+    const adminReportEntries = isAdmin
+      ? (adminModeration?.openReports ?? [])
+        .map((report) => {
+          const notificationId = adminReportNotificationId(report);
+          const createdAt = new Date(report.createdAt ?? 0).getTime();
+          if (!createdAt || createdAt <= Number(seenMap[notificationId] ?? 0)) {
+            return null;
+          }
+
+          return {
+            id: notificationId,
+            type: "admin-report",
+            reportId: report.id,
+            section: loggedSections.ADMIN,
+            title: "Nova denúncia recebida",
+            message: report.reason ?? "Um usuário denunciou um anúncio para revisão.",
+            createdAt: report.createdAt
+          };
+        })
+        .filter(Boolean)
+      : [];
+
+    const unreadEntries = [
+      ...adminReportEntries,
+      ...moderationEntries,
+      ...expiringInterestEntries,
+      ...newOfferEntries,
+      ...unreadMessageEntries,
+      ...sellerItemEntries
+    ]
       .sort((left, right) => new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime());
 
     setNotifications(unreadEntries);
     setHasUnreadMessages(unreadEntries.length > 0);
-  }, [session, currentUser?.id, receivedOffers, sentOffers, sellerItems, myInterests, messageSyncKey]);
+  }, [session, currentUser?.id, receivedOffers, sentOffers, sellerItems, myInterests, isAdmin, adminModeration?.openReports, messageSyncKey]);
 
   useEffect(() => {
     if (!session) {
@@ -1549,6 +1755,7 @@ export default function App() {
 
     try {
       const authResponse = await login(loginForm);
+
       const nextSession = {
         expiresAt: authResponse.expiresAt,
         token: authResponse.token ?? null,
@@ -1557,11 +1764,16 @@ export default function App() {
 
       storeSession(nextSession);
       setSession(nextSession);
+
       setPasswordRecoveryPreview(null);
       setLoginForm(initialLoginForm);
       closeAuthModal();
+
       openFeedback("success", "Login realizado", "Você entrou com sucesso na plataforma.");
     } catch (requestError) {
+      clearSession();
+      setSession(null);
+
       const message = requestError.message || "Confira seu e-mail e senha.";
       if (message.toLowerCase().includes("confirme seu e-mail")) {
         setLoginInlineError(message);
@@ -1639,6 +1851,8 @@ export default function App() {
       setDashboard(null);
       setMonetizationAccount(null);
       setSellerItems([]);
+      setAdminModeration(null);
+      setIsAdmin(false);
       setLoggedSection(loggedSections.EXPLORE);
       setOffers([]);
       setConversationModal((current) => ({ ...current, visible: false, data: null, draftMessage: "" }));
@@ -1661,26 +1875,20 @@ export default function App() {
     }
   }
 
-  async function handleOfferImageChange(event) {
-    const [file] = event.target.files ?? [];
-    if (!file) {
-      setOfferForm((current) => ({ ...current, offerImageUrl: "" }));
-      return;
-    }
-
-    try {
-      const dataUrl = await fileToDataUrl(file);
-      setOfferForm((current) => ({ ...current, offerImageUrl: dataUrl }));
-    } catch (requestError) {
-      openFeedback("error", "Imagem inválida", requestError.message || "Não foi possível usar a imagem.");
-    }
-  }
-
   async function handleInterestSubmit(event) {
     event.preventDefault();
 
     if (!session) {
       openAuthModal("register");
+      return;
+    }
+
+    if (hasLink(interestForm.description)) {
+      openFeedback(
+        "error",
+        "Link não permitido",
+        "Remova links da descrição do anúncio antes de enviar para moderação."
+      );
       return;
     }
 
@@ -1700,10 +1908,10 @@ export default function App() {
       navigateTo(loggedSections.MY_INTERESTS);
       openFeedback(
         "success",
-        editingInterestId ? "Anúncio atualizado" : "Interesse publicado",
+        editingInterestId ? "Alteração recebida" : "Interesse recebido",
         editingInterestId
-          ? "Seu anúncio foi atualizado com sucesso."
-          : "Seu interesse foi publicado com sucesso."
+          ? "Vamos validar a alteração agora. Se houver recusa, você receberá um aviso para editar novamente."
+          : "Vamos validar o anúncio agora. Se houver recusa, você receberá um aviso para ajustar."
       );
     } catch (requestError) {
       openFeedback(
@@ -1740,7 +1948,6 @@ export default function App() {
         offeredPrice: offerForm.offeredPrice,
         sellerPhone: offerForm.sellerPhone,
         message: offerForm.message,
-        offerImageUrl: offerForm.offerImageUrl || null,
         includesDelivery: offerForm.includesDelivery,
         highlights: offerForm.highlights
           .split(",")
@@ -1786,6 +1993,137 @@ export default function App() {
       openFeedback("success", "Anúncio excluído", "O anúncio foi removido da plataforma.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível excluir", requestError.message || "Tente novamente.");
+    }
+  }
+
+  function buildSessionFromMeResponse(me, previousSession = null) {
+    if (!me) {
+      return previousSession;
+    }
+
+    const user = me.user ?? (
+        me.id
+            ? {
+              id: me.id,
+              name: me.name,
+              email: me.email,
+              city: me.city,
+              state: me.state,
+              sellerCredits: me.credits,
+              credits: me.credits
+            }
+            : null
+    );
+
+    return {
+      expiresAt: me.expiresAt ?? previousSession?.expiresAt ?? null,
+      token: me.token ?? previousSession?.token ?? null,
+      user
+    };
+  }
+
+  function openReportModal(interest) {
+    setReportModal({
+      visible: true,
+      interest,
+      form: initialReportForm,
+      isSubmitting: false
+    });
+  }
+
+  function closeReportModal() {
+    setReportModal({ visible: false, interest: null, form: initialReportForm, isSubmitting: false });
+  }
+
+  async function handleReportSubmit(event) {
+    event.preventDefault();
+    if (!reportModal.interest?.id) {
+      return;
+    }
+
+    setReportModal((current) => ({ ...current, isSubmitting: true }));
+    try {
+      await reportInterest(reportModal.interest.id, reportModal.form);
+      closeReportModal();
+      await refreshPublicData();
+      openFeedback("success", "Denúncia enviada", "Obrigado. O conteúdo será analisado pela moderação.");
+    } catch (requestError) {
+      setReportModal((current) => ({ ...current, isSubmitting: false }));
+      openFeedback("error", "Não foi possível denunciar", requestError.message || "Tente novamente.");
+    }
+  }
+
+  async function refreshAdminModerationData() {
+    try {
+      const data = await fetchAdminModeration();
+      setAdminModeration(data);
+      setIsAdmin(true);
+    } catch (requestError) {
+      setAdminModeration(null);
+      setIsAdmin(false);
+      throw requestError;
+    }
+  }
+
+  function startEditingModerationRule(rule) {
+    setModerationRuleForm({
+      id: rule.id,
+      term: rule.term ?? "",
+      riskLevel: rule.riskLevel ?? "HIGH",
+      active: Boolean(rule.active)
+    });
+  }
+
+  async function handleModerationRuleSubmit(event) {
+    event.preventDefault();
+    setIsSubmittingModerationRule(true);
+    try {
+      await saveModerationRule(moderationRuleForm.id || null, {
+        term: moderationRuleForm.term,
+        riskLevel: moderationRuleForm.riskLevel,
+        active: moderationRuleForm.active
+      });
+      setModerationRuleForm(initialModerationRuleForm);
+      await refreshAdminModerationData();
+      openFeedback("success", "Regra salva", "A regra de moderação foi atualizada.");
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível salvar a regra", requestError.message || "Tente novamente.");
+    } finally {
+      setIsSubmittingModerationRule(false);
+    }
+  }
+
+  async function handleDeleteModerationRule(ruleId) {
+    if (!ruleId || !window.confirm("Deseja remover esta regra de moderação?")) {
+      return;
+    }
+
+    setIsModerationActionLoading(true);
+    try {
+      await deleteModerationRule(ruleId);
+      await refreshAdminModerationData();
+      openFeedback("success", "Regra removida", "A regra não será mais usada na moderação local.");
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível remover", requestError.message || "Tente novamente.");
+    } finally {
+      setIsModerationActionLoading(false);
+    }
+  }
+
+  async function handleModerationDecision(interestId, status) {
+    if (!interestId) {
+      return;
+    }
+
+    setIsModerationActionLoading(true);
+    try {
+      await decideInterestModeration(interestId, { status });
+      await Promise.all([refreshAdminModerationData(), refreshPrivateData({ silent: true }), refreshPublicData()]);
+      openFeedback("success", "Decisão aplicada", `Anúncio marcado como ${moderationStatusLabel(status).toLowerCase()}.`);
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível aplicar decisão", requestError.message || "Tente novamente.");
+    } finally {
+      setIsModerationActionLoading(false);
     }
   }
 
@@ -2131,6 +2469,22 @@ export default function App() {
       return;
     }
 
+    if (notification.type === "interest-moderation") {
+      const interest = myInterests.find((item) => item.id === notification.interestId);
+      if (interest) {
+        setSelectedInterest(interest);
+        setExpandedInterests((current) => ({ ...current, [interest.id]: true }));
+      }
+      navigateTo(loggedSections.MY_INTERESTS);
+      return;
+    }
+
+    if (notification.type === "admin-report") {
+      markAdminReportsSeen();
+      navigateTo(loggedSections.ADMIN);
+      return;
+    }
+
     navigateTo(notification.section ?? loggedSections.RECEIVED_OFFERS);
     if (notification.offerId) {
       await openConversation(notification.offerId);
@@ -2343,6 +2697,8 @@ export default function App() {
                   />
                 ) : null}
 
+                <p className="detail-description">{selectedInterest.description}</p>
+
                 <div className="detail-block">
                   <div className="detail-row">
                     <span>Categoria</span>
@@ -2366,6 +2722,14 @@ export default function App() {
                   </div>
                   {isSelectedInterestMine ? (
                     <div className="detail-row">
+                      <span>Status</span>
+                      <strong className={`moderation-badge moderation-badge--${moderationStatusTone(selectedInterest.status)}`}>
+                        {moderationStatusLabel(selectedInterest.status)}
+                      </strong>
+                    </div>
+                  ) : null}
+                  {isSelectedInterestMine ? (
+                    <div className="detail-row">
                       <span>Tempo restante</span>
                       <strong className={expiryPillClass(selectedInterest)}>
                         {isListingExpiringSoon(selectedInterest) ? "⚠ " : ""}
@@ -2387,8 +2751,6 @@ export default function App() {
                   ) : null}
                 </div>
 
-                <p className="detail-description">{selectedInterest.description}</p>
-
                 <div className="tag-cluster">
                   {selectedInterest.tags?.map((tag) => (
                     <span key={tag}>{tag}</span>
@@ -2396,6 +2758,24 @@ export default function App() {
                 </div>
 
                 {renderInterestShareActions(selectedInterest)}
+
+                {!isSelectedInterestMine ? (
+                  <button
+                    type="button"
+                    className="report-button"
+                    onClick={() => {
+                      if (!session) {
+                        openFeedback("info", "Entre para denunciar", "Faça login para informar a moderação sobre este interesse.");
+                        openAuthModal("login");
+                        return;
+                      }
+                      openReportModal(selectedInterest);
+                    }}
+                  >
+                    <span aria-hidden="true">⚠</span>
+                    <span>Denunciar este interesse</span>
+                  </button>
+                ) : null}
 
                 {session ? (
                   isSelectedInterestMine ? (
@@ -2447,10 +2827,15 @@ export default function App() {
                         placeholder="Explique como sua oferta atende ao interesse"
                         value={offerForm.message}
                         onChange={(event) =>
-                          setOfferForm((current) => ({ ...current, message: event.target.value }))
+                          setOfferForm((current) => ({
+                            ...current,
+                            message: limitText(event.target.value, DESCRIPTION_MAX_LENGTH)
+                          }))
                         }
+                        maxLength={DESCRIPTION_MAX_LENGTH}
                         required
                       />
+                      <FieldCounter value={offerForm.message} max={DESCRIPTION_MAX_LENGTH} />
                       <input
                         placeholder="Destaques separados por vírgula"
                         value={offerForm.highlights}
@@ -2461,22 +2846,6 @@ export default function App() {
                           }))
                         }
                       />
-                      <div className="media-field">
-                        <label htmlFor="offer-image">Foto do item oferecido</label>
-                        <input
-                          id="offer-image"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleOfferImageChange}
-                        />
-                        {offerForm.offerImageUrl ? (
-                          <img
-                            className="interest-upload-preview"
-                            src={offerForm.offerImageUrl}
-                            alt="Prévia da foto enviada na oferta"
-                          />
-                        ) : null}
-                      </div>
                       <label className="checkbox-row">
                         <input
                           type="checkbox"
@@ -2563,6 +2932,9 @@ export default function App() {
                   {interest.title}
                   {isBoostActive(interest) ? <BoostRocket /> : null}
                 </strong>
+                <span className={`moderation-badge moderation-badge--${moderationStatusTone(interest.status)}`}>
+                  {moderationStatusLabel(interest.status)}
+                </span>
                 <span>{interest.location?.city ? `${interest.location.city}/${interest.location?.state}` : "Sem local informado"}</span>
               </div>
             </div>
@@ -2955,16 +3327,30 @@ export default function App() {
         <input
           placeholder="Título do item ou serviço"
           value={sellerItemForm.title}
-          onChange={(event) => setSellerItemForm((current) => ({ ...current, title: event.target.value }))}
+          onChange={(event) =>
+            setSellerItemForm((current) => ({
+              ...current,
+              title: limitText(event.target.value, TITLE_MAX_LENGTH)
+            }))
+          }
+          maxLength={TITLE_MAX_LENGTH}
           required
         />
+        <FieldCounter value={sellerItemForm.title} max={TITLE_MAX_LENGTH} />
         <textarea
           rows="4"
           placeholder="Descreva o que você tem, estado de conservação ou detalhes do serviço"
           value={sellerItemForm.description}
-          onChange={(event) => setSellerItemForm((current) => ({ ...current, description: event.target.value }))}
+          onChange={(event) =>
+            setSellerItemForm((current) => ({
+              ...current,
+              description: limitText(event.target.value, DESCRIPTION_MAX_LENGTH)
+            }))
+          }
+          maxLength={DESCRIPTION_MAX_LENGTH}
           required
         />
+        <FieldCounter value={sellerItemForm.description} max={DESCRIPTION_MAX_LENGTH} />
 
         <div className="two-columns">
           <select
@@ -3176,9 +3562,14 @@ export default function App() {
                   placeholder="Mensagem opcional ao compartilhar este item"
                   value={sellerItemShareForm.message}
                   onChange={(event) =>
-                    setSellerItemShareForm((current) => ({ ...current, message: event.target.value }))
+                    setSellerItemShareForm((current) => ({
+                      ...current,
+                      message: limitText(event.target.value, DESCRIPTION_MAX_LENGTH)
+                    }))
                   }
+                  maxLength={DESCRIPTION_MAX_LENGTH}
                 />
+                <FieldCounter value={sellerItemShareForm.message} max={DESCRIPTION_MAX_LENGTH} />
                 <label className="checkbox-row">
                   <input
                     type="checkbox"
@@ -3265,6 +3656,176 @@ export default function App() {
     );
   }
 
+  function renderAdminModerationPage() {
+    const pendingInterests = adminModeration?.pendingInterests ?? [];
+    const rules = adminModeration?.rules ?? [];
+    const openReports = adminModeration?.openReports ?? [];
+
+    return (
+      <section className="admin-moderation panel panel--spaced">
+        <div className="panel__header">
+          <div>
+            <span className="eyebrow">Admin</span>
+            <h2>Moderação de conteúdo</h2>
+          </div>
+          <button
+            type="button"
+            className="ghost-button ghost-button--small"
+            onClick={() => refreshAdminModerationData().catch((requestError) => {
+              openFeedback("error", "Não foi possível atualizar", requestError.message || "Tente novamente.");
+            })}
+          >
+            Atualizar
+          </button>
+        </div>
+
+        <article className="admin-card admin-card--priority">
+          <div className="form-heading">
+            <span className="eyebrow">Fila manual</span>
+            <h3>{pendingInterests.length} anúncio(s) para revisar</h3>
+          </div>
+          <div className="admin-list">
+            {pendingInterests.length ? pendingInterests.map((interest) => (
+              <article key={interest.id} className="admin-list-item admin-list-item--stacked">
+                <div>
+                  <strong>{interest.title}</strong>
+                  <span>{moderationStatusLabel(interest.status)} · {interest.category}</span>
+                  <p>{interest.description}</p>
+                  {interest.moderation?.reason ? <small>{interest.moderation.reason}</small> : null}
+                </div>
+                <div className="inline-actions admin-decision-actions">
+                  <button
+                    type="button"
+                    className="primary-button moderation-action-button"
+                    disabled={isModerationActionLoading}
+                    onClick={() => handleModerationDecision(interest.id, "APPROVED")}
+                  >
+                    Aprovar anúncio
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button moderation-action-button"
+                    disabled={isModerationActionLoading}
+                    onClick={() => handleModerationDecision(interest.id, "HIDDEN")}
+                  >
+                    Ocultar anúncio
+                  </button>
+                  <button
+                    type="button"
+                    className="danger-button moderation-action-button"
+                    disabled={isModerationActionLoading}
+                    onClick={() => handleModerationDecision(interest.id, "REJECTED")}
+                  >
+                    Recusar anúncio
+                  </button>
+                </div>
+              </article>
+            )) : (
+              <EmptyState title="Fila vazia" description="Nada pendente de revisão manual agora." />
+            )}
+          </div>
+        </article>
+
+        <div className="admin-grid">
+          <article className="admin-card">
+            <div className="form-heading">
+              <span className="eyebrow">Regras locais</span>
+              <h3>{moderationRuleForm.id ? "Editar regra" : "Nova regra"}</h3>
+            </div>
+            <form className="stacked-form" onSubmit={handleModerationRuleSubmit}>
+              <input
+                placeholder="Palavra ou expressão"
+                value={moderationRuleForm.term}
+                onChange={(event) =>
+                  setModerationRuleForm((current) => ({
+                    ...current,
+                    term: limitText(event.target.value, TITLE_MAX_LENGTH)
+                  }))
+                }
+                maxLength={TITLE_MAX_LENGTH}
+                required
+              />
+              <FieldCounter value={moderationRuleForm.term} max={TITLE_MAX_LENGTH} />
+              <div className="two-columns">
+                <select
+                  value={moderationRuleForm.riskLevel}
+                  onChange={(event) =>
+                    setModerationRuleForm((current) => ({ ...current, riskLevel: event.target.value }))
+                  }
+                >
+                  <option value="HIGH">Alto risco</option>
+                  <option value="MEDIUM">Médio risco</option>
+                  <option value="LOW">Baixo risco</option>
+                </select>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={moderationRuleForm.active}
+                    onChange={(event) =>
+                      setModerationRuleForm((current) => ({ ...current, active: event.target.checked }))
+                    }
+                  />
+                  <span>Regra ativa</span>
+                </label>
+              </div>
+              <div className="inline-actions">
+                {moderationRuleForm.id ? (
+                  <button type="button" className="ghost-button ghost-button--small" onClick={() => setModerationRuleForm(initialModerationRuleForm)}>
+                    Cancelar
+                  </button>
+                ) : null}
+                <button type="submit" className="primary-button primary-button--compact" disabled={isSubmittingModerationRule}>
+                  {isSubmittingModerationRule ? "Salvando..." : "Salvar regra"}
+                </button>
+              </div>
+            </form>
+
+            <div className="admin-list">
+              {rules.length ? rules.map((rule) => (
+                <article key={rule.id} className="admin-list-item">
+                  <div>
+                    <strong>{rule.term}</strong>
+                    <span>{rule.riskLevel} · {rule.active ? "ativa" : "inativa"}</span>
+                  </div>
+                  <div className="inline-actions">
+                    <button type="button" className="ghost-button ghost-button--small" onClick={() => startEditingModerationRule(rule)}>
+                      Editar
+                    </button>
+                    <button type="button" className="danger-button action-button--compact" disabled={isModerationActionLoading} onClick={() => handleDeleteModerationRule(rule.id)}>
+                      Remover
+                    </button>
+                  </div>
+                </article>
+              )) : (
+                <EmptyState title="Nenhuma regra cadastrada" description="Cadastre termos locais para bloqueio ou revisão manual." />
+              )}
+            </div>
+          </article>
+
+          <article className="admin-card">
+            <div className="form-heading">
+              <span className="eyebrow">Denúncias</span>
+              <h3>{openReports.length} denúncia(s) abertas</h3>
+            </div>
+            <div className="admin-list">
+              {openReports.length ? openReports.map((report) => (
+                <article key={report.id} className="admin-list-item">
+                  <div>
+                    <strong>{report.reason}</strong>
+                    <span>Conteúdo: {report.contentId}</span>
+                    {report.message ? <p>{report.message}</p> : null}
+                  </div>
+                </article>
+              )) : (
+                <EmptyState title="Nenhuma denúncia aberta" description="As denúncias dos usuários aparecerão aqui." />
+              )}
+            </div>
+          </article>
+        </div>
+      </section>
+    );
+  }
+
   function renderLoggedArea() {
     const statCards = [
       {
@@ -3313,6 +3874,13 @@ export default function App() {
             Home
           </button>
           <button
+              type="button"
+              className={loggedSection === loggedSections.NEW_INTEREST ? "active" : ""}
+              onClick={openNewInterestForm}
+          >
+            Cadastrar interesse
+          </button>
+          <button
             type="button"
             className={loggedSection === loggedSections.MY_INTERESTS ? "active" : ""}
             onClick={() => navigateTo(loggedSections.MY_INTERESTS)}
@@ -3347,13 +3915,21 @@ export default function App() {
           >
             Comprar créditos
           </button>
-          <button
-            type="button"
-            className={loggedSection === loggedSections.NEW_INTEREST ? "active" : ""}
-            onClick={openNewInterestForm}
-          >
-            Cadastrar interesse
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              className={`admin-nav-button ${loggedSection === loggedSections.ADMIN ? "active" : ""}`}
+              onClick={() => {
+                markAdminReportsSeen();
+                navigateTo(loggedSections.ADMIN);
+              }}
+            >
+              <span>Moderação</span>
+              {unreadAdminReportCount > 0 ? (
+                <strong className="admin-nav-badge">{unreadAdminReportCount}</strong>
+              ) : null}
+            </button>
+          ) : null}
         </section>
 
         {loggedSection === loggedSections.EXPLORE ? renderPublicHome(false) : null}
@@ -3400,6 +3976,16 @@ export default function App() {
                   ) : null}
 
                   <p className="detail-description">{selectedInterest.description}</p>
+                  {["PENDING", "REVIEW_REQUIRED", "REJECTED", "REPORTED"].includes(selectedInterest.status) ? (
+                    <div className={`moderation-callout moderation-callout--${moderationStatusTone(selectedInterest.status)}`}>
+                      <strong>{moderationStatusLabel(selectedInterest.status)}</strong>
+                      <p>
+                        {selectedInterest.status === "REJECTED"
+                          ? "Seu anúncio foi rejeitado. Edite para enviar novamente para análise ou exclua se preferir."
+                          : (selectedInterest.moderation?.reason ?? "Seu anúncio ainda não está disponível publicamente.")}
+                      </p>
+                    </div>
+                  ) : null}
                   <div className="expiry-renewal-row">
                     <span className={`${expiryPillClass(selectedInterest)} expiry-pill--inline`}>
                       {isListingExpiringSoon(selectedInterest) ? "⚠ " : ""}
@@ -3443,57 +4029,64 @@ export default function App() {
                       Excluir anúncio
                     </button>
                   </div>
-
-                  <div className="boost-box">
-                    <div>
-                      <strong>Impulsionar interesse</strong>
-                      <p>
-                        {selectedInterest.boostedUntil
-                          ? `Destaque ativo até ${formatTimestamp(selectedInterest.boostedUntil)}`
-                          : "Apareça com prioridade na busca e na home."}
-                      </p>
-                    </div>
-                    <div className="boost-box__actions">
-                      {boostProducts.map((product) => (
-                        <article key={product.code} className="product-chip product-chip--boost">
+                  {["APPROVED", "OPEN"].includes(selectedInterest?.status) && (
+                      <>
+                        <div className="boost-box">
                           <div>
-                            <strong>{product.name}</strong>
-                            <span>{currency(product.price)}</span>
+                            <strong>Impulsionar interesse</strong>
+                            <p>
+                              {selectedInterest.boostedUntil
+                                  ? `Destaque ativo até ${formatTimestamp(selectedInterest.boostedUntil)}`
+                                  : "Apareça com prioridade na busca e na home."}
+                            </p>
                           </div>
-                          <div className="product-chip__actions">
-                            <button
-                              type="button"
-                              className="text-button"
-                              disabled={isProcessingPurchase}
-                              onClick={() => handleBoostInterest(product.code, selectedInterest.id, "MERCADO_PAGO")}
-                            >
-                              Pague com Mercado Pago
-                            </button>
+
+                          <div className="boost-box__actions">
+                            {boostProducts.map((product) => (
+                                <article key={product.code} className="product-chip product-chip--boost">
+                                  <div>
+                                    <strong>{product.name}</strong>
+                                    <span>{currency(product.price)}</span>
+                                  </div>
+
+                                  <div className="product-chip__actions">
+                                    <button
+                                        type="button"
+                                        className="text-button"
+                                        disabled={isProcessingPurchase}
+                                        onClick={() =>
+                                            handleBoostInterest(product.code, selectedInterest.id, "MERCADO_PAGO")
+                                        }
+                                    >
+                                      Pague com Mercado Pago
+                                    </button>
+                                  </div>
+                                </article>
+                            ))}
                           </div>
-                        </article>
-                      ))}
-                    </div>
-                  </div>
+                        </div>
 
-                  <div className="offers">
-                    <div className="offers__header">
-                      <span className="eyebrow">Ofertas recebidas</span>
-                      <strong>{offers.length}</strong>
-                    </div>
+                        <div className="offers">
+                          <div className="offers__header">
+                            <span className="eyebrow">Ofertas recebidas</span>
+                            <strong>{offers.length}</strong>
+                          </div>
 
-                    {offers.length === 0 ? (
-                      <EmptyState
-                        title="Ainda sem ofertas"
-                        description="Quando alguém responder ao seu interesse, as mensagens aparecerão aqui."
-                      />
-                    ) : (
-                      <div className="accordion-list">
-                        {offers.map((offer) =>
-                          renderOfferListItem(offer, "right", selectedInterest.referenceImageUrl)
-                        )}
-                      </div>
-                    )}
-                  </div>
+                          {offers.length === 0 ? (
+                              <EmptyState
+                                  title="Ainda sem ofertas"
+                                  description="Quando alguém responder ao seu interesse, as mensagens aparecerão aqui."
+                              />
+                          ) : (
+                              <div className="accordion-list">
+                                {offers.map((offer) =>
+                                    renderOfferListItem(offer, "right", selectedInterest.referenceImageUrl)
+                                )}
+                              </div>
+                          )}
+                        </div>
+                      </>
+                  )}
                 </>
               ) : (
                 <EmptyState
@@ -3551,6 +4144,8 @@ export default function App() {
 
         {loggedSection === loggedSections.SELLER_ITEMS ? renderSellerItemsPage() : null}
 
+        {loggedSection === loggedSections.ADMIN && isAdmin ? renderAdminModerationPage() : null}
+
         {isInterestModalVisible ? (
           <div className="modal-overlay" role="presentation" onClick={cancelInterestEditing}>
             <section
@@ -3592,19 +4187,32 @@ export default function App() {
                 placeholder="Título do interesse"
                 value={interestForm.title}
                 onChange={(event) =>
-                  setInterestForm((current) => ({ ...current, title: event.target.value }))
+                  setInterestForm((current) => ({
+                    ...current,
+                    title: limitText(event.target.value, TITLE_MAX_LENGTH)
+                  }))
                 }
+                maxLength={TITLE_MAX_LENGTH}
                 required
               />
+              <FieldCounter value={interestForm.title} max={TITLE_MAX_LENGTH} />
               <textarea
                 rows="4"
                 placeholder="Descreva o item ou serviço que você procura"
                 value={interestForm.description}
                 onChange={(event) =>
-                  setInterestForm((current) => ({ ...current, description: event.target.value }))
+                  setInterestForm((current) => ({
+                    ...current,
+                    description: limitText(event.target.value, DESCRIPTION_MAX_LENGTH)
+                  }))
                 }
+                maxLength={DESCRIPTION_MAX_LENGTH}
                 required
               />
+              <FieldCounter value={interestForm.description} max={DESCRIPTION_MAX_LENGTH} />
+              {hasLink(interestForm.description) ? (
+                <p className="form-note form-note--compact">Links não são permitidos no anúncio.</p>
+              ) : null}
 
               <div className="two-columns">
                 <select
@@ -3879,6 +4487,60 @@ export default function App() {
         onMarkAllRead={handleMarkAllNotificationsRead}
         onSelect={handleNotificationSelect}
       />
+
+      {reportModal.visible ? (
+        <div className="modal-overlay" role="presentation" onClick={closeReportModal}>
+          <section
+            className="feedback-modal panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="report-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="feedback-modal__header">
+              <div>
+                <span className="eyebrow">Denúncia</span>
+                <h2 id="report-modal-title">Denunciar interesse</h2>
+              </div>
+              <button type="button" className="modal-close-button" onClick={closeReportModal} aria-label="Fechar modal">
+                X
+              </button>
+            </div>
+            <form className="stacked-form" onSubmit={handleReportSubmit}>
+              <input
+                placeholder="Motivo da denúncia"
+                value={reportModal.form.reason}
+                onChange={(event) =>
+                  setReportModal((current) => ({
+                    ...current,
+                    form: { ...current.form, reason: limitText(event.target.value, TITLE_MAX_LENGTH) }
+                  }))
+                }
+                maxLength={TITLE_MAX_LENGTH}
+                required
+              />
+              <FieldCounter value={reportModal.form.reason} max={TITLE_MAX_LENGTH} />
+              <textarea
+                rows="3"
+                placeholder="Conte um pouco mais, se quiser"
+                value={reportModal.form.message}
+                onChange={(event) =>
+                  setReportModal((current) => ({
+                    ...current,
+                    form: { ...current.form, message: limitText(event.target.value, DESCRIPTION_MAX_LENGTH) }
+                  }))
+                }
+                maxLength={DESCRIPTION_MAX_LENGTH}
+              />
+              <FieldCounter value={reportModal.form.message} max={DESCRIPTION_MAX_LENGTH} />
+              <p className="form-note">O conteúdo será analisado pela equipe de moderação.</p>
+              <button type="submit" className="primary-button" disabled={reportModal.isSubmitting}>
+                {reportModal.isSubmitting ? "Enviando..." : "Enviar denúncia"}
+              </button>
+            </form>
+          </section>
+        </div>
+      ) : null}
 
       {isPaymentReturnLoading ? (
         <div className="modal-overlay">

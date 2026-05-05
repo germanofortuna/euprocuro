@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -33,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/seller-items")
 @RequiredArgsConstructor
+@Tag(name = "Seller Items", description = "Endpoints relacionados a gerenciamento de itens do vendedor, incluindo criacao, atualizacao, desativacao e compartilhamento como oferta.")
 public class SellerItemController {
 
     private final SellerItemUseCase sellerItemUseCase;

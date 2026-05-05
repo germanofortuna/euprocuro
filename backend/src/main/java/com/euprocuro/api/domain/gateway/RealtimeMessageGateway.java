@@ -6,4 +6,6 @@ public interface RealtimeMessageGateway {
     void publishConversationMessage(String userId, ConversationMessage message);
 
     void publishOfferCreated(String userId, String offerId);
+
+    void publishInterestModerationUpdated(String userId, String interestId, String status, String reason);
 }

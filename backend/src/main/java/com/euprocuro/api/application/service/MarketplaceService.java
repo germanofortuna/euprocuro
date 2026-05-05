@@ -23,6 +23,7 @@ import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.usecase.MarketplaceUseCase;
+import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
@@ -49,6 +50,7 @@ public class MarketplaceService implements MarketplaceUseCase {
     private final EventPublisherGateway eventPublisherGateway;
     private final EmailGateway emailGateway;
     private final RealtimeMessageGateway realtimeMessageGateway;
+    private final BlockedTermValidationGateway blockedTermValidationGateway;
 
     @Value("${application.listings.expiration-days:30}")
     private long listingExpirationDays = 30;
@@ -86,11 +88,17 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .boostEnabled(command.isBoostEnabled())
                 .preferredCondition(command.getPreferredCondition())
                 .preferredContactMode(command.getPreferredContactMode())
-                .status(InterestStatus.OPEN)
+                .status(InterestStatus.PENDING)
                 .createdAt(now)
                 .updatedAt(now)
                 .expiresAt(expiresAt(now))
                 .build();
+
+        // Validate for blocked terms before saving
+        blockedTermValidationGateway.validateBlockedTerms(interestPost)
+                .ifPresent(validation -> {
+                    throw new BusinessException(validation.getReason());
+                });
 
         InterestPost saved = interestGateway.save(interestPost);
         eventPublisherGateway.publish("interest.created", Map.of(
@@ -99,12 +107,13 @@ public class MarketplaceService implements MarketplaceUseCase {
                 "category", saved.getCategory().name(),
                 "budgetMax", saved.getBudgetMax()
         ));
+        publishModerationRequest(saved);
         return saved;
     }
 
     @Override
     public InterestPost closeInterest(String currentUserId, String interestId) {
-        InterestPost existingInterest = getInterest(interestId);
+        InterestPost existingInterest = loadInterest(interestId);
         if (!Objects.equals(existingInterest.getOwnerId(), currentUserId)) {
             throw new ForbiddenException("Apenas o dono do interesse pode desativar esse anuncio.");
         }
@@ -124,7 +133,7 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     @Override
     public void deleteInterest(String currentUserId, String interestId) {
-        InterestPost existingInterest = getInterest(interestId);
+        InterestPost existingInterest = loadInterest(interestId);
         if (!Objects.equals(existingInterest.getOwnerId(), currentUserId)) {
             throw new ForbiddenException("Apenas o dono do interesse pode excluir esse anuncio.");
         }
@@ -138,7 +147,7 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     @Override
     public InterestPost updateInterest(String currentUserId, String interestId, UpdateInterestCommand command) {
-        InterestPost existingInterest = getInterest(interestId);
+        InterestPost existingInterest = loadInterest(interestId);
         if (!Objects.equals(existingInterest.getOwnerId(), currentUserId)) {
             throw new ForbiddenException("Apenas o dono do interesse pode editar esse anuncio.");
         }
@@ -166,8 +175,16 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .boostEnabled(command.isBoostEnabled())
                 .preferredCondition(command.getPreferredCondition())
                 .preferredContactMode(command.getPreferredContactMode())
+                .status(InterestStatus.PENDING)
+                .moderation(null)
                 .updatedAt(Instant.now())
                 .build();
+
+        // Validate for blocked terms before saving
+        blockedTermValidationGateway.validateBlockedTerms(updatedInterest)
+                .ifPresent(validation -> {
+                    throw new BusinessException(validation.getReason());
+                });
 
         InterestPost saved = interestGateway.save(updatedInterest);
         eventPublisherGateway.publish("interest.updated", Map.of(
@@ -176,12 +193,13 @@ public class MarketplaceService implements MarketplaceUseCase {
                 "category", saved.getCategory().name(),
                 "budgetMax", saved.getBudgetMax()
         ));
+        publishModerationRequest(saved);
         return saved;
     }
 
     @Override
     public InterestPost renewInterest(String currentUserId, String interestId) {
-        InterestPost existingInterest = getInterest(interestId);
+        InterestPost existingInterest = loadInterest(interestId);
         if (!Objects.equals(existingInterest.getOwnerId(), currentUserId)) {
             throw new ForbiddenException("Apenas o dono do interesse pode renovar esse anuncio.");
         }
@@ -227,7 +245,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                         || post.getBudgetMax().compareTo(filter.getMaxBudget()) <= 0)
                 .filter(post -> filter.getQuery() == null || filter.getQuery().isBlank()
                         || containsIgnoreCase(post, filter.getQuery()))
-                .filter(post -> !filter.isOpenOnly() || post.getStatus() == InterestStatus.OPEN)
+                .filter(post -> !filter.isOpenOnly() || isPubliclyVisible(post))
                 .sorted(Comparator
                         .comparing(this::isBoostActive).reversed()
                         .thenComparing(InterestPost::getCreatedAt, Comparator.reverseOrder()))
@@ -250,6 +268,14 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     @Override
     public InterestPost getInterest(String id) {
+        InterestPost interest = loadInterest(id);
+        if (!isPubliclyVisible(interest)) {
+            throw new ResourceNotFoundException("Interesse nao encontrado.");
+        }
+        return interest;
+    }
+
+    private InterestPost loadInterest(String id) {
         InterestPost interest = interestGateway.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Interesse nao encontrado."));
         if (isExpired(interest)) {
@@ -261,8 +287,8 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     @Override
     public Offer createOffer(String currentUserId, String interestId, CreateOfferCommand command) {
-        InterestPost interestPost = getInterest(interestId);
-        if (interestPost.getStatus() != InterestStatus.OPEN) {
+        InterestPost interestPost = loadInterest(interestId);
+        if (!isPubliclyVisible(interestPost)) {
             throw new BusinessException("Este interesse não está mais aberto.");
         }
 
@@ -293,7 +319,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .sellerPhone(command.getSellerPhone())
                 .offeredPrice(command.getOfferedPrice())
                 .message(command.getMessage())
-                .offerImageUrl(normalizeReferenceImage(command.getOfferImageUrl()))
+                .offerImageUrl(null)
                 .includesDelivery(command.isIncludesDelivery())
                 .highlights(Optional.ofNullable(command.getHighlights()).orElse(List.of()))
                 .status(OfferStatus.SENT)
@@ -317,7 +343,7 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     @Override
     public List<Offer> listOffersByInterest(String currentUserId, String interestId) {
-        InterestPost interest = getInterest(interestId);
+        InterestPost interest = loadInterest(interestId);
         if (!Objects.equals(interest.getOwnerId(), currentUserId)) {
             throw new ForbiddenException("Apenas o dono do interesse pode visualizar essas propostas.");
         }
@@ -349,6 +375,19 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     private boolean isNotExpired(InterestPost post) {
         return !isExpired(post);
+    }
+
+    private boolean isPubliclyVisible(InterestPost post) {
+        return post.getStatus() == InterestStatus.OPEN
+                || post.getStatus() == InterestStatus.APPROVED
+                || post.getStatus() == InterestStatus.REPORTED;
+    }
+
+    private void publishModerationRequest(InterestPost interestPost) {
+        eventPublisherGateway.publish("interest.moderation.requested", Map.of(
+                "interestId", interestPost.getId(),
+                "ownerId", interestPost.getOwnerId()
+        ));
     }
 
     private boolean isExpired(InterestPost post) {
@@ -385,7 +424,7 @@ public class MarketplaceService implements MarketplaceUseCase {
     }
 
     private boolean equalsIgnoreCase(String left, String right) {
-        return left != null && right != null && left.equalsIgnoreCase(right);
+        return left != null && left.equalsIgnoreCase(right);
     }
 
     private String safe(String value) {

@@ -69,12 +69,23 @@ async function request(path, options = {}) {
 
 export function getStoredSession() {
   const rawValue = window.localStorage.getItem(SESSION_STORAGE_KEY);
+
   if (!rawValue) {
     return null;
   }
 
   try {
-    return JSON.parse(rawValue);
+    const session = JSON.parse(rawValue);
+
+    const hasToken = Boolean(session?.token);
+    const hasUser = Boolean(session?.user?.id);
+
+    if (!hasToken && !hasUser) {
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+
+    return session;
   } catch (error) {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
     return null;
@@ -92,6 +103,15 @@ export function storeSession(session) {
     token: session.token ?? null,
     user: session.user ?? null
   };
+
+  const hasToken = Boolean(sanitizedSession.token);
+  const hasUser = Boolean(sanitizedSession.user?.id);
+
+  if (!hasToken && !hasUser) {
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    return;
+  }
+
   window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sanitizedSession));
 }
 
@@ -271,6 +291,13 @@ export async function createOffer(interestId, payload) {
   });
 }
 
+export async function reportInterest(interestId, payload) {
+  return request(`/interests/${interestId}/reports`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function fetchOfferConversation(offerId) {
   return request(`/offers/${offerId}/conversation`);
 }
@@ -309,6 +336,31 @@ export async function deactivateSellerItem(itemId) {
 
 export async function shareSellerItemOffer(itemId, interestId, payload) {
   return request(`/seller-items/${itemId}/interests/${interestId}/offer`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function fetchAdminModeration() {
+  return request("/admin/moderation");
+}
+
+export async function saveModerationRule(ruleId, payload) {
+  const path = ruleId ? `/admin/moderation/rules/${ruleId}` : "/admin/moderation/rules";
+  return request(path, {
+    method: ruleId ? "PUT" : "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteModerationRule(ruleId) {
+  return request(`/admin/moderation/rules/${ruleId}`, {
+    method: "DELETE"
+  });
+}
+
+export async function decideInterestModeration(interestId, payload) {
+  return request(`/admin/moderation/interests/${interestId}/decision`, {
     method: "POST",
     body: JSON.stringify(payload)
   });

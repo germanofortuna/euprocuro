@@ -40,6 +40,8 @@ public class MercadoPagoCheckoutGateway implements PaymentCheckoutGateway {
     private String pendingUrl;
     @Value("${application.monetization.mercado-pago.notification-url:}")
     private String notificationUrl;
+    @Value("${application.monetization.mercado-pago.sandbox:false}")
+    private boolean sandbox;
 
     public MercadoPagoCheckoutGateway(RestTemplateBuilder restTemplateBuilder) {
         this.restTemplate = restTemplateBuilder.build();
@@ -65,8 +67,14 @@ public class MercadoPagoCheckoutGateway implements PaymentCheckoutGateway {
             ).getBody();
 
             String preferenceId = valueAsString(response, "id");
-            String checkoutUrl = Optional.ofNullable(valueAsString(response, "init_point"))
-                    .orElse(valueAsString(response, "sandbox_init_point"));
+            String checkoutUrl = sandbox
+                    ? valueAsString(response, "sandbox_init_point")
+                    : valueAsString(response, "init_point");
+
+            if (!StringUtils.hasText(checkoutUrl)) {
+                checkoutUrl = Optional.ofNullable(valueAsString(response, "init_point"))
+                        .orElse(valueAsString(response, "sandbox_init_point"));
+            }
 
             if (!StringUtils.hasText(preferenceId) || !StringUtils.hasText(checkoutUrl)) {
                 throw new IllegalStateException("Mercado Pago nao retornou link de checkout.");
@@ -117,6 +125,19 @@ public class MercadoPagoCheckoutGateway implements PaymentCheckoutGateway {
         body.put("auto_return", "approved");
         body.put("external_reference", paymentOrder.getId());
         body.put("metadata", metadata);
+
+
+        Map<String, Object> paymentMethods = new LinkedHashMap<>();
+
+        paymentMethods.put("excluded_payment_types", List.of(
+                Map.of("id", "prepaid_card"),
+                Map.of("id", "atm"),
+                Map.of("id", "digital_currency")
+        ));
+
+        paymentMethods.put("installments", 12);
+
+        body.put("payment_methods", paymentMethods);
 
         if (StringUtils.hasText(notificationUrl)) {
             body.put("notification_url", notificationUrl);

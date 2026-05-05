@@ -22,7 +22,6 @@ public final class UserPersistenceMapper {
                 .passwordHash(document.getPasswordHash())
                 .city(document.getCity())
                 .state(document.getState())
-                .bio(document.getBio())
                 .emailVerified(document.getEmailVerified() == null || document.getEmailVerified())
                 .buyerRating(document.getBuyerRating())
                 .sellerRating(document.getSellerRating())
@@ -30,6 +29,7 @@ public final class UserPersistenceMapper {
                 .purchasedCreditsTotal(document.getPurchasedCreditsTotal())
                 .subscriptionPlan(document.getSubscriptionPlan())
                 .subscriptionActiveUntil(document.getSubscriptionActiveUntil())
+                .ipAddress(document.getIpAddress())
                 .build();
     }
 
@@ -47,7 +47,6 @@ public final class UserPersistenceMapper {
                 .passwordHash(domain.getPasswordHash())
                 .city(domain.getCity())
                 .state(domain.getState())
-                .bio(domain.getBio())
                 .emailVerified(domain.isEmailVerified())
                 .buyerRating(domain.getBuyerRating())
                 .sellerRating(domain.getSellerRating())
@@ -55,6 +54,7 @@ public final class UserPersistenceMapper {
                 .purchasedCreditsTotal(domain.getPurchasedCreditsTotal())
                 .subscriptionPlan(domain.getSubscriptionPlan())
                 .subscriptionActiveUntil(domain.getSubscriptionActiveUntil())
+                .ipAddress(domain.getIpAddress())
                 .build();
     }
 }

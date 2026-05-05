@@ -12,5 +12,5 @@ public class RegisterUserCommand {
     String password;
     String city;
     String state;
-    String bio;
+    String ipAddress;
 }

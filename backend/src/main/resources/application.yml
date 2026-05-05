@@ -24,6 +24,16 @@ spring:
           starttls:
             enable: ${MAIL_SMTP_STARTTLS:true}
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    doc-expansion: none
+
 server:
   port: ${PORT:8080}
   forward-headers-strategy: framework
@@ -39,9 +49,10 @@ application:
     session-hours: ${APP_AUTH_SESSION_HOURS:168}
     password-reset-hours: ${APP_AUTH_PASSWORD_RESET_HOURS:2}
     email-verification-hours: ${APP_AUTH_EMAIL_VERIFICATION_HOURS:24}
+    email-verification-required: ${APP_AUTH_EMAIL_VERIFICATION_REQUIRED:true}
     reset-base-url: ${APP_RESET_BASE_URL:http://localhost:5173}
     expose-reset-preview: ${APP_AUTH_EXPOSE_RESET_PREVIEW:true}
-    expose-session-token: ${APP_AUTH_EXPOSE_SESSION_TOKEN:true}
+    expose-session-token: ${APP_AUTH_EXPOSE_SESSION_TOKEN:false}
     cookie:
       name: ${APP_AUTH_COOKIE_NAME:EU_PROCURO_SESSION}
       secure: ${APP_AUTH_COOKIE_SECURE:false}
@@ -94,10 +105,24 @@ application:
     access:
       enabled: ${APP_HML_ACCESS_ENABLED:false}
       allowed-emails: ${APP_HML_ALLOWED_EMAILS:}
+  admin:
+    allowed-emails: ${APP_ADMIN_ALLOWED_EMAILS:gfortuna@outlook.com}
+  moderation:
+    local:
+      blocked-terms: ${APP_MODERATION_BLOCKED_TERMS:}
+    ai:
+      review-threshold: ${APP_MODERATION_REVIEW_THRESHOLD:0.20}
+      reject-threshold: ${APP_MODERATION_REJECT_THRESHOLD:0.30}
+    openai:
+      enabled: ${APP_OPENAI_MODERATION_ENABLED:true}
+      api-key: ${OPENAI_API_KEY:}
+      model: ${APP_OPENAI_MODERATION_MODEL:omni-moderation-latest}
+      base-url: ${APP_OPENAI_BASE_URL:https://api.openai.com}
   messaging:
     rabbit:
       exchange: ${APP_RABBIT_EXCHANGE:euprocuro.exchange}
       interest-created-queue: ${APP_RABBIT_INTEREST_CREATED_QUEUE:euprocuro.interest.created}
+      interest-moderation-queue: ${APP_RABBIT_INTEREST_MODERATION_QUEUE:euprocuro.interest.moderation}
       offer-created-queue: ${APP_RABBIT_OFFER_CREATED_QUEUE:euprocuro.offer.created}
       conversation-message-created-queue: ${APP_RABBIT_CONVERSATION_MESSAGE_CREATED_QUEUE:euprocuro.conversation.message.created}
       auth-queue: ${APP_RABBIT_AUTH_QUEUE:euprocuro.auth.events}

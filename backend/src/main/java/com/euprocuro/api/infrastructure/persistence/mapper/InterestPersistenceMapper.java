@@ -2,8 +2,10 @@ package com.euprocuro.api.infrastructure.persistence.mapper;
 
 import java.util.ArrayList;
 
+import com.euprocuro.api.domain.model.InterestModeration;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.LocationInfo;
+import com.euprocuro.api.infrastructure.persistence.document.InterestModerationDocument;
 import com.euprocuro.api.infrastructure.persistence.document.InterestPostDocument;
 import com.euprocuro.api.infrastructure.persistence.document.LocationDocument;
 
@@ -38,6 +40,7 @@ public final class InterestPersistenceMapper {
                 .preferredCondition(document.getPreferredCondition())
                 .preferredContactMode(document.getPreferredContactMode())
                 .status(document.getStatus())
+                .moderation(toDomain(document.getModeration()))
                 .createdAt(document.getCreatedAt())
                 .updatedAt(document.getUpdatedAt())
                 .expiresAt(document.getExpiresAt())
@@ -70,9 +73,46 @@ public final class InterestPersistenceMapper {
                 .preferredCondition(domain.getPreferredCondition())
                 .preferredContactMode(domain.getPreferredContactMode())
                 .status(domain.getStatus())
+                .moderation(toDocument(domain.getModeration()))
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .expiresAt(domain.getExpiresAt())
+                .build();
+    }
+
+    private static InterestModeration toDomain(InterestModerationDocument document) {
+        if (document == null) {
+            return null;
+        }
+
+        return InterestModeration.builder()
+                .riskLevel(document.getRiskLevel())
+                .categories(document.getCategories())
+                .scores(document.getScores())
+                .reviewRequired(document.isReviewRequired())
+                .provider(document.getProvider())
+                .reason(document.getReason())
+                .checkedAt(document.getCheckedAt())
+                .reviewedBy(document.getReviewedBy())
+                .reviewedAt(document.getReviewedAt())
+                .build();
+    }
+
+    private static InterestModerationDocument toDocument(InterestModeration domain) {
+        if (domain == null) {
+            return null;
+        }
+
+        return InterestModerationDocument.builder()
+                .riskLevel(domain.getRiskLevel())
+                .categories(domain.getCategories())
+                .scores(domain.getScores())
+                .reviewRequired(domain.isReviewRequired())
+                .provider(domain.getProvider())
+                .reason(domain.getReason())
+                .checkedAt(domain.getCheckedAt())
+                .reviewedBy(domain.getReviewedBy())
+                .reviewedAt(domain.getReviewedAt())
                 .build();
     }
 

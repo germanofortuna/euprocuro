@@ -33,6 +33,7 @@ public class InterestResponse {
     String preferredCondition;
     String preferredContactMode;
     InterestStatus status;
+    InterestModerationResponse moderation;
     Instant createdAt;
     Instant updatedAt;
     Instant expiresAt;

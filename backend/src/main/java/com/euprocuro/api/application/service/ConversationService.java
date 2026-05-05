@@ -105,7 +105,7 @@ public class ConversationService implements ConversationUseCase {
                 "interestPostId", message.getInterestPostId(),
                 "senderId", message.getSenderId(),
                 "recipientId", message.getRecipientId(),
-                "createdAt", message.getCreatedAt()
+                "createdAt", message.getCreatedAt().toString()
         ));
         realtimeMessageGateway.publishConversationMessage(recipient.getId(), message);
 

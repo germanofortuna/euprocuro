@@ -26,5 +26,4 @@ public class RegisterRequest {
     @NotBlank
     private String state;
 
-    private String bio;
 }

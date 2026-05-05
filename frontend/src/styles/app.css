@@ -228,6 +228,32 @@ img {
   color: white;
 }
 
+.section-nav button.admin-nav-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(227, 248, 237, 0.95);
+  color: #127a45;
+}
+
+.section-nav button.admin-nav-button.active {
+  background: linear-gradient(135deg, #1fb36b, #087a45);
+  color: white;
+}
+
+.admin-nav-badge {
+  min-width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #12284a;
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
 .profile-badge {
   display: inline-flex;
   align-items: center;
@@ -435,7 +461,7 @@ img {
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
-  margin-bottom: 18px;
+  margin-bottom: 10px;
 }
 
 .panel__header-note {
@@ -1342,7 +1368,7 @@ textarea:focus {
 }
 
 .detail-description {
-  padding: 16px;
+  padding: 10px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.9);
 }
@@ -1351,7 +1377,7 @@ textarea:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 12px;
+  margin: 10px 0;
 }
 
 .tag-cluster--compact {
@@ -1409,7 +1435,7 @@ textarea:focus {
 }
 
 .expiry-renewal-row .expiry-pill--inline {
-  margin-top: 0;
+  margin-top: 10px;
   margin-bottom: 0;
 }
 
@@ -1714,6 +1740,12 @@ textarea:focus {
   font-size: 0.9rem;
 }
 
+.form-note--compact {
+  margin-top: -10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .password-status {
   margin-top: -8px;
   font-size: 0.84rem;
@@ -1726,6 +1758,98 @@ textarea:focus {
 
 .password-status--valid {
   color: #0d8a4a;
+}
+
+.field-counter {
+  display: block;
+  margin-top: -8px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.moderation-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 24px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.moderation-badge--approved {
+  background: rgba(13, 138, 74, 0.12);
+  color: #0d8a4a;
+}
+
+.moderation-badge--pending,
+.moderation-badge--neutral {
+  background: rgba(30, 111, 242, 0.1);
+  color: var(--accent-strong);
+}
+
+.moderation-badge--warning {
+  background: rgba(245, 158, 11, 0.14);
+  color: #9a5d16;
+}
+
+.moderation-badge--rejected {
+  background: rgba(179, 38, 30, 0.12);
+  color: var(--danger);
+}
+
+.moderation-callout {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(30, 111, 242, 0.16);
+  background: rgba(232, 241, 255, 0.72);
+}
+
+.moderation-callout p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.moderation-callout--warning {
+  border-color: rgba(245, 158, 11, 0.24);
+  background: rgba(255, 248, 225, 0.85);
+  margin-bottom: 10px;
+}
+
+.moderation-callout--rejected {
+  border-color: rgba(179, 38, 30, 0.22);
+  background: rgba(255, 237, 242, 0.85);
+  margin-bottom: 10px;
+}
+
+.report-button {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid rgba(245, 158, 11, 0.38);
+  border-radius: 14px;
+  background: #fff7d6;
+  color: #8a4b00;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.report-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(245, 158, 11, 0.65);
+  background: #ffefad;
 }
 
 .form-inline-error {
@@ -1760,6 +1884,82 @@ textarea:focus {
   color: var(--ink);
   padding: 10px;
   text-align: left;
+}
+
+.admin-moderation {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+}
+
+.admin-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(30, 111, 242, 0.14);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.admin-card--priority {
+  border-color: rgba(31, 179, 107, 0.24);
+  background: rgba(248, 255, 251, 0.86);
+}
+
+.admin-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(30, 111, 242, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.admin-list-item--stacked {
+  align-items: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-list-item > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.admin-list-item p,
+.admin-list-item span,
+.admin-list-item small {
+  margin: 0;
+  color: var(--muted);
+}
+
+.admin-list-item .inline-actions {
+  flex-shrink: 0;
+}
+
+.admin-decision-actions {
+  align-items: stretch;
+}
+
+.moderation-action-button {
+  width: 152px;
+  min-height: 40px;
+  margin-bottom: 0;
+  padding: 0 12px;
+  font-size: 0.9rem;
 }
 
 .seller-item-tabs button.active {
@@ -2229,6 +2429,15 @@ textarea:focus {
   .seller-match-card,
   .seller-item-tabs button {
     grid-template-columns: 1fr;
+  }
+
+  .admin-grid,
+  .admin-list-item {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-list-item {
+    display: grid;
   }
 
   .payment-status-pill {

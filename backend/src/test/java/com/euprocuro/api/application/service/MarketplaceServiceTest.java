@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.euprocuro.api.domain.gateway.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -28,12 +29,6 @@ import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
-import com.euprocuro.api.domain.gateway.EventPublisherGateway;
-import com.euprocuro.api.domain.gateway.EmailGateway;
-import com.euprocuro.api.domain.gateway.InterestGateway;
-import com.euprocuro.api.domain.gateway.OfferGateway;
-import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
-import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestSearchCriteria;
@@ -58,6 +53,8 @@ class MarketplaceServiceTest {
     private EmailGateway emailGateway;
     @Mock
     private RealtimeMessageGateway realtimeMessageGateway;
+    @Mock
+    private BlockedTermValidationGateway blockedTermValidationGateway;
 
     @InjectMocks
     private MarketplaceService marketplaceService;
@@ -91,11 +88,12 @@ class MarketplaceServiceTest {
 
         assertThat(result.getId()).isEqualTo("interest-1");
         assertThat(result.getReferenceImageUrl()).isEqualTo("data:image/png;base64,abc");
-        assertThat(result.getStatus()).isEqualTo(InterestStatus.OPEN);
+        assertThat(result.getStatus()).isEqualTo(InterestStatus.PENDING);
         assertThat(result.getLocation().getCity()).isEqualTo("Campinas");
         assertThat(result.getExpiresAt()).isAfter(result.getCreatedAt().plus(29, ChronoUnit.DAYS));
         assertThat(result.getExpiresAt()).isBefore(result.getCreatedAt().plus(31, ChronoUnit.DAYS));
         verify(eventPublisherGateway).publish(eq("interest.created"), any(Map.class));
+        verify(eventPublisherGateway).publish(eq("interest.moderation.requested"), any(Map.class));
     }
 
     @Test
@@ -139,7 +137,9 @@ class MarketplaceServiceTest {
         assertThat(result.getTitle()).isEqualTo("Quero um violao eletrico");
         assertThat(result.getReferenceImageUrl()).isEqualTo("imagem");
         assertThat(result.isBoostEnabled()).isTrue();
+        assertThat(result.getStatus()).isEqualTo(InterestStatus.PENDING);
         verify(eventPublisherGateway).publish(eq("interest.updated"), any(Map.class));
+        verify(eventPublisherGateway).publish(eq("interest.moderation.requested"), any(Map.class));
     }
 
     @Test

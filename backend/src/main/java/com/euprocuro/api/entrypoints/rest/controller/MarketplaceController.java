@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,10 +25,13 @@ import org.springframework.web.bind.annotation.RestController;
 import com.euprocuro.api.application.command.InterestSearchFilter;
 import com.euprocuro.api.application.usecase.DashboardUseCase;
 import com.euprocuro.api.application.usecase.MarketplaceUseCase;
+import com.euprocuro.api.application.usecase.ModerationUseCase;
 import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.entrypoints.rest.dto.request.CreateInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.CreateOfferRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.ReportInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.UpdateInterestRequest;
+import com.euprocuro.api.entrypoints.rest.dto.response.ActionMessageResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.CategoryOptionResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.InterestResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.OfferResponse;
@@ -40,10 +44,12 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
+@Tag(name = "Marketplace", description = "Endpoints relacionados a gerenciamento de anuncios, ofertas e dashboard pessoal do usuario.")
 public class MarketplaceController {
 
     private final MarketplaceUseCase marketplaceUseCase;
     private final DashboardUseCase dashboardUseCase;
+    private final ModerationUseCase moderationUseCase;
 
     @GetMapping("/categories")
     public List<CategoryOptionResponse> listCategories() {
@@ -146,5 +152,18 @@ public class MarketplaceController {
         return RestMapper.toResponse(
                 marketplaceUseCase.createOffer(CurrentUserContext.userId(request), id, RestMapper.toCommand(requestBody))
         );
+    }
+
+    @PostMapping("/interests/{id}/reports")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ActionMessageResponse reportInterest(
+            @PathVariable String id,
+            HttpServletRequest request,
+            @Valid @RequestBody ReportInterestRequest requestBody
+    ) {
+        moderationUseCase.reportInterest(CurrentUserContext.userId(request), id, RestMapper.toCommand(requestBody));
+        return ActionMessageResponse.builder()
+                .message("Denuncia enviada. Obrigado por ajudar a manter a plataforma segura.")
+                .build();
     }
 }

@@ -37,6 +37,7 @@ public class AuthCookieManager {
 
     public void writeSessionCookie(HttpServletResponse response, String token, Instant expiresAt) {
         long maxAgeSeconds = Math.max(0, Duration.between(Instant.now(), expiresAt).getSeconds());
+
         ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(cookieName, token)
                 .httpOnly(true)
                 .secure(secureCookie)
@@ -48,7 +49,15 @@ public class AuthCookieManager {
             builder.domain(cookieDomain);
         }
 
-        response.addHeader(HttpHeaders.SET_COOKIE, builder.build().toString());
+        ResponseCookie cookie = builder.build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        response.addHeader("X-Auth-Cookie-Debug",
+                "name=" + cookieName
+                        + "; secure=" + secureCookie
+                        + "; sameSite=" + sameSite
+                        + "; maxAge=" + maxAgeSeconds);
     }
 
     public void clearSessionCookie(HttpServletResponse response) {

@@ -20,6 +20,7 @@ public class WebSocketRealtimeMessageGatewayAdapter implements RealtimeMessageGa
     private static final Logger LOGGER = LoggerFactory.getLogger(WebSocketRealtimeMessageGatewayAdapter.class);
     private static final String CONVERSATION_MESSAGE_CREATED = "conversation-message.created";
     private static final String OFFER_CREATED = "offer.created";
+    private static final String INTEREST_MODERATION_UPDATED = "interest.moderation.updated";
 
     private final ChatWebSocketSessionRegistry sessionRegistry;
     private final ObjectMapper objectMapper;
@@ -51,6 +52,25 @@ public class WebSocketRealtimeMessageGatewayAdapter implements RealtimeMessageGa
             sessionRegistry.sendToUser(userId, objectMapper.writeValueAsString(envelope));
         } catch (Exception exception) {
             LOGGER.warn("Nao foi possivel enviar oferta em tempo real para usuario '{}'.", userId);
+        }
+    }
+
+    @Override
+    public void publishInterestModerationUpdated(String userId, String interestId, String status, String reason) {
+        try {
+            RealtimeEventEnvelope envelope = RealtimeEventEnvelope.builder()
+                    .type(INTEREST_MODERATION_UPDATED)
+                    .createdAt(Instant.now())
+                    .payload(Map.of(
+                            "interestId", interestId,
+                            "status", status,
+                            "reason", reason == null ? "" : reason
+                    ))
+                    .build();
+
+            sessionRegistry.sendToUser(userId, objectMapper.writeValueAsString(envelope));
+        } catch (Exception exception) {
+            LOGGER.warn("Nao foi possivel enviar moderacao em tempo real para usuario '{}'.", userId);
         }
     }
 }

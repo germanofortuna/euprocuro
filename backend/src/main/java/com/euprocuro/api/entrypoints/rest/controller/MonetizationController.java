@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.view.RedirectView;
@@ -39,6 +40,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/monetization")
 @RequiredArgsConstructor
+@Tag(name = "Monetization", description = "Endpoints relacionados a monetizacao, como compra de produtos, gerenciamento de conta e integracao com Mercado Pago.")
 public class MonetizationController {
 
     private final MonetizationUseCase monetizationUseCase;

@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/offers")
 @RequiredArgsConstructor
+@Tag(name = "Conversation", description = "Endpoints relacionados a conversas entre compradores e vendedores sobre um anuncio.")
 public class ConversationController {
 
     private final ConversationUseCase conversationUseCase;

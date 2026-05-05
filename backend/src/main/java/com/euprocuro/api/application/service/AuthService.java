@@ -82,6 +82,9 @@ public class AuthService implements AuthUseCase {
     @Value("${application.hml.access.allowed-emails:}")
     private String hmlAllowedEmails;
 
+    @Value("${application.auth.email-verification-required:true}")
+    private boolean emailVerificationRequired;
+
     @Override
     public RegistrationView register(RegisterUserCommand command) {
         String normalizedName = normalizeName(command.getName());
@@ -110,12 +113,12 @@ public class AuthService implements AuthUseCase {
                 .passwordHash(passwordEncoder.encode(command.getPassword()))
                 .city(normalizeText(command.getCity()))
                 .state(normalizeState(command.getState()))
-                .bio(Optional.ofNullable(command.getBio()).orElse(""))
                 .emailVerified(false)
                 .buyerRating(4.8)
                 .sellerRating(4.8)
                 .sellerCredits(3)
                 .purchasedCreditsTotal(0)
+                .ipAddress(command.getIpAddress())
                 .build());
 
         EmailVerificationToken verificationToken = emailVerificationTokenGateway.save(EmailVerificationToken.builder()
@@ -133,11 +136,12 @@ public class AuthService implements AuthUseCase {
                 "verificationSentByEmail", verificationSent
         ));
 
+        String message = emailVerificationRequired ? (verificationSent ? "Conta criada. Enviamos um link para confirmar seu e-mail antes do login."
+                : "Conta criada, mas nao conseguimos enviar o e-mail de confirmacao. Verifique a configuracao SMTP.") : "Conta criada";
+
         return RegistrationView.builder()
                 .verificationSentByEmail(verificationSent)
-                .message(verificationSent
-                        ? "Conta criada. Enviamos um link para confirmar seu e-mail antes do login."
-                        : "Conta criada, mas nao conseguimos enviar o e-mail de confirmacao. Verifique a configuracao SMTP.")
+                .message(message)
                 .build();
     }
 
@@ -154,7 +158,7 @@ public class AuthService implements AuthUseCase {
             throw new UnauthorizedException("E-mail ou senha invalidos.");
         }
 
-        if (!user.isEmailVerified()) {
+        if (emailVerificationRequired && !user.isEmailVerified()) {
             throw new BusinessException("Confirme seu e-mail antes de entrar.");
         }
 
@@ -173,14 +177,13 @@ public class AuthService implements AuthUseCase {
     }
 
     @Override
-    public AuthenticatedSessionView me(String token) {
-        UserProfile user = requireAuthenticatedUser(token);
-        AuthSession session = getValidSession(token);
-        return AuthenticatedSessionView.builder()
-                .token(session.getToken())
-                .expiresAt(session.getExpiresAt())
-                .user(user)
-                .build();
+    public UserProfile meByUserId(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            throw new UnauthorizedException("Usuario nao autenticado.");
+        }
+
+        return userGateway.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Usuario nao encontrado."));
     }
 
     @Override
@@ -191,6 +194,24 @@ public class AuthService implements AuthUseCase {
                 "userId", user.getId(),
                 "email", user.getEmail()
         ));
+    }
+
+    @Override
+    public void logoutIfPresent(String token) {
+        if (!StringUtils.hasText(token)) {
+            return;
+        }
+
+        authSessionGateway.findByToken(token)
+                .ifPresent(session -> {
+                    authSessionGateway.deleteByToken(token);
+
+                    userGateway.findById(session.getUserId())
+                            .ifPresent(user -> eventPublisherGateway.publish(
+                                    "auth.logout",
+                                    Map.of("userId", user.getId(),"email", user.getEmail())
+                            ));
+                });
     }
 
     @Override

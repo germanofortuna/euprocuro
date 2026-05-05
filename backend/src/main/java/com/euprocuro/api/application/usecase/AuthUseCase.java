@@ -14,9 +14,11 @@ public interface AuthUseCase {
 
     AuthenticatedSessionView login(LoginCommand command);
 
-    AuthenticatedSessionView me(String token);
+    UserProfile meByUserId(String userId);
 
     void logout(String token);
+
+    void logoutIfPresent(String token);
 
     PasswordResetRequestView forgotPassword(ForgotPasswordCommand command);
 

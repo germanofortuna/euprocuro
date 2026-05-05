@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -15,11 +16,13 @@ import com.euprocuro.api.application.command.CreateSellerItemCommand;
 import com.euprocuro.api.application.command.InterestSearchFilter;
 import com.euprocuro.api.application.command.ShareSellerItemCommand;
 import com.euprocuro.api.application.command.UpdateSellerItemCommand;
+import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.usecase.MarketplaceUseCase;
 import com.euprocuro.api.application.usecase.SellerItemUseCase;
 import com.euprocuro.api.application.view.SellerItemMatchesView;
+import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
 import com.euprocuro.api.domain.gateway.SellerItemGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.InterestPost;
@@ -38,6 +41,7 @@ public class SellerItemService implements SellerItemUseCase {
     private final SellerItemGateway sellerItemGateway;
     private final UserGateway userGateway;
     private final MarketplaceUseCase marketplaceUseCase;
+    private final BlockedTermValidationGateway blockedTermValidationGateway;
 
     @Override
     public List<SellerItemMatchesView> listItemsWithMatches(String currentUserId, boolean includeInactive) {
@@ -87,7 +91,7 @@ public class SellerItemService implements SellerItemUseCase {
     @Override
     public SellerItem updateItem(String currentUserId, String itemId, UpdateSellerItemCommand command) {
         SellerItem item = requireOwnedItem(currentUserId, itemId);
-        return sellerItemGateway.save(item.toBuilder()
+        SellerItem updatedItem = item.toBuilder()
                 .title(command.getTitle())
                 .description(command.getDescription())
                 .referenceImageUrl(normalize(command.getReferenceImageUrl()))
@@ -101,7 +105,15 @@ public class SellerItemService implements SellerItemUseCase {
                         .build())
                 .tags(Optional.ofNullable(command.getTags()).orElse(List.of()))
                 .updatedAt(Instant.now())
-                .build());
+                .build();
+
+        // Validate for blocked terms before saving
+        blockedTermValidationGateway.validateBlockedTerms(updatedItem)
+                .ifPresent(validation -> {
+                    throw new BusinessException(validation.getReason());
+                });
+
+        return sellerItemGateway.save(updatedItem);
     }
 
     @Override
@@ -139,7 +151,7 @@ public class SellerItemService implements SellerItemUseCase {
 
     private List<InterestPost> matchInterests(String currentUserId, SellerItem item, List<InterestPost> interests) {
         return interests.stream()
-                .filter(interest -> interest.getStatus() == InterestStatus.OPEN)
+                .filter(this::isPubliclyVisible)
                 .filter(interest -> !Objects.equals(interest.getOwnerId(), currentUserId))
                 .filter(interest -> interest.getCategory() == item.getCategory())
                 .filter(interest -> hasTextMatch(item, interest))
@@ -161,9 +173,14 @@ public class SellerItemService implements SellerItemUseCase {
                 .anyMatch(haystack::contains);
     }
 
+    private boolean isPubliclyVisible(InterestPost interest) {
+        return interest.getStatus() == InterestStatus.OPEN
+                || interest.getStatus() == InterestStatus.APPROVED
+                || interest.getStatus() == InterestStatus.REPORTED;
+    }
+
     private List<String> tokens(String value) {
-        return List.of(safe(value).toLowerCase(Locale.ROOT).split("\\s+"))
-                .stream()
+        return Stream.of(safe(value).toLowerCase(Locale.ROOT).split("\\s+"))
                 .map(String::trim)
                 .filter(token -> token.length() >= 3)
                 .collect(Collectors.toList());

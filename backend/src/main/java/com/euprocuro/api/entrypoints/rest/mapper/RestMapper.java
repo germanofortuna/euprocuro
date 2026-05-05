@@ -1,6 +1,7 @@
 package com.euprocuro.api.entrypoints.rest.mapper;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -10,19 +11,25 @@ import com.euprocuro.api.application.command.CreateSellerItemCommand;
 import com.euprocuro.api.application.command.BoostInterestCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.LoginCommand;
+import com.euprocuro.api.application.command.ModerationDecisionCommand;
 import com.euprocuro.api.application.command.PurchaseProductCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
+import com.euprocuro.api.application.command.ReportInterestCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
+import com.euprocuro.api.application.command.SaveModerationRuleCommand;
 import com.euprocuro.api.application.command.SendConversationMessageCommand;
 import com.euprocuro.api.application.command.ShareSellerItemCommand;
 import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.command.UpdateSellerItemCommand;
+import com.euprocuro.api.application.view.AdminModerationView;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
 import com.euprocuro.api.application.view.CheckoutView;
 import com.euprocuro.api.application.view.ConversationMessageView;
+import com.euprocuro.api.application.view.ContentReportView;
 import com.euprocuro.api.application.view.DashboardOfferView;
 import com.euprocuro.api.application.view.MonetizationAccountView;
 import com.euprocuro.api.application.view.MonetizationProductView;
+import com.euprocuro.api.application.view.ModerationRuleView;
 import com.euprocuro.api.application.view.OfferConversationView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.PaymentOrderView;
@@ -30,8 +37,10 @@ import com.euprocuro.api.application.view.PersonalDashboardView;
 import com.euprocuro.api.application.view.RegistrationView;
 import com.euprocuro.api.application.view.SellerItemMatchesView;
 import com.euprocuro.api.domain.model.InterestCategory;
+import com.euprocuro.api.domain.model.InterestModeration;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.LocationInfo;
+import com.euprocuro.api.domain.model.ModerationRule;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.SellerItem;
 import com.euprocuro.api.domain.model.UserProfile;
@@ -41,37 +50,24 @@ import com.euprocuro.api.entrypoints.rest.dto.request.CreateSellerItemRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.BoostInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ForgotPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.LoginRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.ModerationDecisionRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.PurchaseProductRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.RegisterRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.ReportInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ResetPasswordRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.SaveModerationRuleRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.SendConversationMessageRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ShareSellerItemRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.UpdateInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.UpdateSellerItemRequest;
-import com.euprocuro.api.entrypoints.rest.dto.response.ActionMessageResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.AuthResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.CategoryOptionResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.CheckoutResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.ConversationMessageResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.DashboardOfferResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.InterestResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.LocationResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.MonetizationAccountResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.MonetizationProductResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.OfferConversationResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.OfferResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.PaymentOrderResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.PersonalDashboardResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.SellerItemMatchesResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.SellerItemResponse;
-import com.euprocuro.api.entrypoints.rest.dto.response.UserResponse;
+import com.euprocuro.api.entrypoints.rest.dto.response.*;
 
 public final class RestMapper {
 
     private RestMapper() {
     }
 
-    public static RegisterUserCommand toCommand(RegisterRequest request) {
+    public static RegisterUserCommand toCommand(RegisterRequest request, String clientIp) {
         return RegisterUserCommand.builder()
                 .name(request.getName())
                 .email(request.getEmail())
@@ -79,7 +75,7 @@ public final class RestMapper {
                 .password(request.getPassword())
                 .city(request.getCity())
                 .state(request.getState())
-                .bio(request.getBio())
+                .ipAddress(clientIp)
                 .build();
     }
 
@@ -121,6 +117,28 @@ public final class RestMapper {
         return BoostInterestCommand.builder()
                 .boostCode(request.getBoostCode())
                 .paymentMethod(request.getPaymentMethod())
+                .build();
+    }
+
+    public static ReportInterestCommand toCommand(ReportInterestRequest request) {
+        return ReportInterestCommand.builder()
+                .reason(request.getReason())
+                .message(request.getMessage())
+                .build();
+    }
+
+    public static SaveModerationRuleCommand toCommand(SaveModerationRuleRequest request) {
+        return SaveModerationRuleCommand.builder()
+                .term(request.getTerm())
+                .riskLevel(request.getRiskLevel())
+                .active(request.isActive())
+                .build();
+    }
+
+    public static ModerationDecisionCommand toCommand(ModerationDecisionRequest request) {
+        return ModerationDecisionCommand.builder()
+                .status(request.getStatus())
+                .reason(request.getReason())
                 .build();
     }
 
@@ -238,6 +256,28 @@ public final class RestMapper {
                 .build();
     }
 
+    public static MeResponse toMeResponse(AuthenticatedSessionView session) {
+        return MeResponse.builder()
+                .id(session.getUser().getId())
+                .name(session.getUser().getName())
+                .email(session.getUser().getEmail())
+                .city(session.getUser().getCity())
+                .state(session.getUser().getState())
+                .credits(session.getUser().getSellerCredits())
+                .build();
+    }
+
+    public static MeResponse toMeResponse(UserProfile user) {
+        return MeResponse.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .city(user.getCity())
+                .state(user.getState())
+                .credits(user.getSellerCredits())
+                .build();
+    }
+
     public static CheckoutResponse toResponse(CheckoutView view) {
         return CheckoutResponse.builder()
                 .provider(view.getProvider())
@@ -301,7 +341,6 @@ public final class RestMapper {
                 .email(domain.getEmail())
                 .city(domain.getCity())
                 .state(domain.getState())
-                .bio(domain.getBio())
                 .emailVerified(domain.isEmailVerified())
                 .buyerRating(domain.getBuyerRating())
                 .sellerRating(domain.getSellerRating())
@@ -334,9 +373,82 @@ public final class RestMapper {
                 .preferredCondition(domain.getPreferredCondition())
                 .preferredContactMode(domain.getPreferredContactMode())
                 .status(domain.getStatus())
+                .moderation(toResponse(domain.getModeration()))
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .expiresAt(domain.getExpiresAt())
+                .build();
+    }
+
+    public static InterestModerationResponse toResponse(InterestModeration domain) {
+        if (domain == null) {
+            return null;
+        }
+
+        return InterestModerationResponse.builder()
+                .riskLevel(domain.getRiskLevel())
+                .categories(Optional.ofNullable(domain.getCategories()).orElse(Map.of()))
+                .scores(domain.getScores())
+                .reviewRequired(domain.isReviewRequired())
+                .provider(domain.getProvider())
+                .reason(domain.getReason())
+                .checkedAt(domain.getCheckedAt())
+                .reviewedBy(domain.getReviewedBy())
+                .reviewedAt(domain.getReviewedAt())
+                .build();
+    }
+
+    public static ModerationRuleResponse toResponse(ModerationRule domain) {
+        return ModerationRuleResponse.builder()
+                .id(domain.getId())
+                .term(domain.getTerm())
+                .riskLevel(domain.getRiskLevel())
+                .active(domain.isActive())
+                .createdAt(domain.getCreatedAt())
+                .updatedAt(domain.getUpdatedAt())
+                .build();
+    }
+
+    public static ModerationRuleResponse toResponse(ModerationRuleView view) {
+        return ModerationRuleResponse.builder()
+                .id(view.getId())
+                .term(view.getTerm())
+                .riskLevel(view.getRiskLevel())
+                .active(view.isActive())
+                .createdAt(view.getCreatedAt())
+                .updatedAt(view.getUpdatedAt())
+                .build();
+    }
+
+    public static ContentReportResponse toResponse(ContentReportView view) {
+        return ContentReportResponse.builder()
+                .id(view.getId())
+                .contentType(view.getContentType())
+                .contentId(view.getContentId())
+                .reportedBy(view.getReportedBy())
+                .reason(view.getReason())
+                .message(view.getMessage())
+                .status(view.getStatus())
+                .createdAt(view.getCreatedAt())
+                .reviewedBy(view.getReviewedBy())
+                .reviewedAt(view.getReviewedAt())
+                .build();
+    }
+
+    public static AdminModerationResponse toResponse(AdminModerationView view) {
+        return AdminModerationResponse.builder()
+                .pendingInterests(Optional.ofNullable(view.getPendingInterests()).orElse(List.of())
+                        .stream()
+                        .map(RestMapper::toResponse)
+                        .collect(Collectors.toList()))
+                .rules(Optional.ofNullable(view.getRules()).orElse(List.of())
+                        .stream()
+                        .map(RestMapper::toResponse)
+                        .collect(Collectors.toList()))
+                .openReports(Optional.ofNullable(view.getOpenReports()).orElse(List.of())
+                        .stream()
+                        .map(RestMapper::toResponse)
+                        .collect(Collectors.toList()))
                 .build();
     }
 

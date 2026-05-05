@@ -20,7 +20,6 @@ public class UserProfile {
     private String passwordHash;
     private String city;
     private String state;
-    private String bio;
     private boolean emailVerified;
     private double buyerRating;
     private double sellerRating;
@@ -28,4 +27,5 @@ public class UserProfile {
     private Integer purchasedCreditsTotal;
     private String subscriptionPlan;
     private Instant subscriptionActiveUntil;
+    private String ipAddress;
 }

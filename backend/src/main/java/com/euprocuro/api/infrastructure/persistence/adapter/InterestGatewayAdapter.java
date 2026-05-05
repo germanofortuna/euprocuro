@@ -156,7 +156,11 @@ public class InterestGatewayAdapter implements InterestGateway {
         ));
 
         if (searchCriteria.isOpenOnly()) {
-            criteria.add(Criteria.where("status").is(InterestStatus.OPEN));
+            criteria.add(Criteria.where("status").in(List.of(
+                    InterestStatus.OPEN,
+                    InterestStatus.APPROVED,
+                    InterestStatus.REPORTED
+            )));
         }
 
         if (searchCriteria.getCategory() != null) {
@@ -185,9 +189,7 @@ public class InterestGatewayAdapter implements InterestGateway {
             ));
         }
 
-        return criteria.isEmpty()
-                ? new Criteria()
-                : new Criteria().andOperator(criteria.toArray(new Criteria[0]));
+        return new Criteria().andOperator(criteria.toArray(new Criteria[0]));
     }
 
     private String exactRegex(String value) {
