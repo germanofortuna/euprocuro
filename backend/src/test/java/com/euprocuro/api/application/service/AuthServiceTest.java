@@ -84,7 +84,6 @@ class AuthServiceTest {
                 .password("Senha123")
                 .city("Sao Paulo")
                 .state("SP")
-                .bio("Compradora")
                 .ipAddress("192.168.1.100")
                 .build();
 
@@ -717,7 +716,6 @@ class AuthServiceTest {
                 .passwordHash("hash")
                 .city("Sao Paulo")
                 .state("SP")
-                .bio("Compradora")
                 .buyerRating(4.8)
                 .sellerRating(4.9)
                 .build();

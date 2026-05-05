@@ -13,7 +13,6 @@ public class UserResponse {
     String email;
     String city;
     String state;
-    String bio;
     boolean emailVerified;
     double buyerRating;
     double sellerRating;

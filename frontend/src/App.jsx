@@ -121,8 +121,7 @@ const initialRegisterForm = {
   documentNumber: "",
   password: "",
   city: "",
-  state: "",
-  bio: ""
+  state: ""
 };
 
 const initialForgotForm = {

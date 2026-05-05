@@ -75,7 +75,6 @@ public final class RestMapper {
                 .password(request.getPassword())
                 .city(request.getCity())
                 .state(request.getState())
-                .bio(request.getBio())
                 .ipAddress(clientIp)
                 .build();
     }
@@ -342,7 +341,6 @@ public final class RestMapper {
                 .email(domain.getEmail())
                 .city(domain.getCity())
                 .state(domain.getState())
-                .bio(domain.getBio())
                 .emailVerified(domain.isEmailVerified())
                 .buyerRating(domain.getBuyerRating())
                 .sellerRating(domain.getSellerRating())

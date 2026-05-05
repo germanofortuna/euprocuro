@@ -110,7 +110,6 @@ public class AuthService implements AuthUseCase {
                 .passwordHash(passwordEncoder.encode(command.getPassword()))
                 .city(normalizeText(command.getCity()))
                 .state(normalizeState(command.getState()))
-                .bio(Optional.ofNullable(command.getBio()).orElse(""))
                 .emailVerified(false)
                 .buyerRating(4.8)
                 .sellerRating(4.8)

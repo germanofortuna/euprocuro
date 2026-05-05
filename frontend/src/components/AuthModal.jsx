@@ -200,12 +200,6 @@ export default function AuthModal({
                 required
               />
             </div>
-            <textarea
-              rows="4"
-              placeholder="Uma bio curta sobre você"
-              value={registerForm.bio}
-              onChange={(event) => handleChange(onRegisterChange, "bio", event.target.value)}
-            />
             <button type="submit" className="primary-button" disabled={isSubmitting}>
               {isSubmitting ? "Criando..." : "Criar conta"}
             </button>
