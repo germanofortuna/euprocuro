@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-import com.euprocuro.api.domain.model.InterestCategory;
 
 import lombok.Builder;
 import lombok.Value;
@@ -18,7 +17,7 @@ public class SellerItemResponse {
     String title;
     String description;
     String referenceImageUrl;
-    InterestCategory category;
+    String category;
     BigDecimal desiredPrice;
     LocationResponse location;
     List<String> tags;

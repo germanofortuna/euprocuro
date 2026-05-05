@@ -23,7 +23,6 @@ import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.ConversationMessage;
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.LocationInfo;
@@ -55,7 +54,7 @@ class DashboardServiceTest {
                 .ownerName("Ana")
                 .title("Quero um violao")
                 .referenceImageUrl("data:image/png;base64,abc")
-                .category(InterestCategory.SERVICOS)
+                .category("SERVICOS")
                 .location(LocationInfo.builder().city("Campinas").state("SP").build())
                 .status(InterestStatus.OPEN)
                 .createdAt(Instant.now())

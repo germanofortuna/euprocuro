@@ -31,7 +31,6 @@ import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.ConversationMessage;
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.LocationInfo;
@@ -201,7 +200,7 @@ class ConversationServiceTest {
                 .ownerName("Ana")
                 .title("Quero um violao")
                 .description("Procuro violao")
-                .category(InterestCategory.SERVICOS)
+                .category("SERVICOS")
                 .status(InterestStatus.OPEN)
                 .location(LocationInfo.builder().city("Campinas").state("SP").build())
                 .build();

@@ -3,7 +3,9 @@ package com.euprocuro.api.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -12,14 +14,15 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -36,14 +39,14 @@ import com.euprocuro.api.domain.gateway.PaymentCheckoutGateway;
 import com.euprocuro.api.domain.gateway.PaymentOrderGateway;
 import com.euprocuro.api.domain.gateway.PaymentStatusGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.PaymentOrder;
 import com.euprocuro.api.domain.model.PaymentOrderStatus;
 import com.euprocuro.api.domain.model.PaymentProviderStatus;
+import com.euprocuro.api.domain.model.MonetizationProductType;
 import com.euprocuro.api.domain.model.UserProfile;
-import com.euprocuro.api.shared.config.MonetizationCatalogProperties;
+import com.euprocuro.api.application.view.MonetizationProductView;
 
 @ExtendWith(MockitoExtension.class)
 class MonetizationServiceTest {
@@ -56,8 +59,8 @@ class MonetizationServiceTest {
     private EventPublisherGateway eventPublisherGateway;
     @Mock
     private EmailGateway emailGateway;
-    @Spy
-    private MonetizationCatalog monetizationCatalog = new MonetizationCatalog(new MonetizationCatalogProperties());
+    @Mock
+    private MonetizationCatalog monetizationCatalog;
     @Mock
     private PaymentOrderGateway paymentOrderGateway;
     @Mock
@@ -67,6 +70,57 @@ class MonetizationServiceTest {
 
     @InjectMocks
     private MonetizationService monetizationService;
+
+    @BeforeEach
+    void setUpCatalog() {
+        List<MonetizationProductView> products = defaultProducts();
+        lenient().when(monetizationCatalog.products()).thenReturn(products);
+        lenient().when(monetizationCatalog.findByCode(anyString())).thenReturn(Optional.empty());
+        for (MonetizationProductView product : products) {
+            lenient().when(monetizationCatalog.findByCode(product.getCode())).thenReturn(Optional.of(product));
+        }
+    }
+
+    private List<MonetizationProductView> defaultProducts() {
+        return List.of(
+                MonetizationProductView.builder()
+                        .code("CREDITS_10")
+                        .name("10 propostas")
+                        .description("Pacote para vendedores enviarem propostas avulsas.")
+                        .type(MonetizationProductType.CREDIT_PACK)
+                        .price(new BigDecimal("9.90"))
+                        .credits(10)
+                        .enabled(true)
+                        .build(),
+                MonetizationProductView.builder()
+                        .code("CREDITS_30")
+                        .name("30 propostas")
+                        .description("Mais volume para vendedores frequentes.")
+                        .type(MonetizationProductType.CREDIT_PACK)
+                        .price(new BigDecimal("24.90"))
+                        .credits(30)
+                        .enabled(true)
+                        .build(),
+                MonetizationProductView.builder()
+                        .code("SELLER_PRO")
+                        .name("Plano vendedor Pro")
+                        .description("Propostas ilimitadas por 30 dias neste MVP.")
+                        .type(MonetizationProductType.SUBSCRIPTION)
+                        .price(new BigDecimal("49.90"))
+                        .durationDays(30)
+                        .enabled(true)
+                        .build(),
+                MonetizationProductView.builder()
+                        .code("BOOST_3_DAYS")
+                        .name("Boost 3 dias")
+                        .description("Impulsiona o interesse na busca e na home.")
+                        .type(MonetizationProductType.BOOST)
+                        .price(new BigDecimal("9.90"))
+                        .durationDays(3)
+                        .enabled(true)
+                        .build()
+        );
+    }
 
     @Test
     void getAccountShouldReturnCreditsPlanAndProducts() {
@@ -508,8 +562,6 @@ class MonetizationServiceTest {
                 .boostCode("BOOST_3_DAYS")
                 .paymentMethod("PIX")
                 .build());
-
-        assertThat(result.isBoostEnabled()).isTrue();
         assertThat(result.getBoostedUntil()).isAfter(Instant.now());
         verify(emailGateway).sendBoostActivatedEmail(any(UserProfile.class), eq("Quero um carro"), any(String.class));
         verify(eventPublisherGateway).publish(eq("interest.boosted"), any(Map.class));
@@ -518,7 +570,6 @@ class MonetizationServiceTest {
     @Test
     void boostInterestShouldExtendExistingBoostWindow() {
         InterestPost interest = baseInterest().toBuilder()
-                .boostEnabled(true)
                 .boostedUntil(Instant.now().plus(2, ChronoUnit.DAYS))
                 .build();
         Instant previousBoostedUntil = interest.getBoostedUntil();
@@ -573,7 +624,7 @@ class MonetizationServiceTest {
                 .ownerId("user-1")
                 .ownerName("Ana")
                 .title("Quero um carro")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .status(InterestStatus.OPEN)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())

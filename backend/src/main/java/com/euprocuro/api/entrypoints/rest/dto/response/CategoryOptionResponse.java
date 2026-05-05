@@ -8,4 +8,6 @@ import lombok.Value;
 public class CategoryOptionResponse {
     String value;
     String label;
+    boolean active;
+    Integer sortOrder;
 }

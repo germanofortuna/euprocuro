@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestStatus;
 
 import lombok.Builder;
@@ -19,16 +18,14 @@ public class InterestResponse {
     String title;
     String description;
     String referenceImageUrl;
-    InterestCategory category;
+    String category;
     BigDecimal budgetMin;
     BigDecimal budgetMax;
     LocationResponse location;
     List<String> tags;
     Integer desiredRadiusKm;
-    boolean acceptsNationwideOffers;
     boolean allowsWhatsappContact;
     String whatsappContact;
-    boolean boostEnabled;
     Instant boostedUntil;
     String preferredCondition;
     String preferredContactMode;

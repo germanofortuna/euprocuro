@@ -42,6 +42,7 @@ public class SellerItemService implements SellerItemUseCase {
     private final UserGateway userGateway;
     private final MarketplaceUseCase marketplaceUseCase;
     private final BlockedTermValidationGateway blockedTermValidationGateway;
+    private final OperationalCatalogService operationalCatalogService;
 
     @Override
     public List<SellerItemMatchesView> listItemsWithMatches(String currentUserId, boolean includeInactive) {
@@ -71,7 +72,7 @@ public class SellerItemService implements SellerItemUseCase {
                 .title(command.getTitle())
                 .description(command.getDescription())
                 .referenceImageUrl(normalize(command.getReferenceImageUrl()))
-                .category(command.getCategory())
+                .category(operationalCatalogService.requireActiveCategory(command.getCategory()))
                 .desiredPrice(command.getDesiredPrice())
                 .location(LocationInfo.builder()
                         .city(command.getCity())
@@ -95,7 +96,7 @@ public class SellerItemService implements SellerItemUseCase {
                 .title(command.getTitle())
                 .description(command.getDescription())
                 .referenceImageUrl(normalize(command.getReferenceImageUrl()))
-                .category(command.getCategory())
+                .category(operationalCatalogService.requireActiveCategory(command.getCategory()))
                 .desiredPrice(command.getDesiredPrice())
                 .location(LocationInfo.builder()
                         .city(command.getCity())
@@ -153,7 +154,7 @@ public class SellerItemService implements SellerItemUseCase {
         return interests.stream()
                 .filter(this::isPubliclyVisible)
                 .filter(interest -> !Objects.equals(interest.getOwnerId(), currentUserId))
-                .filter(interest -> interest.getCategory() == item.getCategory())
+                .filter(interest -> Objects.equals(interest.getCategory(), item.getCategory()))
                 .filter(interest -> hasTextMatch(item, interest))
                 .collect(Collectors.toList());
     }

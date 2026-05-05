@@ -31,13 +31,13 @@ import com.euprocuro.api.application.usecase.MarketplaceUseCase;
 import com.euprocuro.api.application.view.SellerItemMatchesView;
 import com.euprocuro.api.domain.gateway.SellerItemGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.SellerItem;
 import com.euprocuro.api.domain.model.UserProfile;
+import org.junit.jupiter.api.BeforeEach;
 
 @ExtendWith(MockitoExtension.class)
 class SellerItemServiceTest {
@@ -50,10 +50,17 @@ class SellerItemServiceTest {
     private MarketplaceUseCase marketplaceUseCase;
     @Mock
     private BlockedTermValidationGateway blockedTermValidationGateway;
+    @Mock
+    private OperationalCatalogService operationalCatalogService;
 
 
     @InjectMocks
     private SellerItemService sellerItemService;
+
+    @BeforeEach
+    void setUpCatalog() {
+        lenient().when(operationalCatalogService.requireActiveCategory(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     @Test
     void createItemShouldPersistActiveItemForCurrentUser() {
@@ -68,7 +75,7 @@ class SellerItemServiceTest {
                 .title("Celta 2012")
                 .description("Carro conservado")
                 .referenceImageUrl("  foto  ")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .desiredPrice(new BigDecimal("22000"))
                 .city("Erechim")
                 .state("RS")
@@ -97,7 +104,7 @@ class SellerItemServiceTest {
                 UpdateSellerItemCommand.builder()
                         .title("Produto bloqueado")
                         .description("Descricao")
-                        .category(InterestCategory.AUTOMOVEIS)
+                        .category("AUTOMOVEIS")
                         .build()
         ))
                 .isInstanceOf(BusinessException.class)
@@ -118,7 +125,7 @@ class SellerItemServiceTest {
                 .id("interest-1")
                 .title("Procuro Celta 2012")
                 .description("Quero um carro pequeno")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .tags(List.of("celta"))
                 .build();
         InterestPost ownInterest = matchingInterest.toBuilder()
@@ -148,7 +155,7 @@ class SellerItemServiceTest {
                 .id("interest-1")
                 .title("Procuro Celta 2012")
                 .description("Quero um carro pequeno")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .tags(List.of("celta"))
                 .build();
 
@@ -223,7 +230,7 @@ class SellerItemServiceTest {
                 .title("Celta 2012 completo")
                 .description("Carro revisado")
                 .referenceImageUrl(" nova-foto ")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .desiredPrice(new BigDecimal("23000"))
                 .city("Passo Fundo")
                 .state("RS")
@@ -253,7 +260,7 @@ class SellerItemServiceTest {
         assertThatThrownBy(() -> sellerItemService.createItem("seller-1", CreateSellerItemCommand.builder()
                 .title("Celta")
                 .description("Carro")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .build()))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Usuario");
@@ -265,14 +272,14 @@ class SellerItemServiceTest {
         InterestPost differentCategory = baseInterest().toBuilder()
                 .id("interest-1")
                 .title("Procuro apartamento")
-                .category(InterestCategory.IMOVEIS)
+                .category("IMOVEIS")
                 .tags(List.of("apartamento"))
                 .build();
         InterestPost noTextMatch = baseInterest().toBuilder()
                 .id("interest-2")
                 .title("Procuro Gol")
                 .description("Outro modelo")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .tags(List.of("gol"))
                 .build();
 
@@ -301,7 +308,7 @@ class SellerItemServiceTest {
                 .title("Celta 2012")
                 .description("Carro conservado")
                 .referenceImageUrl("foto")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .desiredPrice(new BigDecimal("22000"))
                 .location(LocationInfo.builder().city("Erechim").state("RS").build())
                 .tags(List.of("celta", "chevrolet"))

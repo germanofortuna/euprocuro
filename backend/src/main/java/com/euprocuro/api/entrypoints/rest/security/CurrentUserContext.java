@@ -1,5 +1,7 @@
 package com.euprocuro.api.entrypoints.rest.security;
 
+import java.util.Optional;
+
 import javax.servlet.http.HttpServletRequest;
 
 import com.euprocuro.api.application.exception.UnauthorizedException;
@@ -19,5 +21,10 @@ public final class CurrentUserContext {
         }
 
         return (String) userId;
+    }
+
+    public static Optional<String> optionalUserId(HttpServletRequest request) {
+        Object userId = request.getAttribute(USER_ID_ATTRIBUTE);
+        return userId instanceof String ? Optional.of((String) userId) : Optional.empty();
     }
 }

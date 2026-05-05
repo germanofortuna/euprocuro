@@ -10,7 +10,12 @@ public class RegisterUserCommand {
     String email;
     String documentNumber;
     String password;
+    String postalCode;
     String city;
     String state;
+    String neighborhood;
+    String country;
     String ipAddress;
+    boolean termsAccepted;
+    String termsVersion;
 }

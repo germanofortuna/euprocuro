@@ -20,8 +20,11 @@ public final class UserPersistenceMapper {
                 .documentNumber(document.getDocumentNumber())
                 .documentType(document.getDocumentType())
                 .passwordHash(document.getPasswordHash())
+                .postalCode(document.getPostalCode())
                 .city(document.getCity())
                 .state(document.getState())
+                .neighborhood(document.getNeighborhood())
+                .country(document.getCountry())
                 .emailVerified(document.getEmailVerified() == null || document.getEmailVerified())
                 .buyerRating(document.getBuyerRating())
                 .sellerRating(document.getSellerRating())
@@ -30,6 +33,9 @@ public final class UserPersistenceMapper {
                 .subscriptionPlan(document.getSubscriptionPlan())
                 .subscriptionActiveUntil(document.getSubscriptionActiveUntil())
                 .ipAddress(document.getIpAddress())
+                .termsAccepted(Boolean.TRUE.equals(document.getTermsAccepted()))
+                .termsAcceptedAt(document.getTermsAcceptedAt())
+                .termsVersion(document.getTermsVersion())
                 .build();
     }
 
@@ -45,8 +51,11 @@ public final class UserPersistenceMapper {
                 .documentNumber(domain.getDocumentNumber())
                 .documentType(domain.getDocumentType())
                 .passwordHash(domain.getPasswordHash())
+                .postalCode(domain.getPostalCode())
                 .city(domain.getCity())
                 .state(domain.getState())
+                .neighborhood(domain.getNeighborhood())
+                .country(domain.getCountry())
                 .emailVerified(domain.isEmailVerified())
                 .buyerRating(domain.getBuyerRating())
                 .sellerRating(domain.getSellerRating())
@@ -55,6 +64,9 @@ public final class UserPersistenceMapper {
                 .subscriptionPlan(domain.getSubscriptionPlan())
                 .subscriptionActiveUntil(domain.getSubscriptionActiveUntil())
                 .ipAddress(domain.getIpAddress())
+                .termsAccepted(domain.isTermsAccepted())
+                .termsAcceptedAt(domain.getTermsAcceptedAt())
+                .termsVersion(domain.getTermsVersion())
                 .build();
     }
 }

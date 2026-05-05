@@ -7,7 +7,6 @@ import java.util.List;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.LocationInfo;
 
 import lombok.AllArgsConstructor;
@@ -28,7 +27,7 @@ public class SellerItemDocument {
     private String title;
     private String description;
     private String referenceImageUrl;
-    private InterestCategory category;
+    private String category;
     private BigDecimal desiredPrice;
     private LocationInfo location;
     private List<String> tags;

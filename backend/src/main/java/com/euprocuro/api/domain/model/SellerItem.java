@@ -20,7 +20,7 @@ public class SellerItem {
     private String title;
     private String description;
     private String referenceImageUrl;
-    private InterestCategory category;
+    private String category;
     private BigDecimal desiredPrice;
     private LocationInfo location;
     private List<String> tags;

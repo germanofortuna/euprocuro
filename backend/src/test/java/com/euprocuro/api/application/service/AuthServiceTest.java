@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -86,6 +87,8 @@ class AuthServiceTest {
                 .city("Sao Paulo")
                 .state("SP")
                 .ipAddress("192.168.1.100")
+                .termsAccepted(true)
+                .termsVersion("2026-05-05")
                 .build();
 
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
@@ -97,13 +100,17 @@ class AuthServiceTest {
             return user;
         });
         when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(emailGateway.sendEmailVerificationEmail(any(UserProfile.class), any(String.class))).thenReturn(true);
 
         RegistrationView result = authService.register(command);
 
-        assertThat(result.isVerificationSentByEmail()).isFalse();
+        assertThat(result.isVerificationSentByEmail()).isTrue();
         ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
         verify(userGateway).save(userCaptor.capture());
         assertThat(userCaptor.getValue().getIpAddress()).isEqualTo("192.168.1.100");  // <- Novo
+        assertThat(userCaptor.getValue().isTermsAccepted()).isTrue();
+        assertThat(userCaptor.getValue().getTermsAcceptedAt()).isNotNull();
+        assertThat(userCaptor.getValue().getTermsVersion()).isEqualTo("2026-05-05");
     }
 
     @Test
@@ -116,6 +123,7 @@ class AuthServiceTest {
                 .city("Sao Paulo")
                 .state("SP")
                 .ipAddress("192.168.1.100")  // <- Adicionado
+                .termsAccepted(true)
                 .build();
 
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
@@ -144,6 +152,7 @@ class AuthServiceTest {
                 .password("Senha123")
                 .city("Erechim")
                 .state("rs")
+                .termsAccepted(true)
                 .build();
 
         when(userGateway.findByEmail("loja@teste.com")).thenReturn(Optional.empty());
@@ -155,6 +164,7 @@ class AuthServiceTest {
             return user;
         });
         when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(emailGateway.sendEmailVerificationEmail(any(UserProfile.class), any(String.class))).thenReturn(true);
 
         RegistrationView result = authService.register(command);
 
@@ -165,6 +175,95 @@ class AuthServiceTest {
         assertThat(userCaptor.getValue().getDocumentType()).isEqualTo("CNPJ");
         assertThat(userCaptor.getValue().getState()).isEqualTo("RS");
         verify(eventPublisherGateway).publish(eq("user.registered"), any(Map.class));
+    }
+
+    @Test
+    void registerShouldRollbackUserWhenVerificationEmailFails() {
+        RegisterUserCommand command = RegisterUserCommand.builder()
+                .name("Ana Silva")
+                .email("ana@teste.com")
+                .documentNumber("529.982.247-25")
+                .password("Senha123")
+                .city("Sao Paulo")
+                .state("SP")
+                .termsAccepted(true)
+                .build();
+
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
+        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Senha123")).thenReturn("senha-hash");
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
+            UserProfile user = invocation.getArgument(0);
+            user.setId("user-1");
+            return user;
+        });
+        when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenReturn(EmailVerificationToken.builder()
+                .token("verify-123")
+                .userId("user-1")
+                .createdAt(Instant.now())
+                .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
+                .build());
+        when(emailGateway.sendEmailVerificationEmail(any(UserProfile.class), any(String.class))).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.register(command))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("e-mail de confirmacao");
+
+        verify(emailVerificationTokenGateway).deleteByToken("verify-123");
+        verify(userGateway).deleteById("user-1");
+        verify(eventPublisherGateway, never()).publish(eq("user.registered"), any(Map.class));
+    }
+
+    @Test
+    void registerShouldSkipVerificationEmailWhenNotRequired() {
+        ReflectionTestUtils.setField(authService, "emailVerificationRequired", false);
+        RegisterUserCommand command = RegisterUserCommand.builder()
+                .name("Ana Silva")
+                .email("ana@teste.com")
+                .documentNumber("529.982.247-25")
+                .password("Senha123")
+                .city("Sao Paulo")
+                .state("SP")
+                .termsAccepted(true)
+                .build();
+
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
+        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Senha123")).thenReturn("senha-hash");
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
+            UserProfile user = invocation.getArgument(0);
+            user.setId("user-1");
+            return user;
+        });
+
+        RegistrationView result = authService.register(command);
+
+        assertThat(result.isVerificationSentByEmail()).isFalse();
+        assertThat(result.getMessage()).isEqualTo("Conta criada");
+        ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
+        verify(userGateway).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().isEmailVerified()).isTrue();
+        verify(emailVerificationTokenGateway, never()).save(any(EmailVerificationToken.class));
+        verify(emailGateway, never()).sendEmailVerificationEmail(any(UserProfile.class), any(String.class));
+        verify(eventPublisherGateway).publish(eq("user.registered"), any(Map.class));
+    }
+
+    @Test
+    void registerShouldRejectWhenTermsAreNotAccepted() {
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
+        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
+                .name("Ana Silva")
+                .email("ana@teste.com")
+                .documentNumber("52998224725")
+                .password("Senha123")
+                .city("Sao Paulo")
+                .state("SP")
+                .termsAccepted(false)
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("termos de uso");
     }
 
     @Test
@@ -240,6 +339,7 @@ class AuthServiceTest {
                 .documentNumber("52998224725")
                 .password("Senha123")
                 .state("SPO")
+                .termsAccepted(true)
                 .build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("UF com 2 letras");
@@ -294,6 +394,7 @@ class AuthServiceTest {
                 .email("ANA@TESTE.COM")
                 .documentNumber("529.982.247-25")
                 .password("Senha123")
+                .termsAccepted(true)
                 .build();
 
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
@@ -305,6 +406,7 @@ class AuthServiceTest {
             return user;
         });
         when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(emailGateway.sendEmailVerificationEmail(any(UserProfile.class), any(String.class))).thenReturn(true);
 
         RegistrationView result = authService.register(command);
 

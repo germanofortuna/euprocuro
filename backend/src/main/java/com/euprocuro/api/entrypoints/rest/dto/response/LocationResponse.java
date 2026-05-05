@@ -6,8 +6,10 @@ import lombok.Value;
 @Value
 @Builder
 public class LocationResponse {
+    String postalCode;
     String city;
     String state;
     String neighborhood;
+    String country;
     boolean remote;
 }

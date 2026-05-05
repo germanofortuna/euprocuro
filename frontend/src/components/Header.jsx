@@ -1,10 +1,37 @@
 import logo from "../assets/eu-procuro-logo.png";
+import { useContentText } from "../content/ContentContext";
 
 const loggedSections = {
   EXPLORE: "EXPLORE",
   CREDITS: "CREDITS",
   NEW_INTEREST: "NEW_INTEREST"
 };
+
+function BellIcon() {
+  return (
+    <svg
+      className="notification-button__icon"
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M18 8.8c0-3.31-2.69-6-6-6s-6 2.69-6 6v3.08c0 .5-.2.98-.55 1.34L4 14.66V17h16v-2.34l-1.45-1.44A1.9 1.9 0 0 1 18 11.88V8.8Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.75 19.2a2.5 2.5 0 0 0 4.5 0"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 export default function Header({
   user,
@@ -19,11 +46,14 @@ export default function Header({
   onNotificationClick,
   onLoginClick,
   onRegisterClick,
-  onLogout
+  onLogout,
+  hideActions = false
 }) {
+  const { t } = useContentText();
   const authenticated = Boolean(isLoggedIn && user?.id);
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? "";
   const hasNoCredits = !subscriptionActive && (sellerCredits ?? 0) <= 0;
+  const notificationLabel = hasNotifications ? t("header.notifications.unread") : t("header.notifications.default");
 
   return (
     <header className="topbar">
@@ -32,13 +62,13 @@ export default function Header({
         className="topbar__brand topbar__brand-button"
         onClick={() => onNavigate(loggedSections.EXPLORE)}
       >
-        <img src={logo} alt="Eu Procuro" />
+        <img src={logo} alt={t("header.logo.alt")} />
         <div className="topbar__brand-copy">
-          <span className="eyebrow">Marketplace reverso</span>
+          <span className="eyebrow">{t("header.brand.eyebrow")}</span>
         </div>
       </button>
 
-      {authenticated ? (
+      {hideActions ? null : authenticated ? (
         <div className="topbar__actions">
           <nav className="topbar__nav">
             <button
@@ -46,7 +76,7 @@ export default function Header({
               className={currentSection === loggedSections.NEW_INTEREST ? "active" : ""}
               onClick={() => onNavigate(loggedSections.NEW_INTEREST)}
             >
-              Novo interesse
+              {t("header.nav.publish")}
             </button>
           </nav>
 
@@ -54,10 +84,10 @@ export default function Header({
             type="button"
             className={`credits-badge ${hasNoCredits ? "credits-badge--empty" : ""}`}
             onClick={onCreditsClick}
-            title="Ver créditos e pagamentos"
+            title={t("header.credits.title")}
           >
-            <strong>{subscriptionActive ? "Pro" : (sellerCredits ?? 0)}</strong>
-            <span>{subscriptionActive ? "plano ativo" : "créditos"}</span>
+            <strong>{subscriptionActive ? t("header.credits.pro") : (sellerCredits ?? 0)}</strong>
+            <span>{subscriptionActive ? t("header.credits.planActive") : t("header.credits.credits")}</span>
           </button>
 
           <button
@@ -65,10 +95,10 @@ export default function Header({
             type="button"
             className={`notification-button ${hasNotifications ? "notification-button--active" : ""}`}
             onClick={onNotificationClick}
-            aria-label={hasNotifications ? "Você tem novas mensagens" : "Notificações"}
-            title={hasNotifications ? "Você tem novas mensagens" : "Notificações"}
+            aria-label={notificationLabel}
+            title={notificationLabel}
           >
-            <span aria-hidden="true">🔔</span>
+            <BellIcon />
             {hasNotifications ? <span className="notification-badge" /> : null}
           </button>
 
@@ -78,16 +108,16 @@ export default function Header({
           </div>
 
           <button type="button" className="ghost-button" onClick={onLogout}>
-            Sair
+            {t("header.auth.logout")}
           </button>
         </div>
       ) : (
         <div className="topbar__actions">
           <button type="button" className="ghost-button" onClick={onLoginClick}>
-            Entrar
+            {t("header.auth.login")}
           </button>
           <button type="button" className="primary-button primary-button--compact" onClick={onRegisterClick}>
-            Criar conta
+            {t("header.auth.register")}
           </button>
         </div>
       )}

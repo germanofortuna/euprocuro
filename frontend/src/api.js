@@ -1,5 +1,8 @@
+import defaultContent from "./content/default-content.json";
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080/api";
 const SESSION_STORAGE_KEY = "eu-procuro-session";
+const GENERIC_REQUEST_ERROR = defaultContent.entries["errors.request.generic"];
 
 function buildWebSocketUrl(token) {
   const configuredBase = import.meta.env.VITE_WS_BASE;
@@ -61,7 +64,7 @@ async function request(path, options = {}) {
       payload = await response.text();
     }
 
-    throw new Error(buildErrorMessage(payload, "Nao foi possivel completar a requisicao."));
+    throw new Error(buildErrorMessage(payload, GENERIC_REQUEST_ERROR));
   }
 
   return response.status === 204 ? null : response.json();
@@ -192,6 +195,14 @@ export async function verifyEmail(token) {
   return request(`/auth/verify-email?${params.toString()}`);
 }
 
+export async function fetchPublicContent(keys = []) {
+  const params = new URLSearchParams({ locale: "pt-BR" });
+  if (keys.length) {
+    params.set("keys", keys.join(","));
+  }
+  return request(`/content/public?${params.toString()}`);
+}
+
 export async function fetchDashboard() {
   return request("/dashboard");
 }
@@ -229,6 +240,11 @@ export async function boostInterest(interestId, payload) {
 
 export async function fetchCategories() {
   return request("/categories");
+}
+
+export async function lookupAddressByPostalCode(postalCode) {
+  const normalizedPostalCode = String(postalCode ?? "").replace(/\D/g, "");
+  return request(`/addresses/postal-code/${normalizedPostalCode}`);
 }
 
 export async function fetchInterests(filters = {}) {
@@ -343,6 +359,41 @@ export async function shareSellerItemOffer(itemId, interestId, payload) {
 
 export async function fetchAdminModeration() {
   return request("/admin/moderation");
+}
+
+export async function fetchAdminContent() {
+  return request("/admin/content");
+}
+
+export async function saveContentEntry(entryId, payload) {
+  const path = entryId ? `/admin/content/${entryId}` : "/admin/content";
+  return request(path, {
+    method: entryId ? "PUT" : "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function publishContentEntry(entryId) {
+  return request(`/admin/content/${entryId}/publish`, {
+    method: "POST"
+  });
+}
+
+export async function archiveContentEntry(entryId) {
+  return request(`/admin/content/${entryId}/archive`, {
+    method: "POST"
+  });
+}
+
+export async function fetchAdminCatalog() {
+  return request("/admin/catalog");
+}
+
+export async function saveAdminCatalog(payload) {
+  return request("/admin/catalog", {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function saveModerationRule(ruleId, payload) {

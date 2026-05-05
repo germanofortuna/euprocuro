@@ -217,7 +217,6 @@ public class MonetizationService implements MonetizationUseCase {
         Instant boostedUntil = currentExpiration.plus(product.getDurationDays(), ChronoUnit.DAYS);
 
         InterestPost boosted = interest.toBuilder()
-                .boostEnabled(true)
                 .boostedUntil(boostedUntil)
                 .updatedAt(now)
                 .build();

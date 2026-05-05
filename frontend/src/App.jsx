@@ -26,6 +26,7 @@ import {
   forgotPassword,
   getStoredSession,
   login,
+  lookupAddressByPostalCode,
   logout,
   purchaseProduct,
   register,
@@ -44,13 +45,20 @@ import {
 import logo from "./assets/eu-procuro-logo.png";
 import mercadoPagoLogo from "./assets/mercado-pago.svg";
 import AuthModal from "./components/AuthModal";
+import ContentAdminPanel from "./components/ContentAdminPanel";
 import EmptyState from "./components/EmptyState";
 import FeedbackModal from "./components/FeedbackModal";
+import Footer from "./components/Footer";
 import Header from "./components/Header";
 import InterestCard from "./components/InterestCard";
+import LegalPage from "./components/LegalPage";
 import NotificationModal from "./components/NotificationModal";
 import OfferConversationModal from "./components/OfferConversationModal";
+import OperationalCatalogAdminPanel from "./components/OperationalCatalogAdminPanel";
 import StatCard from "./components/StatCard";
+import { useContentText } from "./content/ContentContext";
+import { useLegalContent } from "./content/useLegalContent";
+import { legalPages } from "./legalContent";
 
 const initialInterestForm = {
   title: "",
@@ -59,14 +67,14 @@ const initialInterestForm = {
   category: "SERVICOS",
   budgetMin: "",
   budgetMax: "",
+  postalCode: "",
   city: "",
   state: "",
   neighborhood: "",
+  country: "Brasil",
   desiredRadiusKm: "30",
-  acceptsNationwideOffers: true,
   allowsWhatsappContact: false,
   whatsappContact: "",
-  boostEnabled: false,
   preferredCondition: "",
   preferredContactMode: "Chat",
   tags: ""
@@ -120,8 +128,13 @@ const initialRegisterForm = {
   email: "",
   documentNumber: "",
   password: "",
+  postalCode: "",
   city: "",
-  state: ""
+  state: "",
+  neighborhood: "",
+  country: "Brasil",
+  termsOpened: false,
+  termsAccepted: false
 };
 
 const initialForgotForm = {
@@ -147,19 +160,19 @@ const TITLE_MAX_LENGTH = 80;
 const DESCRIPTION_MAX_LENGTH = 120;
 const LISTING_EXPIRATION_DAYS = Number(import.meta.env.VITE_LISTING_EXPIRATION_DAYS ?? 30);
 const FALLBACK_CATEGORIES = [
-  { value: "AUTOMOVEIS", label: "Automóveis" },
-  { value: "IMOVEIS", label: "Imóveis" },
-  { value: "SERVICOS", label: "Serviços" },
-  { value: "ELETRONICOS", label: "Eletrônicos" },
-  { value: "INSTRUMENTOS", label: "Instrumentos" },
-  { value: "OUTROS", label: "Outros" }
+  { value: "AUTOMOVEIS", labelKey: "categories.automoveis" },
+  { value: "IMOVEIS", labelKey: "categories.imoveis" },
+  { value: "SERVICOS", labelKey: "categories.servicos" },
+  { value: "ELETRONICOS", labelKey: "categories.eletronicos" },
+  { value: "INSTRUMENTOS", labelKey: "categories.instrumentos" },
+  { value: "OUTROS", labelKey: "categories.outros" }
 ];
 const AUTH_SESSION_MODE = import.meta.env.VITE_AUTH_SESSION_MODE ?? "bearer";
 const SHOULD_RECOVER_SESSION_FROM_COOKIE = AUTH_SESSION_MODE === "cookie";
 
-function currency(value) {
+function currency(value, t) {
   if (value === null || value === undefined || value === "") {
-    return "A combinar";
+    return t ? t("global.currency.negotiable") : "";
   }
 
   return new Intl.NumberFormat("pt-BR", {
@@ -168,9 +181,21 @@ function currency(value) {
   }).format(Number(value));
 }
 
-function formatTimestamp(value) {
+function ProductPrice({ product }) {
+  const hasPromotion = Boolean(product?.promotional && product.originalPrice);
+
+  return (
+    <span className="product-price">
+      {hasPromotion ? <s>{currency(product.originalPrice)}</s> : null}
+      <strong>{currency(product?.price)}</strong>
+      {hasPromotion && product.promotionLabel ? <em>{product.promotionLabel}</em> : null}
+    </span>
+  );
+}
+
+function formatTimestamp(value, t) {
   if (!value) {
-    return "Agora";
+    return t ? t("global.time.now") : "";
   }
 
   return new Intl.DateTimeFormat("pt-BR", {
@@ -179,15 +204,8 @@ function formatTimestamp(value) {
   }).format(new Date(value));
 }
 
-function paymentStatusLabel(status) {
-  const labels = {
-    APPROVED: "Aprovado",
-    PENDING: "Pendente",
-    CREATED: "Pendente",
-    REJECTED: "Reprovado",
-    CANCELLED: "Reprovado"
-  };
-  return labels[status] ?? "Pendente";
+function paymentStatusLabel(status, t) {
+  return t ? t(`payment.status.${status || "PENDING"}`) : (status || "PENDING");
 }
 
 function paymentStatusTone(status) {
@@ -200,16 +218,9 @@ function paymentStatusTone(status) {
   return "pending";
 }
 
-function paymentMethodLabel(method) {
+function paymentMethodLabel(method, t) {
   const normalized = String(method ?? "").toUpperCase();
-  const labels = {
-    PIX: "Pix",
-    CREDIT_CARD: "Cartão de crédito",
-    DEBIT_CARD: "Cartão de débito",
-    ACCOUNT_MONEY: "Saldo Mercado Pago",
-    TICKET: "Boleto"
-  };
-  return labels[normalized] ?? (method || "Mercado Pago");
+  return t && normalized ? t(`payment.method.${normalized}`) : (method || "Mercado Pago");
 }
 
 function listingExpiresAt(listing) {
@@ -230,24 +241,24 @@ function listingExpiresAt(listing) {
   return createdAt;
 }
 
-function formatRemainingListingTime(listing) {
+function formatRemainingListingTime(listing, t) {
   const expiresAt = listingExpiresAt(listing);
   if (!expiresAt) {
-    return `Ativo por até ${LISTING_EXPIRATION_DAYS} dias`;
+    return t ? t("listing.activeDays", { count: LISTING_EXPIRATION_DAYS }) : "";
   }
 
   const diff = expiresAt.getTime() - Date.now();
   if (diff <= 0) {
-    return "Expirado";
+    return t ? t("listing.expired") : "";
   }
 
   const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
   if (days > 1) {
-    return `Expira em ${days} dias`;
+    return t ? t("listing.expires.days", { count: days }) : "";
   }
 
   const hours = Math.max(1, Math.ceil(diff / (1000 * 60 * 60)));
-  return hours > 1 ? `Expira em ${hours} horas` : "Expira em 1 hora";
+  return hours > 1 ? t("listing.expires.hours", { count: hours }) : t("listing.expires.oneHour");
 }
 
 function remainingListingDays(listing) {
@@ -268,18 +279,8 @@ function expiryPillClass(listing) {
   return `expiry-pill ${isListingExpiringSoon(listing) ? "expiry-pill--warning" : ""}`;
 }
 
-function moderationStatusLabel(status) {
-  const labels = {
-    PENDING: "Em análise",
-    APPROVED: "Aprovado",
-    REVIEW_REQUIRED: "Em revisão",
-    REJECTED: "Rejeitado",
-    HIDDEN: "Oculto",
-    REPORTED: "Denunciado",
-    OPEN: "Publicado",
-    CLOSED: "Desativado"
-  };
-  return labels[status] ?? "Em análise";
+function moderationStatusLabel(status, t) {
+  return t ? t(`moderation.status.${status || "PENDING"}`) : (status || "PENDING");
 }
 
 function moderationStatusTone(status) {
@@ -304,8 +305,15 @@ function hasLink(value) {
   return /(https?:\/\/|www\.|\b[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+\b)/i.test(String(value ?? ""));
 }
 
-function firstName(value) {
-  return value?.trim().split(/\s+/)[0] ?? "usuário";
+function firstName(value, t) {
+  return value?.trim().split(/\s+/)[0] ?? (t ? t("global.user.fallback") : "");
+}
+
+function fallbackCategories(t) {
+  return FALLBACK_CATEGORIES.map((category) => ({
+    value: category.value,
+    label: t(category.labelKey)
+  }));
 }
 
 function createResetStateFromLocation() {
@@ -319,6 +327,11 @@ function createResetStateFromLocation() {
 function createInitialSharedInterestId() {
   const params = new URLSearchParams(window.location.search);
   return params.get("interest") ?? "";
+}
+
+function getActiveLegalPageSlug() {
+  const slug = window.location.hash.replace("#", "");
+  return legalPages[slug] ? slug : "";
 }
 
 function fileToDataUrl(file) {
@@ -364,14 +377,14 @@ function mapInterestToForm(interest) {
     category: interest?.category ?? "SERVICOS",
     budgetMin: interest?.budgetMin ?? "",
     budgetMax: interest?.budgetMax ?? "",
+    postalCode: interest?.location?.postalCode ?? "",
     city: interest?.location?.city ?? "",
     state: interest?.location?.state ?? "",
     neighborhood: interest?.location?.neighborhood ?? "",
+    country: interest?.location?.country ?? "Brasil",
     desiredRadiusKm: interest?.desiredRadiusKm ?? "30",
-    acceptsNationwideOffers: Boolean(interest?.acceptsNationwideOffers),
     allowsWhatsappContact: Boolean(interest?.allowsWhatsappContact),
     whatsappContact: interest?.whatsappContact ?? "",
-    boostEnabled: Boolean(interest?.boostEnabled),
     preferredCondition: interest?.preferredCondition ?? "",
     preferredContactMode: interest?.preferredContactMode ?? "Chat",
     tags: interest?.tags?.join(", ") ?? ""
@@ -386,14 +399,14 @@ function buildInterestPayload(interestForm) {
     category: interestForm.category,
     budgetMin: interestForm.budgetMin || 0,
     budgetMax: interestForm.budgetMax,
+    postalCode: interestForm.postalCode,
     city: interestForm.city,
     state: interestForm.state,
     neighborhood: interestForm.neighborhood,
+    country: interestForm.country,
     desiredRadiusKm: Number(interestForm.desiredRadiusKm || 0),
-    acceptsNationwideOffers: interestForm.acceptsNationwideOffers,
     allowsWhatsappContact: interestForm.allowsWhatsappContact,
     whatsappContact: interestForm.allowsWhatsappContact ? interestForm.whatsappContact : null,
-    boostEnabled: interestForm.boostEnabled,
     preferredCondition: interestForm.preferredCondition,
     preferredContactMode: interestForm.preferredContactMode,
     tags: interestForm.tags
@@ -437,8 +450,7 @@ function mapSellerItemToForm(groupOrItem) {
 
 function isBoostActive(interest) {
   return Boolean(
-    interest?.boostEnabled
-    && interest?.boostedUntil
+    interest?.boostedUntil
     && new Date(interest.boostedUntil).getTime() > Date.now()
   );
 }
@@ -525,8 +537,38 @@ function writeSeenMessages(userId, seenMap) {
   window.localStorage.setItem(`${MESSAGE_SEEN_STORAGE_KEY}:${userId}`, JSON.stringify(seenMap));
 }
 
+function seenTimestamp(value) {
+  const timestamp = new Date(value ?? Date.now()).getTime();
+  return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : Date.now();
+}
+
+function notificationSeenPatch(notification, timestampOverride) {
+  const timestamp = timestampOverride ?? seenTimestamp(notification?.createdAt);
+  const patch = {};
+
+  if (notification?.id) {
+    patch[notification.id] = timestamp;
+  }
+
+  if (notification?.offerId) {
+    patch[notification.offerId] = timestamp;
+    patch[`offer:${notification.offerId}`] = timestamp;
+    patch[`new-offer:${notification.offerId}`] = timestamp;
+  }
+
+  return patch;
+}
+
 function adminReportNotificationId(report) {
   return `admin-report:${report?.id ?? report?.contentId ?? "unknown"}`;
+}
+
+function formatCep(value) {
+  const digits = String(value ?? "").replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 5) {
+    return digits;
+  }
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
 }
 
 function latestIncomingMessageTimestamp(conversation, currentUserId) {
@@ -558,6 +600,8 @@ function FieldCounter({ value, max }) {
 }
 
 export default function App() {
+  const { t } = useContentText();
+  const { termsVersion } = useLegalContent();
   const initialResetState = useMemo(() => createResetStateFromLocation(), []);
   const initialSharedInterestId = useMemo(() => createInitialSharedInterestId(), []);
   const sharedInterestIdRef = useRef(initialSharedInterestId);
@@ -573,6 +617,7 @@ export default function App() {
   const sellerItemsSectionRef = useRef(null);
   const newInterestSectionRef = useRef(null);
   const [session, setSession] = useState(() => getStoredSession());
+  const [activeLegalPageSlug, setActiveLegalPageSlug] = useState(getActiveLegalPageSlug);
   const [dashboard, setDashboard] = useState(null);
   const [monetizationAccount, setMonetizationAccount] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -634,6 +679,10 @@ export default function App() {
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [selectedPurchaseProductCode, setSelectedPurchaseProductCode] = useState(null);
   const [feedbackModal, setFeedbackModal] = useState(null);
+  const [addressLookupState, setAddressLookupState] = useState({
+    register: { isLoading: false, message: "" },
+    interest: { isLoading: false, message: "" }
+  });
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [isNotificationModalVisible, setIsNotificationModalVisible] = useState(false);
@@ -696,7 +745,7 @@ export default function App() {
     [sentOffers, selectedInterest?.id]
   );
   const canSendOffer = Boolean(monetizationAccount?.subscriptionActive || (monetizationAccount?.sellerCredits ?? 0) > 0);
-  const noCreditsTooltip = "Você não possui créditos ativos para enviar ofertas.";
+  const noCreditsTooltip = t("offers.noCredits");
   const unreadAdminReportCount = useMemo(() => {
     if (!isAdmin || !currentUser?.id) {
       return 0;
@@ -711,6 +760,81 @@ export default function App() {
 
   function openFeedback(type, title, message) {
     setFeedbackModal({ type, title, message });
+  }
+
+  function updateAddressLookupState(scope, patch) {
+    setAddressLookupState((current) => ({
+      ...current,
+      [scope]: {
+        ...current[scope],
+        ...patch
+      }
+    }));
+  }
+
+  async function handlePostalCodeLookup(scope, postalCode, applyAddress) {
+    const normalizedPostalCode = String(postalCode ?? "").replace(/\D/g, "");
+    if (!normalizedPostalCode) {
+      updateAddressLookupState(scope, { isLoading: false, message: "" });
+      return;
+    }
+
+    if (normalizedPostalCode.length !== 8) {
+      updateAddressLookupState(scope, {
+        isLoading: false,
+        message: t("address.lookup.invalid")
+      });
+      return;
+    }
+
+    updateAddressLookupState(scope, {
+      isLoading: true,
+      message: t("address.lookup.loading")
+    });
+
+    try {
+      const address = await lookupAddressByPostalCode(normalizedPostalCode);
+      applyAddress(address);
+      updateAddressLookupState(scope, {
+        isLoading: false,
+        message: t("address.lookup.success")
+      });
+    } catch (requestError) {
+      updateAddressLookupState(scope, {
+        isLoading: false,
+        message: requestError.message || t("address.lookup.error")
+      });
+    }
+  }
+
+  function markNotificationsSeen(notificationList, { refresh = true, clear = false } = {}) {
+    if (!currentUser?.id) {
+      return;
+    }
+
+    const list = Array.isArray(notificationList) ? notificationList : [notificationList];
+    const patch = list.reduce((accumulator, notification) => ({
+      ...accumulator,
+      ...notificationSeenPatch(notification)
+    }), {});
+
+    if (Object.keys(patch).length === 0) {
+      return;
+    }
+
+    writeSeenMessages(currentUser.id, {
+      ...readSeenMessages(currentUser.id),
+      ...patch
+    });
+
+    if (clear) {
+      setNotifications([]);
+      setHasUnreadMessages(false);
+    }
+
+    if (refresh) {
+      setMessageSyncKey((current) => current + 1);
+    }
   }
 
   function markAdminReportsSeen() {
@@ -819,7 +943,7 @@ export default function App() {
   }
 
   function buildInterestShareText(interest) {
-    return `Olha esse interesse no Eu Procuro: ${interest.title} - ${buildInterestShareUrl(interest)}`;
+    return t("share.message", { title: interest.title, url: buildInterestShareUrl(interest) });
   }
 
   function buildWhatsAppShareUrl(interest) {
@@ -828,7 +952,7 @@ export default function App() {
 
   function buildXShareUrl(interest) {
     const url = new URL("https://twitter.com/intent/tweet");
-    url.searchParams.set("text", `Olha esse interesse no Eu Procuro: ${interest.title}`);
+    url.searchParams.set("text", t("share.xMessage", { title: interest.title }));
     url.searchParams.set("url", buildInterestShareUrl(interest));
     return url.toString();
   }
@@ -841,15 +965,15 @@ export default function App() {
       return;
     }
 
-    window.prompt("Copie o link do interesse:", url);
+    window.prompt(t("share.prompt"), url);
   }
 
   async function handleCopyInterestLink(interest) {
     try {
       await copyInterestLinkToClipboard(interest);
-      openFeedback("success", "Link copiado", "Agora você pode compartilhar esse interesse.");
+      openFeedback("success", t("share.feedback.success.title"), t("share.feedback.success.message"));
     } catch (error) {
-      window.prompt("Copie o link do interesse:", buildInterestShareUrl(interest));
+      window.prompt(t("share.prompt"), buildInterestShareUrl(interest));
     }
   }
 
@@ -858,15 +982,15 @@ export default function App() {
       return null;
     }
 
-    if (!["APPROVED", "OPEN"].includes(selectedInterest?.status)) {
+    if (!["APPROVED", "OPEN", "REPORTED"].includes(selectedInterest?.status)) {
       return null;
     }
 
     return (
       <div className="share-card">
         <div>
-          <span className="eyebrow">Compartilhar</span>
-          <strong>Envie este interesse para alguém</strong>
+          <span className="eyebrow">{t("share.eyebrow")}</span>
+          <strong>{t("share.title")}</strong>
         </div>
         <div className="share-card__actions">
           <a
@@ -874,7 +998,7 @@ export default function App() {
             href={buildWhatsAppShareUrl(interest)}
             target="_blank"
             rel="noreferrer"
-            aria-label="Compartilhar no WhatsApp"
+            aria-label={t("share.whatsapp")}
           >
             <WhatsAppIcon />
           </a>
@@ -883,7 +1007,7 @@ export default function App() {
             href={buildXShareUrl(interest)}
             target="_blank"
             rel="noreferrer"
-            aria-label="Compartilhar no X"
+            aria-label={t("share.x")}
           >
             <XIcon />
           </a>
@@ -893,7 +1017,7 @@ export default function App() {
             onClick={() => handleCopyInterestLink(interest)}
           >
             <LinkIcon />
-            Copiar link
+            {t("share.copy")}
           </button>
         </div>
       </div>
@@ -1159,10 +1283,10 @@ export default function App() {
   async function refreshCategories() {
     try {
       const loadedCategories = await fetchCategories();
-      setCategories(loadedCategories?.length ? loadedCategories : FALLBACK_CATEGORIES);
+      setCategories(loadedCategories?.length ? loadedCategories : fallbackCategories(t));
     } catch (requestError) {
-      setCategories(FALLBACK_CATEGORIES);
-      openFeedback("error", "Falha ao carregar categorias", requestError.message || "Tente novamente.");
+      setCategories(fallbackCategories(t));
+      openFeedback("error", t("categories.feedback.loadError.title"), requestError.message || t("errors.retry"));
     }
   }
 
@@ -1241,8 +1365,8 @@ export default function App() {
       if (envelope.payload?.status === "REJECTED") {
         openFeedback(
           "error",
-          "Anúncio recusado pela moderação",
-          envelope.payload?.reason || "Seu anúncio foi recusado. Você pode editar e enviar novamente para análise."
+          t("moderation.feedback.rejected.title"),
+          envelope.payload?.reason || t("moderation.feedback.rejected.message")
         );
       }
       return;
@@ -1293,6 +1417,16 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    function handleHashChange() {
+      setActiveLegalPageSlug(getActiveLegalPageSlug());
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  useEffect(() => {
     if (!SHOULD_RECOVER_SESSION_FROM_COOKIE) {
       setIsLoadingPrivate(false);
       return undefined;
@@ -1327,13 +1461,17 @@ export default function App() {
   }, [session]);
 
   useEffect(() => {
+    if (activeLegalPageSlug) {
+      return;
+    }
+
     refreshPublicData({
       query: deferredQuery,
       category: filters.category,
       city: filters.city,
       maxBudget: filters.maxBudget
     }).catch(() => {});
-  }, [deferredQuery, filters.category, filters.city, filters.maxBudget]);
+  }, [deferredQuery, filters.category, filters.city, filters.maxBudget, activeLegalPageSlug]);
 
   useEffect(() => {
     if (!sharedInterestIdRef.current) {
@@ -1670,8 +1808,8 @@ export default function App() {
           type: "interest-expiring",
           interestId: interest.id,
           section: loggedSections.MY_INTERESTS,
-          title: interest.title ?? "Anúncio perto de expirar",
-          message: `Seu anúncio expira em breve. ${formatRemainingListingTime(interest)}.`,
+          title: interest.title ?? t("listing.expirationNotification.title"),
+          message: t("listing.expirationNotification.message", { remaining: formatRemainingListingTime(interest, t) }),
           createdAt: expiresAt?.toISOString() ?? new Date().toISOString()
         };
       })
@@ -1769,16 +1907,16 @@ export default function App() {
       setLoginForm(initialLoginForm);
       closeAuthModal();
 
-      openFeedback("success", "Login realizado", "Você entrou com sucesso na plataforma.");
+      openFeedback("success", t("auth.feedback.login.success.title"), t("auth.feedback.login.success.message"));
     } catch (requestError) {
       clearSession();
       setSession(null);
 
-      const message = requestError.message || "Confira seu e-mail e senha.";
+      const message = requestError.message || t("auth.feedback.login.error.message");
       if (message.toLowerCase().includes("confirme seu e-mail")) {
         setLoginInlineError(message);
       } else {
-        openFeedback("error", "Não foi possível entrar", message);
+        openFeedback("error", t("auth.feedback.login.error.title"), message);
       }
     } finally {
       setIsSubmittingAuth(false);
@@ -1789,19 +1927,29 @@ export default function App() {
     event.preventDefault();
     setIsSubmittingAuth(true);
 
+    if (!registerForm.termsOpened || !registerForm.termsAccepted) {
+      openFeedback("error", t("auth.feedback.register.terms.title"), t("auth.feedback.register.terms.message"));
+      setIsSubmittingAuth(false);
+      return;
+    }
+
     try {
-      const response = await register(registerForm);
+      const response = await register({
+        ...registerForm,
+        termsAccepted: true,
+        termsVersion
+      });
       setRegisterForm(initialRegisterForm);
       setHomeMatchFilter(null);
       setLoginForm((current) => ({ ...current, email: registerForm.email, password: "" }));
       setAuthMode("login");
       openFeedback(
         "success",
-        "Confirme seu e-mail",
-        response?.message ?? "Sua conta foi criada. Confirme seu e-mail para entrar."
+        t("auth.feedback.register.success.title"),
+        response?.message ?? t("auth.feedback.register.success.message")
       );
     } catch (requestError) {
-      openFeedback("error", "Não foi possível criar a conta", requestError.message || "Revise os dados e tente novamente.");
+      openFeedback("error", t("auth.feedback.register.error.title"), requestError.message || t("auth.feedback.register.error.message"));
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -1815,9 +1963,9 @@ export default function App() {
       const response = await forgotPassword(forgotForm);
       setPasswordRecoveryPreview(response);
       setForgotForm(initialForgotForm);
-      openFeedback("success", "Solicitação enviada", response.message);
+      openFeedback("success", t("auth.feedback.forgot.success.title"), response.message);
     } catch (requestError) {
-      openFeedback("error", "Falha ao solicitar redefinição", requestError.message || "Tente novamente.");
+      openFeedback("error", t("auth.feedback.forgot.error.title"), requestError.message || t("errors.retry"));
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -1832,9 +1980,9 @@ export default function App() {
       window.history.replaceState({}, "", window.location.pathname);
       setResetForm({ token: "", newPassword: "", confirmPassword: "" });
       setAuthMode("login");
-      openFeedback("success", "Senha redefinida", "Agora você pode entrar com a nova senha.");
+      openFeedback("success", t("auth.feedback.reset.success.title"), t("auth.feedback.reset.success.message"));
     } catch (requestError) {
-      openFeedback("error", "Não foi possível redefinir", requestError.message || "Confira o token e tente novamente.");
+      openFeedback("error", t("auth.feedback.reset.error.title"), requestError.message || t("auth.feedback.reset.error.message"));
     } finally {
       setIsSubmittingAuth(false);
     }
@@ -1886,8 +2034,8 @@ export default function App() {
     if (hasLink(interestForm.description)) {
       openFeedback(
         "error",
-        "Link não permitido",
-        "Remova links da descrição do anúncio antes de enviar para moderação."
+        t("interest.feedback.linkNotAllowed.title"),
+        t("interest.feedback.linkNotAllowed.message")
       );
       return;
     }
@@ -1908,16 +2056,16 @@ export default function App() {
       navigateTo(loggedSections.MY_INTERESTS);
       openFeedback(
         "success",
-        editingInterestId ? "Alteração recebida" : "Interesse recebido",
+        editingInterestId ? t("interest.feedback.updateReceived.title") : t("interest.feedback.createReceived.title"),
         editingInterestId
-          ? "Vamos validar a alteração agora. Se houver recusa, você receberá um aviso para editar novamente."
-          : "Vamos validar o anúncio agora. Se houver recusa, você receberá um aviso para ajustar."
+          ? t("interest.feedback.updateReceived.message")
+          : t("interest.feedback.createReceived.message")
       );
     } catch (requestError) {
       openFeedback(
         "error",
-        editingInterestId ? "Não foi possível atualizar" : "Não foi possível publicar",
-        requestError.message || "Revise os dados e tente novamente."
+        editingInterestId ? t("interest.feedback.updateError.title") : t("interest.feedback.createError.title"),
+        requestError.message || t("auth.feedback.register.error.message")
       );
     } finally {
       setIsSubmittingInterest(false);
@@ -2009,6 +2157,9 @@ export default function App() {
               email: me.email,
               city: me.city,
               state: me.state,
+              postalCode: me.postalCode,
+              neighborhood: me.neighborhood,
+              country: me.country,
               sellerCredits: me.credits,
               credits: me.credits
             }
@@ -2046,10 +2197,10 @@ export default function App() {
       await reportInterest(reportModal.interest.id, reportModal.form);
       closeReportModal();
       await refreshPublicData();
-      openFeedback("success", "Denúncia enviada", "Obrigado. O conteúdo será analisado pela moderação.");
+      openFeedback("success", t("report.feedback.success.title"), t("report.feedback.success.message"));
     } catch (requestError) {
       setReportModal((current) => ({ ...current, isSubmitting: false }));
-      openFeedback("error", "Não foi possível denunciar", requestError.message || "Tente novamente.");
+      openFeedback("error", t("report.feedback.error.title"), requestError.message || t("errors.retry"));
     }
   }
 
@@ -2085,16 +2236,16 @@ export default function App() {
       });
       setModerationRuleForm(initialModerationRuleForm);
       await refreshAdminModerationData();
-      openFeedback("success", "Regra salva", "A regra de moderação foi atualizada.");
+      openFeedback("success", t("admin.moderation.rule.saved.title"), t("admin.moderation.rule.saved.message"));
     } catch (requestError) {
-      openFeedback("error", "Não foi possível salvar a regra", requestError.message || "Tente novamente.");
+      openFeedback("error", t("admin.moderation.rule.saveError.title"), requestError.message || t("errors.retry"));
     } finally {
       setIsSubmittingModerationRule(false);
     }
   }
 
   async function handleDeleteModerationRule(ruleId) {
-    if (!ruleId || !window.confirm("Deseja remover esta regra de moderação?")) {
+    if (!ruleId || !window.confirm(t("admin.moderation.rule.deleteConfirm"))) {
       return;
     }
 
@@ -2102,9 +2253,9 @@ export default function App() {
     try {
       await deleteModerationRule(ruleId);
       await refreshAdminModerationData();
-      openFeedback("success", "Regra removida", "A regra não será mais usada na moderação local.");
+      openFeedback("success", t("admin.moderation.rule.removed.title"), t("admin.moderation.rule.removed.message"));
     } catch (requestError) {
-      openFeedback("error", "Não foi possível remover", requestError.message || "Tente novamente.");
+      openFeedback("error", t("admin.moderation.rule.removeError.title"), requestError.message || t("errors.retry"));
     } finally {
       setIsModerationActionLoading(false);
     }
@@ -2119,7 +2270,7 @@ export default function App() {
     try {
       await decideInterestModeration(interestId, { status });
       await Promise.all([refreshAdminModerationData(), refreshPrivateData({ silent: true }), refreshPublicData()]);
-      openFeedback("success", "Decisão aplicada", `Anúncio marcado como ${moderationStatusLabel(status).toLowerCase()}.`);
+      openFeedback("success", t("admin.moderation.decisionApplied.title"), t("admin.moderation.decisionApplied.message", { status: moderationStatusLabel(status, t).toLowerCase() }));
     } catch (requestError) {
       openFeedback("error", "Não foi possível aplicar decisão", requestError.message || "Tente novamente.");
     } finally {
@@ -2360,7 +2511,9 @@ export default function App() {
         const seenMap = readSeenMessages(currentUser.id);
         writeSeenMessages(currentUser.id, {
           ...seenMap,
-          [offerId]: latestIncoming
+          [offerId]: latestIncoming,
+          [`offer:${offerId}`]: latestIncoming,
+          [`new-offer:${offerId}`]: latestIncoming
         });
         setMessageSyncKey((current) => current + 1);
       }
@@ -2419,24 +2572,9 @@ export default function App() {
 
   async function handleNotificationSelect(notification) {
     setIsNotificationModalVisible(false);
-    if (currentUser?.id && notification.id) {
-      const seenMap = readSeenMessages(currentUser.id);
-      writeSeenMessages(currentUser.id, {
-        ...seenMap,
-        [notification.id]: new Date(notification.createdAt ?? 0).getTime()
-      });
-      setMessageSyncKey((current) => current + 1);
-    }
+    markNotificationsSeen(notification);
 
     if (notification.type === "seller-item-match") {
-      if (currentUser?.id && notification.id) {
-        const seenMap = readSeenMessages(currentUser.id);
-        writeSeenMessages(currentUser.id, {
-          ...seenMap,
-          [notification.id]: new Date(notification.createdAt ?? 0).getTime()
-        });
-        setMessageSyncKey((current) => current + 1);
-      }
       if (notification.sellerItemId) {
         setSelectedSellerItemId(notification.sellerItemId);
       }
@@ -2516,47 +2654,39 @@ export default function App() {
       return;
     }
 
-    const seenMap = readSeenMessages(currentUser.id);
-    const nextSeenMap = notifications.reduce((accumulator, notification) => ({
-      ...accumulator,
-      [notification.id ?? notification.offerId]: new Date(notification.createdAt ?? 0).getTime()
-    }), seenMap);
-
-    writeSeenMessages(currentUser.id, nextSeenMap);
-    setNotifications([]);
-    setHasUnreadMessages(false);
-    setMessageSyncKey((current) => current + 1);
+    markNotificationsSeen(notifications, { clear: true });
   }
 
   function renderPublicHome(showHero = true) {
+    const canShowRestrictedInterestDetails = Boolean(session);
+
     return (
       <>
         {showHero ? (
           <section className="hero hero--public">
             <div className="hero__copy">
-              <h1>Encontre oportunidades publicadas e negocie direto com quem está procurando.</h1>
+              <h1>{t("home.hero.title")}</h1>
               <p>
-                A home mostra os interesses cadastrados na plataforma. Quem quiser publicar um novo
-                interesse ou responder com oferta pode entrar e seguir para a área correta.
+                {t("home.hero.description")}
               </p>
               <div className="hero__actions">
                 <button type="button" className="primary-button" onClick={() => openAuthModal("register")}>
-                  Quero cadastrar um interesse
+                  {t("home.hero.primary")}
                 </button>
                 <button type="button" className="ghost-button" onClick={() => openAuthModal("login")}>
-                  Entrar na conta
+                  {t("home.hero.secondary")}
                 </button>
               </div>
             </div>
 
             <div className="hero__aside">
               <div className="hero-card">
-                <strong>O que você encontra aqui</strong>
-                <p>Demandas reais de compra, filtros por categoria e uma forma clara de responder.</p>
+                <strong>{t("home.hero.card1.title")}</strong>
+                <p>{t("home.hero.card1.description")}</p>
               </div>
               <div className="hero-card">
-                <strong>Sem conta?</strong>
-                <p>Você pode explorar a home normalmente e criar sua conta apenas quando quiser agir.</p>
+                <strong>{t("home.hero.card2.title")}</strong>
+                <p>{t("home.hero.card2.description")}</p>
               </div>
             </div>
           </section>
@@ -2566,10 +2696,10 @@ export default function App() {
           <article className="panel panel--wide">
               <div className="panel__header">
                 <div>
-                  <span className="eyebrow">Home</span>
-                  <h2>Os usuários estão interessados em...</h2>
+                  <span className="eyebrow">{t("home.panel.eyebrow")}</span>
+                  <h2>{t("home.panel.title")}</h2>
                 </div>
-                <div className="panel__header-note">Use os filtros para buscar serviços, produtos ou regiões.</div>
+                <div className="panel__header-note">{t("home.panel.note")}</div>
               </div>
 
             <div className="filters">
@@ -2578,7 +2708,7 @@ export default function App() {
                 onChange={(event) =>
                   updateHomeFilters((current) => ({ ...current, query: event.target.value }))
                 }
-                placeholder="Buscar por produto, serviço ou palavra-chave"
+                placeholder={t("home.filters.query")}
               />
 
               <select
@@ -2587,7 +2717,7 @@ export default function App() {
                   updateHomeFilters((current) => ({ ...current, category: event.target.value }))
                 }
               >
-                <option value="">Todas as categorias</option>
+                <option value="">{t("home.filters.category.all")}</option>
                 {categories.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -2600,7 +2730,7 @@ export default function App() {
                 onChange={(event) =>
                   updateHomeFilters((current) => ({ ...current, city: event.target.value }))
                 }
-                placeholder="Cidade"
+                placeholder={t("home.filters.city")}
               />
 
               <input
@@ -2610,33 +2740,33 @@ export default function App() {
                 onChange={(event) =>
                   updateHomeFilters((current) => ({ ...current, maxBudget: event.target.value }))
                 }
-                placeholder="Orçamento máximo"
+                placeholder={t("home.filters.maxBudget")}
               />
             </div>
 
             {homeMatchFilter ? (
               <div className="context-filter-card">
                 <div>
-                  <span className="eyebrow">Filtro por item</span>
-                  <strong>Mostrando interesses parecidos com: {homeMatchFilter.sellerItemTitle}</strong>
+                  <span className="eyebrow">{t("home.itemFilter.eyebrow")}</span>
+                  <strong>{t("home.itemFilter.showing", { title: homeMatchFilter.sellerItemTitle })}</strong>
                 </div>
                 <button type="button" className="text-button" onClick={clearHomeMatchFilter}>
-                  Limpar filtro
+                  {t("home.itemFilter.clear")}
                 </button>
               </div>
             ) : null}
 
             {isLoadingPublic && !homeMatchFilter ? (
-              <div className="loading-card">Carregando interesses publicados...</div>
+              <div className="loading-card">{t("home.loading.published")}</div>
             ) : visibleHomeInterests.length === 0 ? (
               <EmptyState
-                title={homeMatchFilter ? "Nenhum interesse parecido encontrado" : (session ? "Nenhum interesse de outros usuários" : "Nada publicado ainda")}
+                title={homeMatchFilter ? t("home.empty.match.title") : (session ? t("home.empty.logged.title") : t("home.empty.public.title"))}
                 description={
                   homeMatchFilter
-                    ? "Quando aparecer um novo interesse parecido com esse item, ele ficará listado aqui."
+                    ? t("home.empty.match.description")
                     : session
-                    ? "Quando outros usuários publicarem interesses, eles aparecerão aqui."
-                    : "Quando os primeiros interesses forem cadastrados, eles aparecerão aqui."
+                    ? t("home.empty.logged.description")
+                    : t("home.empty.public.description")
                 }
               />
             ) : (
@@ -2658,7 +2788,7 @@ export default function App() {
                     disabled={isLoadingMorePublic}
                     onClick={handleLoadMoreInterests}
                   >
-                    {isLoadingMorePublic ? "Carregando..." : "Ver mais"}
+                    {isLoadingMorePublic ? t("common.actions.loading") : t("common.actions.loadMore")}
                   </button>
                 ) : null}
               </>
@@ -2670,22 +2800,26 @@ export default function App() {
               <div className="panel-title-stack">
                 <span className="eyebrow detail-owner-line">
                   {selectedInterest ? (
-                    <>
-                      <span>O usuário</span>
-                      <strong>{firstName(selectedInterest.ownerName)}</strong>
-                      <span>procura por um(a)</span>
-                    </>
-                  ) : "Selecione um interesse"}
+                    canShowRestrictedInterestDetails ? (
+                      <>
+                        <span>{t("interest.detail.owner.before")}</span>
+                        <strong>{firstName(selectedInterest.ownerName, t)}</strong>
+                        <span>{t("interest.detail.owner.after")}</span>
+                      </>
+                    ) : (
+                      <span>{t("interest.detail.publicEyebrow")}</span>
+                    )
+                  ) : t("interest.detail.select")}
                 </span>
                 <h2 className="title-with-badge">
-                  {selectedInterest?.title ?? "Selecione um interesse"}
+                  {selectedInterest?.title ?? t("interest.detail.select")}
                   {isBoostActive(selectedInterest) ? <BoostRocket /> : null}
                 </h2>
               </div>
             </div>
 
             {isLoadingInterestDetail ? (
-              <div className="loading-card">Carregando anúncio...</div>
+              <div className="loading-card">{t("interest.detail.loading")}</div>
             ) : selectedInterest ? (
               <>
                 {selectedInterest.referenceImageUrl ? (
@@ -2701,43 +2835,47 @@ export default function App() {
 
                 <div className="detail-block">
                   <div className="detail-row">
-                    <span>Categoria</span>
+                    <span>{t("interest.detail.category")}</span>
                     <strong>{selectedInterest.category}</strong>
                   </div>
                   <div className="detail-row">
-                    <span>Localidade</span>
+                    <span>{t("interest.detail.location")}</span>
                     <strong>
                       {selectedInterest.location?.city}/{selectedInterest.location?.state}
                     </strong>
                   </div>
-                  <div className="detail-row">
-                    <span>Faixa de valor</span>
-                    <strong>
-                      {currency(selectedInterest.budgetMin)} até {currency(selectedInterest.budgetMax)}
-                    </strong>
-                  </div>
-                  <div className="detail-row">
-                    <span>Publicado por</span>
-                    <strong>{selectedInterest.ownerName}</strong>
-                  </div>
+                  {canShowRestrictedInterestDetails ? (
+                    <>
+                      <div className="detail-row">
+                        <span>{t("interest.detail.priceRange")}</span>
+                        <strong>
+                          {t("interest.detail.priceRangeValue", { min: currency(selectedInterest.budgetMin, t), max: currency(selectedInterest.budgetMax, t) })}
+                        </strong>
+                      </div>
+                      <div className="detail-row">
+                        <span>{t("interest.detail.owner")}</span>
+                        <strong>{selectedInterest.ownerName}</strong>
+                      </div>
+                    </>
+                  ) : null}
                   {isSelectedInterestMine ? (
                     <div className="detail-row">
-                      <span>Status</span>
+                      <span>{t("interest.detail.status")}</span>
                       <strong className={`moderation-badge moderation-badge--${moderationStatusTone(selectedInterest.status)}`}>
-                        {moderationStatusLabel(selectedInterest.status)}
+                        {moderationStatusLabel(selectedInterest.status, t)}
                       </strong>
                     </div>
                   ) : null}
                   {isSelectedInterestMine ? (
                     <div className="detail-row">
-                      <span>Tempo restante</span>
+                      <span>{t("interest.detail.remaining")}</span>
                       <strong className={expiryPillClass(selectedInterest)}>
                         {isListingExpiringSoon(selectedInterest) ? "⚠ " : ""}
-                        {formatRemainingListingTime(selectedInterest)}
+                        {formatRemainingListingTime(selectedInterest, t)}
                       </strong>
                     </div>
                   ) : null}
-                  {selectedInterest.allowsWhatsappContact && selectedInterest.whatsappContact ? (
+                  {canShowRestrictedInterestDetails && selectedInterest.allowsWhatsappContact && selectedInterest.whatsappContact ? (
                     <div className="detail-row">
                       <span>WhatsApp</span>
                       <a
@@ -2765,7 +2903,7 @@ export default function App() {
                     className="report-button"
                     onClick={() => {
                       if (!session) {
-                        openFeedback("info", "Entre para denunciar", "Faça login para informar a moderação sobre este interesse.");
+                        openFeedback("info", t("interest.report.loginRequired.title"), t("interest.report.loginRequired.message"));
                         openAuthModal("login");
                         return;
                       }
@@ -2773,21 +2911,21 @@ export default function App() {
                     }}
                   >
                     <span aria-hidden="true">⚠</span>
-                    <span>Denunciar este interesse</span>
+                    <span>{t("interest.detail.report")}</span>
                   </button>
                 ) : null}
 
                 {session ? (
                   isSelectedInterestMine ? (
                     <div className="cta-card">
-                      <strong>Este interesse é seu</strong>
-                      <p>Use a página de interesses ativos para acompanhar respostas recebidas.</p>
+                      <strong>{t("interest.detail.own.title")}</strong>
+                      <p>{t("interest.detail.own.description")}</p>
                       <button
                         type="button"
                         className="primary-button"
                         onClick={() => navigateTo(loggedSections.MY_INTERESTS)}
                       >
-                        Ir para interesses ativos
+                        {t("interest.detail.own.cta")}
                       </button>
                     </div>
                   ) : sentOfferForSelectedInterest ? (
@@ -2795,13 +2933,13 @@ export default function App() {
                   ) : (
                     <form className="stacked-form" onSubmit={handleOfferSubmit}>
                       <div className="form-heading">
-                        <span className="eyebrow">Responder</span>
-                        <h3>Enviar oferta</h3>
+                        <span className="eyebrow">{t("offer.form.eyebrow")}</span>
+                        <h3>{t("offer.form.title")}</h3>
                       </div>
                       <input
                         type="number"
                         min="0"
-                        placeholder="Valor ofertado"
+                        placeholder={t("offer.form.price")}
                         value={offerForm.offeredPrice}
                         onChange={(event) =>
                           setOfferForm((current) => ({
@@ -2812,7 +2950,7 @@ export default function App() {
                         required
                       />
                       <input
-                        placeholder="Telefone ou WhatsApp"
+                        placeholder={t("offer.form.phone")}
                         value={offerForm.sellerPhone}
                         onChange={(event) =>
                           setOfferForm((current) => ({
@@ -2824,7 +2962,7 @@ export default function App() {
                       />
                       <textarea
                         rows="4"
-                        placeholder="Explique como sua oferta atende ao interesse"
+                        placeholder={t("offer.form.message")}
                         value={offerForm.message}
                         onChange={(event) =>
                           setOfferForm((current) => ({
@@ -2837,7 +2975,7 @@ export default function App() {
                       />
                       <FieldCounter value={offerForm.message} max={DESCRIPTION_MAX_LENGTH} />
                       <input
-                        placeholder="Destaques separados por vírgula"
+                        placeholder={t("offer.form.highlights")}
                         value={offerForm.highlights}
                         onChange={(event) =>
                           setOfferForm((current) => ({
@@ -2857,7 +2995,7 @@ export default function App() {
                             }))
                           }
                         />
-                        <span>Inclui entrega ou deslocamento</span>
+                        <span>{t("offer.form.delivery")}</span>
                       </label>
                       <button
                         type="submit"
@@ -2865,21 +3003,21 @@ export default function App() {
                         disabled={isSubmittingOffer || !canSendOffer}
                         title={!canSendOffer ? noCreditsTooltip : undefined}
                       >
-                        {isSubmittingOffer ? "Enviando..." : "Enviar oferta"}
+                        {isSubmittingOffer ? t("offer.form.submitting") : t("offer.form.submit")}
                       </button>
                       {!canSendOffer ? <p className="form-note">{noCreditsTooltip}</p> : null}
                     </form>
                   )
                 ) : (
                   <div className="cta-card">
-                    <strong>Gostou desta oportunidade?</strong>
-                    <p>Entre na plataforma para enviar uma oferta ou publicar seu próprio interesse.</p>
+                    <strong>{t("interest.detail.guest.title")}</strong>
+                    <p>{t("interest.detail.guest.description")}</p>
                     <div className="cta-card__actions">
                       <button type="button" className="primary-button" onClick={() => openAuthModal("login")}>
-                        Entrar
+                        {t("common.actions.login")}
                       </button>
                       <button type="button" className="ghost-button" onClick={() => openAuthModal("register")}>
-                        Criar conta
+                        {t("common.actions.createAccount")}
                       </button>
                     </div>
                   </div>
@@ -2887,8 +3025,8 @@ export default function App() {
               </>
             ) : (
               <EmptyState
-                title="Nada selecionado"
-                description="Escolha um interesse para ver mais detalhes."
+                title={t("interest.detail.empty.title")}
+                description={t("interest.detail.empty.description")}
               />
             )}
           </aside>
@@ -2933,7 +3071,7 @@ export default function App() {
                   {isBoostActive(interest) ? <BoostRocket /> : null}
                 </strong>
                 <span className={`moderation-badge moderation-badge--${moderationStatusTone(interest.status)}`}>
-                  {moderationStatusLabel(interest.status)}
+                  {moderationStatusLabel(interest.status, t)}
                 </span>
                 <span>{interest.location?.city ? `${interest.location.city}/${interest.location?.state}` : "Sem local informado"}</span>
               </div>
@@ -2947,11 +3085,11 @@ export default function App() {
           <div className="accordion-card__content">
             <p>{interest.description}</p>
             <div className="accordion-card__meta">
-              <span>{currency(interest.budgetMax)}</span>
+              <span>{currency(interest.budgetMax, t)}</span>
               <span>{interest.tags?.slice(0, 3).join(" • ") || "Sem tags"}</span>
               <span className={`${expiryPillClass(interest)} expiry-pill--inline`}>
                 {isListingExpiringSoon(interest) ? "⚠ " : ""}
-                {formatRemainingListingTime(interest)}
+                {formatRemainingListingTime(interest, t)}
               </span>
             </div>
           </div>
@@ -2965,10 +3103,10 @@ export default function App() {
     const resolvedImageUrl = offer.offerImageUrl ?? interestImageUrl ?? offer.referenceImageUrl ?? null;
     const isIncomingOffer = side === "right" || side === "received";
     const primaryLabel = isIncomingOffer ? offer.sellerName : offer.interestTitle;
-    const receivedSecondaryLabel = `${currency(offer.offeredPrice)} - ${offer.interestTitle ?? "Interesse"}`;
+    const receivedSecondaryLabel = t("offer.list.receivedSecondary", { price: currency(offer.offeredPrice, t), title: offer.interestTitle ?? t("offer.fallback.interest") });
     const secondaryLabel = isIncomingOffer
-      ? `${currency(offer.offeredPrice)} • ${formatTimestamp(offer.createdAt)}`
-      : `${currency(offer.offeredPrice)} • ${offer.sellerName ?? "Sem anunciante"}`;
+      ? t("offer.list.incomingSecondary", { price: currency(offer.offeredPrice, t), date: formatTimestamp(offer.createdAt, t) })
+      : t("offer.list.outgoingSecondary", { price: currency(offer.offeredPrice, t), seller: offer.sellerName ?? t("offer.fallback.seller") });
 
     return (
       <article key={offer.id} className="accordion-card">
@@ -3017,7 +3155,7 @@ export default function App() {
             <p>{offer.message || "Sem mensagem informada."}</p>
             <div className="accordion-card__meta">
               {isIncomingOffer ? <span>{offer.sellerEmail || "Sem e-mail"}</span> : <span>{offer.interestTitle}</span>}
-              <span>{offer.sellerPhone || formatTimestamp(offer.createdAt)}</span>
+              <span>{offer.sellerPhone || formatTimestamp(offer.createdAt, t)}</span>
             </div>
             {offer.highlights?.length ? (
               <div className="tag-cluster tag-cluster--compact">
@@ -3060,7 +3198,7 @@ export default function App() {
         <div className="sent-offer-summary__grid">
           <div>
             <span>Valor ofertado</span>
-            <strong>{currency(offer.offeredPrice)}</strong>
+            <strong>{currency(offer.offeredPrice, t)}</strong>
           </div>
           <div>
             <span>Contato informado</span>
@@ -3068,7 +3206,7 @@ export default function App() {
           </div>
           <div>
             <span>Enviada em</span>
-            <strong>{formatTimestamp(offer.createdAt)}</strong>
+            <strong>{formatTimestamp(offer.createdAt, t)}</strong>
           </div>
           <div>
             <span>Entrega/deslocamento</span>
@@ -3187,19 +3325,19 @@ export default function App() {
                 <article key={payment.id} className="payment-history__item">
                   <div>
                     <strong>{payment.productName ?? payment.productCode ?? "Compra de créditos"}</strong>
-                    <span>{formatTimestamp(payment.createdAt)}</span>
+                    <span>{formatTimestamp(payment.createdAt, t)}</span>
                   </div>
                   <div>
-                    <span>{paymentMethodLabel(payment.paymentMethod)}</span>
+                    <span>{paymentMethodLabel(payment.paymentMethod, t)}</span>
                     <small>
                       {payment.provider === "MERCADO_PAGO_CHECKOUT_PRO"
                         ? "Mercado Pago"
                         : payment.provider || "Mercado Pago"}
                     </small>
                   </div>
-                  <strong>{currency(payment.amount)}</strong>
+                  <strong>{currency(payment.amount, t)}</strong>
                   <span className={`payment-status-pill payment-status-pill--${tone}`}>
-                    {paymentStatusLabel(payment.status)}
+                    {paymentStatusLabel(payment.status, t)}
                   </span>
                 </article>
               );
@@ -3282,7 +3420,7 @@ export default function App() {
                         <strong>{product.name}</strong>
                         <small>{description}</small>
                       </span>
-                      <span className="purchase-option__price">{currency(product.price)}</span>
+                      <span className="purchase-option__price"><ProductPrice product={product} /></span>
                     </button>
                   );
                 })}
@@ -3294,7 +3432,7 @@ export default function App() {
               <h3>{selectedPurchaseProduct ? selectedPurchaseProduct.name : "Selecione uma opção"}</h3>
               <p>
                 {selectedPurchaseProduct
-                  ? `Total selecionado: ${currency(selectedPurchaseProduct.price)}`
+                  ? t("credits.purchase.total", { total: currency(selectedPurchaseProduct.price, t) })
                   : "Escolha um pacote ou plano para continuar."}
               </p>
               <div className="product-chip__actions product-chip__actions--payment">
@@ -3321,11 +3459,11 @@ export default function App() {
     return (
       <form className="stacked-form seller-item-form" onSubmit={handleSellerItemSubmit}>
         <div className="form-heading">
-          <span className="eyebrow">{editingSellerItemId ? "Editar item" : "Cadastrar item"}</span>
-          <h3>{editingSellerItemId ? "Atualize o item cadastrado" : "Algo que você aceitaria negociar"}</h3>
+          <span className="eyebrow">{editingSellerItemId ? t("sellerItem.form.editTitle") : t("sellerItem.form.createTitle")}</span>
+          <h3>{editingSellerItemId ? t("sellerItem.form.editSubtitle") : t("sellerItem.form.createSubtitle")}</h3>
         </div>
         <input
-          placeholder="Título do item ou serviço"
+          placeholder={t("sellerItem.form.title.placeholder")}
           value={sellerItemForm.title}
           onChange={(event) =>
             setSellerItemForm((current) => ({
@@ -3339,7 +3477,7 @@ export default function App() {
         <FieldCounter value={sellerItemForm.title} max={TITLE_MAX_LENGTH} />
         <textarea
           rows="4"
-          placeholder="Descreva o que você tem, estado de conservação ou detalhes do serviço"
+          placeholder={t("sellerItem.form.description.placeholder")}
           value={sellerItemForm.description}
           onChange={(event) =>
             setSellerItemForm((current) => ({
@@ -3366,7 +3504,7 @@ export default function App() {
           <input
             type="number"
             min="0"
-            placeholder="Valor que você analisaria"
+            placeholder={t("sellerItem.form.price.placeholder")}
             value={sellerItemForm.desiredPrice}
             onChange={(event) => setSellerItemForm((current) => ({ ...current, desiredPrice: event.target.value }))}
           />
@@ -3374,36 +3512,36 @@ export default function App() {
 
         <div className="three-columns">
           <input
-            placeholder="Cidade"
+            placeholder={t("auth.register.city.placeholder")}
             value={sellerItemForm.city}
             onChange={(event) => setSellerItemForm((current) => ({ ...current, city: event.target.value }))}
           />
           <input
-            placeholder="Estado"
+            placeholder={t("auth.register.state.placeholder")}
             value={sellerItemForm.state}
             onChange={(event) => setSellerItemForm((current) => ({ ...current, state: event.target.value }))}
           />
           <input
-            placeholder="Bairro"
+            placeholder={t("interest.form.neighborhood.placeholder")}
             value={sellerItemForm.neighborhood}
             onChange={(event) => setSellerItemForm((current) => ({ ...current, neighborhood: event.target.value }))}
           />
         </div>
 
         <input
-          placeholder="Tags separadas por vírgula"
+          placeholder={t("interest.form.tags.placeholder")}
           value={sellerItemForm.tags}
           onChange={(event) => setSellerItemForm((current) => ({ ...current, tags: event.target.value }))}
         />
 
         <div className="media-field">
-          <label htmlFor="seller-item-image">Foto do item</label>
+          <label htmlFor="seller-item-image">{t("sellerItem.form.image.label")}</label>
           <input id="seller-item-image" type="file" accept="image/*" onChange={handleSellerItemImageChange} />
           {sellerItemForm.referenceImageUrl ? (
             <img
               className="interest-upload-preview"
               src={sellerItemForm.referenceImageUrl}
-              alt="Prévia do item"
+              alt={t("sellerItem.form.image.previewAlt")}
               decoding="async"
             />
           ) : null}
@@ -3412,13 +3550,13 @@ export default function App() {
         <div className="form-actions">
           {editingSellerItemId ? (
             <button type="button" className="ghost-button" onClick={cancelSellerItemEditing}>
-              Cancelar edição
+              {t("interest.form.cancelEdit")}
             </button>
           ) : null}
           <button type="submit" className="primary-button" disabled={isSubmittingSellerItem}>
             {isSubmittingSellerItem
-              ? (editingSellerItemId ? "Salvando..." : "Cadastrando...")
-              : (editingSellerItemId ? "Salvar alterações" : "Cadastrar item")}
+              ? (editingSellerItemId ? t("common.actions.saving") : t("common.actions.registering"))
+              : (editingSellerItemId ? t("interest.form.saveChanges") : t("sellerItem.form.submit"))}
           </button>
         </div>
       </form>
@@ -3435,14 +3573,14 @@ export default function App() {
         <article className="panel">
           <div className="panel__header">
             <div>
-              <span className="eyebrow">Página</span>
-              <h2>Meus itens</h2>
+              <span className="eyebrow">{t("interest.form.eyebrow")}</span>
+              <h2>{t("dashboard.nav.sellerItems")}</h2>
             </div>
           </div>
 
           <div className="cta-card seller-item-create-card">
-            <strong>Cadastre itens que você aceitaria negociar</strong>
-            <p>Ao cadastrar um item, a plataforma mostra interesses parecidos de outros usuários.</p>
+            <strong>{t("sellerItem.createCard.title")}</strong>
+            <p>{t("sellerItem.createCard.description")}</p>
             <div className="cta-card__actions">
               <button
                 type="button"
@@ -3453,7 +3591,7 @@ export default function App() {
                   setIsSellerItemModalVisible(true);
                 }}
               >
-                Cadastrar item
+                {t("sellerItem.form.submit")}
               </button>
             </div>
           </div>
@@ -3514,7 +3652,7 @@ export default function App() {
               {selectedItem ? (
                 <div className="seller-item-summary">
                   <div className="seller-item-summary__content">
-                    <strong>{currency(selectedItem.desiredPrice)}</strong>
+                    <strong>{currency(selectedItem.desiredPrice, t)}</strong>
                     {!selectedItem.active ? <span className="seller-item-status-badge">Desativado</span> : null}
                     {selectedItem.description ? (
                       <p title={selectedItem.description}>{selectedItem.description}</p>
@@ -3596,7 +3734,7 @@ export default function App() {
                           {isBoostActive(interest) ? <BoostRocket /> : null}
                         </strong>
                         <p>{interest.description}</p>
-                        <span>{currency(interest.budgetMax)}</span>
+                        <span>{currency(interest.budgetMax, t)}</span>
                       </div>
                       <button
                         type="button"
@@ -3636,14 +3774,14 @@ export default function App() {
             >
               <div className="feedback-modal__header">
                 <div>
-                  <span className="eyebrow">Meus itens</span>
-                  <h2 id="seller-item-form-title">{editingSellerItemId ? "Editar item" : "Cadastrar item"}</h2>
+                  <span className="eyebrow">{t("dashboard.nav.sellerItems")}</span>
+                  <h2 id="seller-item-form-title">{editingSellerItemId ? t("sellerItem.form.editTitle") : t("sellerItem.form.createTitle")}</h2>
                 </div>
                 <button
                   type="button"
                   className="modal-close-button"
                   onClick={cancelSellerItemEditing}
-                  aria-label="Fechar modal"
+                  aria-label={t("common.actions.closeModal")}
                 >
                   X
                 </button>
@@ -3665,31 +3803,31 @@ export default function App() {
       <section className="admin-moderation panel panel--spaced">
         <div className="panel__header">
           <div>
-            <span className="eyebrow">Admin</span>
-            <h2>Moderação de conteúdo</h2>
+            <span className="eyebrow">{t("admin.nav")}</span>
+            <h2>{t("admin.moderation.title")}</h2>
           </div>
           <button
             type="button"
             className="ghost-button ghost-button--small"
             onClick={() => refreshAdminModerationData().catch((requestError) => {
-              openFeedback("error", "Não foi possível atualizar", requestError.message || "Tente novamente.");
+              openFeedback("error", t("admin.moderation.refreshError.title"), requestError.message || t("errors.retry"));
             })}
           >
-            Atualizar
+            {t("common.actions.update")}
           </button>
         </div>
 
         <article className="admin-card admin-card--priority">
           <div className="form-heading">
-            <span className="eyebrow">Fila manual</span>
-            <h3>{pendingInterests.length} anúncio(s) para revisar</h3>
+            <span className="eyebrow">{t("admin.moderation.queue")}</span>
+            <h3>{t("admin.moderation.queueCount", { count: pendingInterests.length })}</h3>
           </div>
           <div className="admin-list">
             {pendingInterests.length ? pendingInterests.map((interest) => (
               <article key={interest.id} className="admin-list-item admin-list-item--stacked">
                 <div>
                   <strong>{interest.title}</strong>
-                  <span>{moderationStatusLabel(interest.status)} · {interest.category}</span>
+                  <span>{moderationStatusLabel(interest.status, t)} · {interest.category}</span>
                   <p>{interest.description}</p>
                   {interest.moderation?.reason ? <small>{interest.moderation.reason}</small> : null}
                 </div>
@@ -3700,7 +3838,7 @@ export default function App() {
                     disabled={isModerationActionLoading}
                     onClick={() => handleModerationDecision(interest.id, "APPROVED")}
                   >
-                    Aprovar anúncio
+                    {t("admin.moderation.approve")}
                   </button>
                   <button
                     type="button"
@@ -3708,7 +3846,7 @@ export default function App() {
                     disabled={isModerationActionLoading}
                     onClick={() => handleModerationDecision(interest.id, "HIDDEN")}
                   >
-                    Ocultar anúncio
+                    {t("admin.moderation.hide")}
                   </button>
                   <button
                     type="button"
@@ -3716,12 +3854,12 @@ export default function App() {
                     disabled={isModerationActionLoading}
                     onClick={() => handleModerationDecision(interest.id, "REJECTED")}
                   >
-                    Recusar anúncio
+                    {t("admin.moderation.reject")}
                   </button>
                 </div>
               </article>
             )) : (
-              <EmptyState title="Fila vazia" description="Nada pendente de revisão manual agora." />
+              <EmptyState title={t("admin.moderation.empty.title")} description={t("admin.moderation.empty.description")} />
             )}
           </div>
         </article>
@@ -3729,12 +3867,12 @@ export default function App() {
         <div className="admin-grid">
           <article className="admin-card">
             <div className="form-heading">
-              <span className="eyebrow">Regras locais</span>
-              <h3>{moderationRuleForm.id ? "Editar regra" : "Nova regra"}</h3>
+              <span className="eyebrow">{t("admin.moderation.rules")}</span>
+              <h3>{moderationRuleForm.id ? t("admin.moderation.editRule") : t("admin.moderation.newRule")}</h3>
             </div>
             <form className="stacked-form" onSubmit={handleModerationRuleSubmit}>
               <input
-                placeholder="Palavra ou expressão"
+                placeholder={t("admin.moderation.rule.placeholder")}
                 value={moderationRuleForm.term}
                 onChange={(event) =>
                   setModerationRuleForm((current) => ({
@@ -3753,9 +3891,9 @@ export default function App() {
                     setModerationRuleForm((current) => ({ ...current, riskLevel: event.target.value }))
                   }
                 >
-                  <option value="HIGH">Alto risco</option>
-                  <option value="MEDIUM">Médio risco</option>
-                  <option value="LOW">Baixo risco</option>
+                  <option value="HIGH">{t("admin.moderation.rule.high")}</option>
+                  <option value="MEDIUM">{t("admin.moderation.rule.medium")}</option>
+                  <option value="LOW">{t("admin.moderation.rule.low")}</option>
                 </select>
                 <label className="checkbox-row">
                   <input
@@ -3765,17 +3903,17 @@ export default function App() {
                       setModerationRuleForm((current) => ({ ...current, active: event.target.checked }))
                     }
                   />
-                  <span>Regra ativa</span>
+                  <span>{t("admin.moderation.rule.active")}</span>
                 </label>
               </div>
               <div className="inline-actions">
                 {moderationRuleForm.id ? (
                   <button type="button" className="ghost-button ghost-button--small" onClick={() => setModerationRuleForm(initialModerationRuleForm)}>
-                    Cancelar
+                    {t("common.actions.cancel")}
                   </button>
                 ) : null}
                 <button type="submit" className="primary-button primary-button--compact" disabled={isSubmittingModerationRule}>
-                  {isSubmittingModerationRule ? "Salvando..." : "Salvar regra"}
+                  {isSubmittingModerationRule ? t("common.actions.saving") : t("admin.moderation.rule.save")}
                 </button>
               </div>
             </form>
@@ -3785,43 +3923,45 @@ export default function App() {
                 <article key={rule.id} className="admin-list-item">
                   <div>
                     <strong>{rule.term}</strong>
-                    <span>{rule.riskLevel} · {rule.active ? "ativa" : "inativa"}</span>
+                    <span>{rule.riskLevel} · {rule.active ? t("common.status.active") : t("common.status.inactive")}</span>
                   </div>
                   <div className="inline-actions">
                     <button type="button" className="ghost-button ghost-button--small" onClick={() => startEditingModerationRule(rule)}>
-                      Editar
+                      {t("common.actions.edit")}
                     </button>
                     <button type="button" className="danger-button action-button--compact" disabled={isModerationActionLoading} onClick={() => handleDeleteModerationRule(rule.id)}>
-                      Remover
+                      {t("common.actions.remove")}
                     </button>
                   </div>
                 </article>
               )) : (
-                <EmptyState title="Nenhuma regra cadastrada" description="Cadastre termos locais para bloqueio ou revisão manual." />
+                <EmptyState title={t("admin.moderation.rule.empty.title")} description={t("admin.moderation.rule.empty.description")} />
               )}
             </div>
           </article>
 
           <article className="admin-card">
             <div className="form-heading">
-              <span className="eyebrow">Denúncias</span>
-              <h3>{openReports.length} denúncia(s) abertas</h3>
+              <span className="eyebrow">{t("admin.moderation.reports")}</span>
+              <h3>{t("admin.moderation.reportsCount", { count: openReports.length })}</h3>
             </div>
             <div className="admin-list">
               {openReports.length ? openReports.map((report) => (
                 <article key={report.id} className="admin-list-item">
                   <div>
                     <strong>{report.reason}</strong>
-                    <span>Conteúdo: {report.contentId}</span>
+                    <span>{t("admin.moderation.reportsContent", { id: report.contentId })}</span>
                     {report.message ? <p>{report.message}</p> : null}
                   </div>
                 </article>
               )) : (
-                <EmptyState title="Nenhuma denúncia aberta" description="As denúncias dos usuários aparecerão aqui." />
+                <EmptyState title={t("admin.moderation.reports.empty.title")} description={t("admin.moderation.reports.empty.description")} />
               )}
             </div>
           </article>
         </div>
+        <ContentAdminPanel onFeedback={openFeedback} />
+        <OperationalCatalogAdminPanel onFeedback={openFeedback} />
       </section>
     );
   }
@@ -3830,19 +3970,19 @@ export default function App() {
     const statCards = [
       {
         key: loggedSections.MY_INTERESTS,
-        label: "Meus Interesses",
+        label: t("dashboard.stats.myInterests"),
         value: dashboard?.totalActiveInterests ?? "...",
         accent: loggedSection === loggedSections.MY_INTERESTS
       },
       {
         key: loggedSections.SENT_OFFERS,
-        label: "Ofertas Enviadas",
+        label: t("dashboard.stats.sentOffers"),
         value: dashboard?.totalOffersSent ?? "...",
         accent: loggedSection === loggedSections.SENT_OFFERS
       },
       {
         key: loggedSections.RECEIVED_OFFERS,
-        label: "Ofertas Recebidas",
+        label: t("dashboard.stats.receivedOffers"),
         value: dashboard?.totalOffersReceived ?? "...",
         accent: loggedSection === loggedSections.RECEIVED_OFFERS
       },
@@ -3871,49 +4011,49 @@ export default function App() {
             className={loggedSection === loggedSections.EXPLORE ? "active" : ""}
             onClick={() => navigateTo(loggedSections.EXPLORE)}
           >
-            Home
+            {t("header.nav.home")}
           </button>
           <button
               type="button"
               className={loggedSection === loggedSections.NEW_INTEREST ? "active" : ""}
               onClick={openNewInterestForm}
           >
-            Cadastrar interesse
+            {t("dashboard.nav.newInterest")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.MY_INTERESTS ? "active" : ""}
             onClick={() => navigateTo(loggedSections.MY_INTERESTS)}
           >
-            Meus Interesses
+            {t("dashboard.nav.myInterests")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.SENT_OFFERS ? "active" : ""}
             onClick={() => navigateTo(loggedSections.SENT_OFFERS)}
           >
-            Ofertas enviadas
+            {t("dashboard.nav.sentOffers")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.RECEIVED_OFFERS ? "active" : ""}
             onClick={() => navigateTo(loggedSections.RECEIVED_OFFERS)}
           >
-            Ofertas recebidas
+            {t("dashboard.nav.receivedOffers")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.SELLER_ITEMS ? "active" : ""}
             onClick={() => navigateTo(loggedSections.SELLER_ITEMS)}
           >
-            Meus itens
+            {t("dashboard.nav.sellerItems")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.CREDITS ? "active" : ""}
             onClick={() => navigateTo(loggedSections.CREDITS)}
           >
-            Comprar créditos
+            {t("dashboard.nav.credits")}
           </button>
           {isAdmin ? (
             <button
@@ -3924,7 +4064,7 @@ export default function App() {
                 navigateTo(loggedSections.ADMIN);
               }}
             >
-              <span>Moderação</span>
+              <span>{t("admin.moderation.nav")}</span>
               {unreadAdminReportCount > 0 ? (
                 <strong className="admin-nav-badge">{unreadAdminReportCount}</strong>
               ) : null}
@@ -3978,7 +4118,7 @@ export default function App() {
                   <p className="detail-description">{selectedInterest.description}</p>
                   {["PENDING", "REVIEW_REQUIRED", "REJECTED", "REPORTED"].includes(selectedInterest.status) ? (
                     <div className={`moderation-callout moderation-callout--${moderationStatusTone(selectedInterest.status)}`}>
-                      <strong>{moderationStatusLabel(selectedInterest.status)}</strong>
+                      <strong>{moderationStatusLabel(selectedInterest.status, t)}</strong>
                       <p>
                         {selectedInterest.status === "REJECTED"
                           ? "Seu anúncio foi rejeitado. Edite para enviar novamente para análise ou exclua se preferir."
@@ -3989,7 +4129,7 @@ export default function App() {
                   <div className="expiry-renewal-row">
                     <span className={`${expiryPillClass(selectedInterest)} expiry-pill--inline`}>
                       {isListingExpiringSoon(selectedInterest) ? "⚠ " : ""}
-                      {formatRemainingListingTime(selectedInterest)}
+                      {formatRemainingListingTime(selectedInterest, t)}
                     </span>
                     {isListingExpiringSoon(selectedInterest) ? (
                       <button
@@ -4036,7 +4176,7 @@ export default function App() {
                             <strong>Impulsionar interesse</strong>
                             <p>
                               {selectedInterest.boostedUntil
-                                  ? `Destaque ativo até ${formatTimestamp(selectedInterest.boostedUntil)}`
+                                  ? t("boost.activeUntil", { date: formatTimestamp(selectedInterest.boostedUntil, t) })
                                   : "Apareça com prioridade na busca e na home."}
                             </p>
                           </div>
@@ -4046,7 +4186,7 @@ export default function App() {
                                 <article key={product.code} className="product-chip product-chip--boost">
                                   <div>
                                     <strong>{product.name}</strong>
-                                    <span>{currency(product.price)}</span>
+                                    <ProductPrice product={product} />
                                   </div>
 
                                   <div className="product-chip__actions">
@@ -4158,14 +4298,14 @@ export default function App() {
             >
             <div className="feedback-modal__header">
               <div>
-                <span className="eyebrow">Página</span>
-                <h2 id="interest-form-title">{editingInterestId ? "Editar anúncio" : "Cadastrar interesse"}</h2>
+                <span className="eyebrow">{t("interest.form.eyebrow")}</span>
+                <h2 id="interest-form-title">{editingInterestId ? t("interest.form.editTitle") : t("interest.form.createTitle")}</h2>
               </div>
               <button
                 type="button"
                 className="modal-close-button"
                 onClick={cancelInterestEditing}
-                aria-label="Fechar modal"
+                aria-label={t("common.actions.closeModal")}
               >
                 X
               </button>
@@ -4173,18 +4313,18 @@ export default function App() {
 
             <form className="stacked-form" onSubmit={handleInterestSubmit}>
               <div className="expiry-note">
-                Este anúncio ficará ativo por até {LISTING_EXPIRATION_DAYS} dias e depois será removido automaticamente.
+                {t("interest.form.expiryNote", { count: LISTING_EXPIRATION_DAYS })}
               </div>
 
               {editingInterestId ? (
                 <div className="cta-card">
-                  <strong>Você está editando um anúncio</strong>
-                  <p>Ajuste os dados abaixo e salve para atualizar o anúncio publicado.</p>
+                  <strong>{t("interest.form.editing.title")}</strong>
+                  <p>{t("interest.form.editing.description")}</p>
                 </div>
               ) : null}
 
               <input
-                placeholder="Título do interesse"
+                placeholder={t("interest.form.title.placeholder")}
                 value={interestForm.title}
                 onChange={(event) =>
                   setInterestForm((current) => ({
@@ -4198,7 +4338,7 @@ export default function App() {
               <FieldCounter value={interestForm.title} max={TITLE_MAX_LENGTH} />
               <textarea
                 rows="4"
-                placeholder="Descreva o item ou serviço que você procura"
+                placeholder={t("interest.form.description.placeholder")}
                 value={interestForm.description}
                 onChange={(event) =>
                   setInterestForm((current) => ({
@@ -4211,7 +4351,7 @@ export default function App() {
               />
               <FieldCounter value={interestForm.description} max={DESCRIPTION_MAX_LENGTH} />
               {hasLink(interestForm.description) ? (
-                <p className="form-note form-note--compact">Links não são permitidos no anúncio.</p>
+                <p className="form-note form-note--compact">{t("interest.form.linksNotAllowed")}</p>
               ) : null}
 
               <div className="two-columns">
@@ -4228,7 +4368,7 @@ export default function App() {
                   ))}
                 </select>
                 <input
-                  placeholder="Tags separadas por vírgula"
+                  placeholder={t("interest.form.tags.placeholder")}
                   value={interestForm.tags}
                   onChange={(event) =>
                     setInterestForm((current) => ({ ...current, tags: event.target.value }))
@@ -4240,7 +4380,7 @@ export default function App() {
                 <input
                   type="number"
                   min="0"
-                  placeholder="Orçamento mínimo"
+                  placeholder={t("interest.form.budgetMin.placeholder")}
                   value={interestForm.budgetMin}
                   onChange={(event) =>
                     setInterestForm((current) => ({ ...current, budgetMin: event.target.value }))
@@ -4249,7 +4389,7 @@ export default function App() {
                 <input
                   type="number"
                   min="0"
-                  placeholder="Orçamento máximo"
+                  placeholder={t("interest.form.budgetMax.placeholder")}
                   value={interestForm.budgetMax}
                   onChange={(event) =>
                     setInterestForm((current) => ({ ...current, budgetMax: event.target.value }))
@@ -4259,7 +4399,7 @@ export default function App() {
                 <input
                   type="number"
                   min="0"
-                  placeholder="Raio em km"
+                  placeholder={t("interest.form.radius.placeholder")}
                   value={interestForm.desiredRadiusKm}
                   onChange={(event) =>
                     setInterestForm((current) => ({
@@ -4272,7 +4412,25 @@ export default function App() {
 
               <div className="three-columns">
                 <input
-                  placeholder="Cidade"
+                  placeholder={t("address.postalCode.placeholder")}
+                  value={interestForm.postalCode}
+                  onChange={(event) =>
+                    setInterestForm((current) => ({ ...current, postalCode: formatCep(event.target.value) }))
+                  }
+                  onBlur={() => handlePostalCodeLookup("interest", interestForm.postalCode, (address) => {
+                    setInterestForm((current) => ({
+                      ...current,
+                      postalCode: address.postalCode ?? current.postalCode,
+                      city: address.city ?? current.city,
+                      state: address.state ?? current.state,
+                      neighborhood: address.neighborhood ?? current.neighborhood,
+                      country: address.country ?? current.country
+                    }));
+                  })}
+                  inputMode="numeric"
+                />
+                <input
+                  placeholder={t("auth.register.city.placeholder")}
                   value={interestForm.city}
                   onChange={(event) =>
                     setInterestForm((current) => ({ ...current, city: event.target.value }))
@@ -4280,25 +4438,45 @@ export default function App() {
                   required
                 />
                 <input
-                  placeholder="Estado"
+                  placeholder={t("auth.register.state.placeholder")}
                   value={interestForm.state}
                   onChange={(event) =>
                     setInterestForm((current) => ({ ...current, state: event.target.value }))
                   }
                   required
                 />
+              </div>
+              {addressLookupState.interest.message ? (
+                <span
+                  className={`address-lookup-note ${addressLookupState.interest.isLoading ? "is-loading" : ""}`}
+                  role="status"
+                  aria-live="polite"
+                  aria-busy={addressLookupState.interest.isLoading}
+                >
+                  {addressLookupState.interest.message}
+                </span>
+              ) : null}
+
+              <div className="two-columns">
                 <input
-                  placeholder="Bairro"
+                  placeholder={t("interest.form.neighborhood.placeholder")}
                   value={interestForm.neighborhood}
                   onChange={(event) =>
                     setInterestForm((current) => ({ ...current, neighborhood: event.target.value }))
+                  }
+                />
+                <input
+                  placeholder={t("address.country.placeholder")}
+                  value={interestForm.country}
+                  onChange={(event) =>
+                    setInterestForm((current) => ({ ...current, country: event.target.value }))
                   }
                 />
               </div>
 
               <div className="two-columns">
                 <input
-                  placeholder="Condição desejada"
+                  placeholder={t("interest.form.condition.placeholder")}
                   value={interestForm.preferredCondition}
                   onChange={(event) =>
                     setInterestForm((current) => ({
@@ -4308,7 +4486,7 @@ export default function App() {
                   }
                 />
                 <input
-                  placeholder="Canal preferido de contato"
+                  placeholder={t("interest.form.contactMode.placeholder")}
                   value={interestForm.preferredContactMode}
                   onChange={(event) =>
                     setInterestForm((current) => ({
@@ -4320,32 +4498,19 @@ export default function App() {
               </div>
 
               <div className="media-field">
-                <label htmlFor="interest-image">Foto de referência</label>
+                <label htmlFor="interest-image">{t("interest.form.referenceImage.label")}</label>
                 <input id="interest-image" type="file" accept="image/*" onChange={handleInterestImageChange} />
                 {interestForm.referenceImageUrl ? (
                   <img
                     className="interest-upload-preview"
                     src={interestForm.referenceImageUrl}
-                    alt="Prévia do interesse"
+                    alt={t("interest.form.referenceImage.previewAlt")}
                     decoding="async"
                   />
                 ) : null}
               </div>
 
               <div className="two-columns">
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={interestForm.acceptsNationwideOffers}
-                    onChange={(event) =>
-                      setInterestForm((current) => ({
-                        ...current,
-                        acceptsNationwideOffers: event.target.checked
-                      }))
-                    }
-                  />
-                  <span>Aceita propostas de todo o Brasil</span>
-                </label>
                 <label className="checkbox-row">
                   <input
                     type="checkbox"
@@ -4358,13 +4523,13 @@ export default function App() {
                       }))
                     }
                   />
-                  <span>Permitir contato via WhatsApp</span>
+                  <span>{t("interest.form.whatsappAllowed")}</span>
                 </label>
               </div>
 
               {interestForm.allowsWhatsappContact ? (
                 <input
-                  placeholder="WhatsApp para contato"
+                  placeholder={t("interest.form.whatsapp.placeholder")}
                   value={interestForm.whatsappContact}
                   onChange={(event) =>
                     setInterestForm((current) => ({ ...current, whatsappContact: event.target.value }))
@@ -4373,32 +4538,16 @@ export default function App() {
                 />
               ) : null}
 
-              <div className="two-columns">
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={interestForm.boostEnabled}
-                    onChange={(event) =>
-                      setInterestForm((current) => ({
-                        ...current,
-                        boostEnabled: event.target.checked
-                      }))
-                    }
-                  />
-                  <span>Destacar interesse</span>
-                </label>
-              </div>
-
               <div className="form-actions">
                 {editingInterestId ? (
                   <button type="button" className="ghost-button" onClick={cancelInterestEditing}>
-                    Cancelar edição
+                    {t("interest.form.cancelEdit")}
                   </button>
                 ) : null}
                 <button type="submit" className="primary-button" disabled={isSubmittingInterest}>
                   {isSubmittingInterest
-                    ? (editingInterestId ? "Salvando..." : "Publicando...")
-                    : (editingInterestId ? "Salvar alterações" : "Publicar interesse")}
+                    ? (editingInterestId ? t("common.actions.saving") : t("interest.form.publishing"))
+                    : (editingInterestId ? t("interest.form.saveChanges") : t("interest.form.publish"))}
                 </button>
               </div>
             </form>
@@ -4406,6 +4555,27 @@ export default function App() {
           </div>
         ) : null}
       </>
+    );
+  }
+
+  if (activeLegalPageSlug) {
+    return (
+      <div className="app-shell">
+        <div className="background-grid" />
+
+        <main className="page">
+          <Header
+            isLoggedIn={false}
+            hideActions
+            onNavigate={() => {
+              window.location.hash = "";
+            }}
+          />
+          <LegalPage slug={activeLegalPageSlug} />
+        </main>
+
+        <Footer />
+      </div>
     );
   }
 
@@ -4438,7 +4608,7 @@ export default function App() {
         />
 
         {isLoadingPrivate && session ? (
-          <section className="loading-card loading-card--full">Carregando sua área logada...</section>
+          <section className="loading-card loading-card--full">{t("dashboard.loadingPrivate")}</section>
         ) : null}
 
         {!session ? renderPublicHome(true) : renderLoggedArea()}
@@ -4450,6 +4620,7 @@ export default function App() {
         isSubmitting={isSubmittingAuth}
         loginForm={loginForm}
         registerForm={registerForm}
+        registerAddressLookup={addressLookupState.register}
         forgotForm={forgotForm}
         resetForm={resetForm}
         loginInlineError={loginInlineError}
@@ -4465,6 +4636,16 @@ export default function App() {
         onResetChange={setResetForm}
         onLoginSubmit={handleLoginSubmit}
         onRegisterSubmit={handleRegisterSubmit}
+        onRegisterPostalCodeLookup={(postalCode) => handlePostalCodeLookup("register", postalCode, (address) => {
+          setRegisterForm((current) => ({
+            ...current,
+            postalCode: address.postalCode ?? current.postalCode,
+            city: address.city ?? current.city,
+            state: address.state ?? current.state,
+            neighborhood: address.neighborhood ?? current.neighborhood,
+            country: address.country ?? current.country
+          }));
+        })}
         onForgotSubmit={handleForgotPasswordSubmit}
         onResetSubmit={handleResetPasswordSubmit}
       />
@@ -4556,9 +4737,7 @@ export default function App() {
 
       <FeedbackModal modal={feedbackModal} onClose={() => setFeedbackModal(null)} />
 
-      <footer className="app-footer">
-        <small>Todos os direitos reservados para Eu Procuro Corp.</small>
-      </footer>
+      <Footer />
     </div>
   );
 }

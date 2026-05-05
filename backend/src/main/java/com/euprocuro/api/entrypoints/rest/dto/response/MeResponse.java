@@ -9,7 +9,10 @@ public class MeResponse {
     private String id;
     private String name;
     private String email;
+    private String postalCode;
     private String city;
     private String state;
+    private String neighborhood;
+    private String country;
     private Integer credits;
 }

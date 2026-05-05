@@ -3,7 +3,6 @@ package com.euprocuro.api.application.command;
 import java.math.BigDecimal;
 import java.util.List;
 
-import com.euprocuro.api.domain.model.InterestCategory;
 
 import lombok.Builder;
 import lombok.Value;
@@ -14,7 +13,7 @@ public class UpdateSellerItemCommand {
     String title;
     String description;
     String referenceImageUrl;
-    InterestCategory category;
+    String category;
     BigDecimal desiredPrice;
     String city;
     String state;

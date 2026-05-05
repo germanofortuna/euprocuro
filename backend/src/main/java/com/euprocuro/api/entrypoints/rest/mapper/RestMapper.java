@@ -9,6 +9,8 @@ import com.euprocuro.api.application.command.CreateInterestCommand;
 import com.euprocuro.api.application.command.CreateOfferCommand;
 import com.euprocuro.api.application.command.CreateSellerItemCommand;
 import com.euprocuro.api.application.command.BoostInterestCommand;
+import com.euprocuro.api.application.command.CatalogCategoryCommand;
+import com.euprocuro.api.application.command.CatalogProductCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.ModerationDecisionCommand;
@@ -16,16 +18,24 @@ import com.euprocuro.api.application.command.PurchaseProductCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ReportInterestCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
+import com.euprocuro.api.application.command.SaveContentEntryCommand;
 import com.euprocuro.api.application.command.SaveModerationRuleCommand;
+import com.euprocuro.api.application.command.SaveOperationalCatalogCommand;
 import com.euprocuro.api.application.command.SendConversationMessageCommand;
 import com.euprocuro.api.application.command.ShareSellerItemCommand;
 import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.command.UpdateSellerItemCommand;
 import com.euprocuro.api.application.view.AdminModerationView;
+import com.euprocuro.api.application.view.AdminOperationalCatalogView;
+import com.euprocuro.api.application.view.AddressLookupView;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
+import com.euprocuro.api.application.view.CatalogCategoryView;
 import com.euprocuro.api.application.view.CheckoutView;
 import com.euprocuro.api.application.view.ConversationMessageView;
+import com.euprocuro.api.application.view.AdminContentCatalogView;
+import com.euprocuro.api.application.view.ContentEntryView;
 import com.euprocuro.api.application.view.ContentReportView;
+import com.euprocuro.api.application.view.ContentRevisionView;
 import com.euprocuro.api.application.view.DashboardOfferView;
 import com.euprocuro.api.application.view.MonetizationAccountView;
 import com.euprocuro.api.application.view.MonetizationProductView;
@@ -34,9 +44,9 @@ import com.euprocuro.api.application.view.OfferConversationView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.PaymentOrderView;
 import com.euprocuro.api.application.view.PersonalDashboardView;
+import com.euprocuro.api.application.view.PublicContentCatalogView;
 import com.euprocuro.api.application.view.RegistrationView;
 import com.euprocuro.api.application.view.SellerItemMatchesView;
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestModeration;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.LocationInfo;
@@ -55,7 +65,9 @@ import com.euprocuro.api.entrypoints.rest.dto.request.PurchaseProductRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.RegisterRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ReportInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ResetPasswordRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.SaveContentEntryRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.SaveModerationRuleRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.SaveOperationalCatalogRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.SendConversationMessageRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ShareSellerItemRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.UpdateInterestRequest;
@@ -73,9 +85,14 @@ public final class RestMapper {
                 .email(request.getEmail())
                 .documentNumber(request.getDocumentNumber())
                 .password(request.getPassword())
+                .postalCode(request.getPostalCode())
                 .city(request.getCity())
                 .state(request.getState())
+                .neighborhood(request.getNeighborhood())
+                .country(request.getCountry())
                 .ipAddress(clientIp)
+                .termsAccepted(request.isTermsAccepted())
+                .termsVersion(request.getTermsVersion())
                 .build();
     }
 
@@ -135,6 +152,51 @@ public final class RestMapper {
                 .build();
     }
 
+    public static SaveContentEntryCommand toCommand(SaveContentEntryRequest request) {
+        return SaveContentEntryCommand.builder()
+                .key(request.getKey())
+                .type(request.getType())
+                .locale(request.getLocale())
+                .draftValue(request.getDraftValue())
+                .description(request.getDescription())
+                .screen(request.getScreen())
+                .legalSlug(request.getLegalSlug())
+                .requiresUserAcceptance(request.isRequiresUserAcceptance())
+                .effectiveFrom(request.getEffectiveFrom())
+                .build();
+    }
+
+    public static SaveOperationalCatalogCommand toCommand(SaveOperationalCatalogRequest request) {
+        return SaveOperationalCatalogCommand.builder()
+                .categories(Optional.ofNullable(request.getCategories()).orElse(List.of())
+                        .stream()
+                        .map(category -> CatalogCategoryCommand.builder()
+                                .code(category.getCode())
+                                .label(category.getLabel())
+                                .active(category.isActive())
+                                .sortOrder(category.getSortOrder())
+                                .build())
+                        .collect(Collectors.toList()))
+                .products(Optional.ofNullable(request.getProducts()).orElse(List.of())
+                        .stream()
+                        .map(product -> CatalogProductCommand.builder()
+                                .code(product.getCode())
+                                .name(product.getName())
+                                .description(product.getDescription())
+                                .type(product.getType())
+                                .price(product.getPrice())
+                                .originalPrice(product.getOriginalPrice())
+                                .promotional(product.isPromotional())
+                                .promotionLabel(product.getPromotionLabel())
+                                .credits(product.getCredits())
+                                .durationDays(product.getDurationDays())
+                                .enabled(product.isEnabled())
+                                .sortOrder(product.getSortOrder())
+                                .build())
+                        .collect(Collectors.toList()))
+                .build();
+    }
+
     public static ModerationDecisionCommand toCommand(ModerationDecisionRequest request) {
         return ModerationDecisionCommand.builder()
                 .status(request.getStatus())
@@ -150,14 +212,14 @@ public final class RestMapper {
                 .category(request.getCategory())
                 .budgetMin(request.getBudgetMin())
                 .budgetMax(request.getBudgetMax())
+                .postalCode(request.getPostalCode())
                 .city(request.getCity())
                 .state(request.getState())
                 .neighborhood(request.getNeighborhood())
+                .country(request.getCountry())
                 .desiredRadiusKm(request.getDesiredRadiusKm())
-                .acceptsNationwideOffers(request.isAcceptsNationwideOffers())
                 .allowsWhatsappContact(request.isAllowsWhatsappContact())
                 .whatsappContact(request.getWhatsappContact())
-                .boostEnabled(request.isBoostEnabled())
                 .preferredCondition(request.getPreferredCondition())
                 .preferredContactMode(request.getPreferredContactMode())
                 .tags(request.getTags())
@@ -172,14 +234,14 @@ public final class RestMapper {
                 .category(request.getCategory())
                 .budgetMin(request.getBudgetMin())
                 .budgetMax(request.getBudgetMax())
+                .postalCode(request.getPostalCode())
                 .city(request.getCity())
                 .state(request.getState())
                 .neighborhood(request.getNeighborhood())
+                .country(request.getCountry())
                 .desiredRadiusKm(request.getDesiredRadiusKm())
-                .acceptsNationwideOffers(request.isAcceptsNationwideOffers())
                 .allowsWhatsappContact(request.isAllowsWhatsappContact())
                 .whatsappContact(request.getWhatsappContact())
-                .boostEnabled(request.isBoostEnabled())
                 .preferredCondition(request.getPreferredCondition())
                 .preferredContactMode(request.getPreferredContactMode())
                 .tags(request.getTags())
@@ -261,8 +323,11 @@ public final class RestMapper {
                 .id(session.getUser().getId())
                 .name(session.getUser().getName())
                 .email(session.getUser().getEmail())
+                .postalCode(session.getUser().getPostalCode())
                 .city(session.getUser().getCity())
                 .state(session.getUser().getState())
+                .neighborhood(session.getUser().getNeighborhood())
+                .country(session.getUser().getCountry())
                 .credits(session.getUser().getSellerCredits())
                 .build();
     }
@@ -272,8 +337,11 @@ public final class RestMapper {
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .postalCode(user.getPostalCode())
                 .city(user.getCity())
                 .state(user.getState())
+                .neighborhood(user.getNeighborhood())
+                .country(user.getCountry())
                 .credits(user.getSellerCredits())
                 .build();
     }
@@ -329,8 +397,13 @@ public final class RestMapper {
                 .description(view.getDescription())
                 .type(view.getType())
                 .price(view.getPrice())
+                .originalPrice(view.getOriginalPrice())
+                .promotional(view.isPromotional())
+                .promotionLabel(view.getPromotionLabel())
                 .credits(view.getCredits())
                 .durationDays(view.getDurationDays())
+                .enabled(view.isEnabled())
+                .sortOrder(view.getSortOrder())
                 .build();
     }
 
@@ -339,8 +412,11 @@ public final class RestMapper {
                 .id(domain.getId())
                 .name(domain.getName())
                 .email(domain.getEmail())
+                .postalCode(domain.getPostalCode())
                 .city(domain.getCity())
                 .state(domain.getState())
+                .neighborhood(domain.getNeighborhood())
+                .country(domain.getCountry())
                 .emailVerified(domain.isEmailVerified())
                 .buyerRating(domain.getBuyerRating())
                 .sellerRating(domain.getSellerRating())
@@ -351,24 +427,40 @@ public final class RestMapper {
                 .build();
     }
 
+    public static AdminOperationalCatalogResponse toResponse(AdminOperationalCatalogView view) {
+        return AdminOperationalCatalogResponse.builder()
+                .categories(Optional.ofNullable(view.getCategories()).orElse(List.of())
+                        .stream()
+                        .map(RestMapper::toResponse)
+                        .collect(Collectors.toList()))
+                .products(Optional.ofNullable(view.getProducts()).orElse(List.of())
+                        .stream()
+                        .map(RestMapper::toResponse)
+                        .collect(Collectors.toList()))
+                .updatedAt(view.getUpdatedAt())
+                .build();
+    }
+
     public static InterestResponse toResponse(InterestPost domain) {
+        return toResponse(domain, true);
+    }
+
+    public static InterestResponse toResponse(InterestPost domain, boolean exposeRestrictedDetails) {
         return InterestResponse.builder()
                 .id(domain.getId())
-                .ownerId(domain.getOwnerId())
-                .ownerName(domain.getOwnerName())
+                .ownerId(exposeRestrictedDetails ? domain.getOwnerId() : null)
+                .ownerName(exposeRestrictedDetails ? domain.getOwnerName() : null)
                 .title(domain.getTitle())
                 .description(domain.getDescription())
                 .referenceImageUrl(domain.getReferenceImageUrl())
                 .category(domain.getCategory())
-                .budgetMin(domain.getBudgetMin())
-                .budgetMax(domain.getBudgetMax())
+                .budgetMin(exposeRestrictedDetails ? domain.getBudgetMin() : null)
+                .budgetMax(exposeRestrictedDetails ? domain.getBudgetMax() : null)
                 .location(toResponse(domain.getLocation()))
                 .tags(Optional.ofNullable(domain.getTags()).orElse(List.of()))
                 .desiredRadiusKm(domain.getDesiredRadiusKm())
-                .acceptsNationwideOffers(domain.isAcceptsNationwideOffers())
-                .allowsWhatsappContact(domain.isAllowsWhatsappContact())
-                .whatsappContact(domain.isAllowsWhatsappContact() ? domain.getWhatsappContact() : null)
-                .boostEnabled(domain.isBoostEnabled())
+                .allowsWhatsappContact(exposeRestrictedDetails && domain.isAllowsWhatsappContact())
+                .whatsappContact(exposeRestrictedDetails && domain.isAllowsWhatsappContact() ? domain.getWhatsappContact() : null)
                 .boostedUntil(domain.getBoostedUntil())
                 .preferredCondition(domain.getPreferredCondition())
                 .preferredContactMode(domain.getPreferredContactMode())
@@ -417,6 +509,77 @@ public final class RestMapper {
                 .active(view.isActive())
                 .createdAt(view.getCreatedAt())
                 .updatedAt(view.getUpdatedAt())
+                .build();
+    }
+
+    public static PublicContentCatalogResponse toResponse(PublicContentCatalogView view) {
+        return PublicContentCatalogResponse.builder()
+                .locale(view.getLocale())
+                .version(view.getVersion())
+                .entries(Optional.ofNullable(view.getEntries()).orElse(List.of())
+                        .stream()
+                        .collect(Collectors.toMap(
+                                ContentEntryView::getKey,
+                                RestMapper::toPublicResponse,
+                                (left, right) -> right,
+                                java.util.LinkedHashMap::new
+                        )))
+                .build();
+    }
+
+    public static AdminContentCatalogResponse toResponse(AdminContentCatalogView view) {
+        return AdminContentCatalogResponse.builder()
+                .entries(Optional.ofNullable(view.getEntries()).orElse(List.of())
+                        .stream()
+                        .map(RestMapper::toResponse)
+                        .collect(Collectors.toList()))
+                .build();
+    }
+
+    public static ContentEntryResponse toResponse(ContentEntryView view) {
+        return ContentEntryResponse.builder()
+                .id(view.getId())
+                .key(view.getKey())
+                .type(view.getType())
+                .locale(view.getLocale())
+                .status(view.getStatus())
+                .version(view.getVersion())
+                .draftValue(view.getDraftValue())
+                .publishedValue(view.getPublishedValue())
+                .description(view.getDescription())
+                .screen(view.getScreen())
+                .legalSlug(view.getLegalSlug())
+                .requiresUserAcceptance(view.isRequiresUserAcceptance())
+                .effectiveFrom(view.getEffectiveFrom())
+                .createdAt(view.getCreatedAt())
+                .updatedAt(view.getUpdatedAt())
+                .publishedAt(view.getPublishedAt())
+                .build();
+    }
+
+    public static ContentRevisionResponse toResponse(ContentRevisionView view) {
+        return ContentRevisionResponse.builder()
+                .id(view.getId())
+                .contentEntryId(view.getContentEntryId())
+                .key(view.getKey())
+                .locale(view.getLocale())
+                .version(view.getVersion())
+                .snapshotValue(view.getSnapshotValue())
+                .publishedAt(view.getPublishedAt())
+                .build();
+    }
+
+    private static PublicContentEntryResponse toPublicResponse(ContentEntryView view) {
+        return PublicContentEntryResponse.builder()
+                .key(view.getKey())
+                .type(view.getType())
+                .locale(view.getLocale())
+                .version(view.getVersion())
+                .value(view.getPublicValue())
+                .legalSlug(view.getLegalSlug())
+                .requiresUserAcceptance(view.isRequiresUserAcceptance())
+                .effectiveFrom(view.getEffectiveFrom())
+                .publishedAt(view.getPublishedAt())
                 .build();
     }
 
@@ -563,10 +726,12 @@ public final class RestMapper {
                 .build();
     }
 
-    public static CategoryOptionResponse toResponse(InterestCategory category) {
+    public static CategoryOptionResponse toResponse(CatalogCategoryView category) {
         return CategoryOptionResponse.builder()
-                .value(category.name())
+                .value(category.getCode())
                 .label(category.getLabel())
+                .active(category.isActive())
+                .sortOrder(category.getSortOrder())
                 .build();
     }
 
@@ -576,10 +741,22 @@ public final class RestMapper {
         }
 
         return LocationResponse.builder()
+                .postalCode(location.getPostalCode())
                 .city(location.getCity())
                 .state(location.getState())
                 .neighborhood(location.getNeighborhood())
+                .country(location.getCountry())
                 .remote(location.isRemote())
+                .build();
+    }
+
+    public static AddressLookupResponse toResponse(AddressLookupView view) {
+        return AddressLookupResponse.builder()
+                .postalCode(view.getPostalCode())
+                .city(view.getCity())
+                .state(view.getState())
+                .neighborhood(view.getNeighborhood())
+                .country(view.getCountry())
                 .build();
     }
 }

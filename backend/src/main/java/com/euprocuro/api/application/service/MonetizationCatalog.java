@@ -6,7 +6,6 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 import com.euprocuro.api.application.view.MonetizationProductView;
-import com.euprocuro.api.shared.config.MonetizationCatalogProperties;
 
 import lombok.RequiredArgsConstructor;
 
@@ -14,10 +13,10 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 class MonetizationCatalog {
 
-    private final MonetizationCatalogProperties properties;
+    private final OperationalCatalogService operationalCatalogService;
 
     List<MonetizationProductView> products() {
-        return properties.toProducts();
+        return operationalCatalogService.listActiveProducts();
     }
 
     Optional<MonetizationProductView> findByCode(String code) {

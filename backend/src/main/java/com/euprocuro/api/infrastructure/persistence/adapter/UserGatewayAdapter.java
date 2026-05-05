@@ -51,4 +51,9 @@ public class UserGatewayAdapter implements UserGateway {
     public long count() {
         return repository.count();
     }
+
+    @Override
+    public void deleteById(String id) {
+        repository.deleteById(id);
+    }
 }

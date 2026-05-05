@@ -130,7 +130,6 @@ public class InterestGatewayAdapter implements InterestGateway {
     private Criteria activeBoostCriteria(InterestSearchCriteria criteria, Instant now) {
         return new Criteria().andOperator(
                 baseCriteria(criteria, now),
-                Criteria.where("boostEnabled").is(true),
                 Criteria.where("boostedUntil").gt(now)
         );
     }
@@ -139,7 +138,6 @@ public class InterestGatewayAdapter implements InterestGateway {
         return new Criteria().andOperator(
                 baseCriteria(criteria, now),
                 new Criteria().orOperator(
-                        Criteria.where("boostEnabled").is(false),
                         Criteria.where("boostedUntil").exists(false),
                         Criteria.where("boostedUntil").is(null),
                         Criteria.where("boostedUntil").lte(now)

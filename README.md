@@ -39,7 +39,8 @@ O backend segue uma separacao clara entre camadas:
   - cadastro de novo interesse
 - Publicacao de interesses com imagem de referencia
 - Busca publica por texto, categoria, cidade e teto de orcamento
-- Monetizacao MVP com creditos para vendedores, plano Pro e boost de interesses
+- Monetizacao MVP com creditos para vendedores, plano Pro e boost pago de interesses apos a publicacao
+- CRM administrativo para textos, politicas legais, categorias, precos, planos e promocoes em runtime
 - Checkout local simulado e Checkout Pro Mercado Pago com confirmacao por webhook
 - E-mails transacionais para reset de senha, nova oferta, mensagem, compra e boost
 - Modais de feedback para mensagens de sucesso ou erro
@@ -250,6 +251,48 @@ APP_ADMIN_ALLOWED_EMAILS=seu-email@dominio.com,outro-admin@dominio.com
 
 Depois reinicie o backend local ou faca redeploy no Render. Ao logar com um e-mail liberado, a opcao `Moderacao` aparece na area logada.
 
+## CRM administrativo
+
+A aba `Moderacao` tambem concentra o CRM interno da plataforma. O acesso e sempre protegido pelo backend: somente usuarios autenticados cujo e-mail esteja em `APP_ADMIN_ALLOWED_EMAILS` conseguem ler ou alterar dados administrativos.
+
+O CRM possui duas frentes:
+
+- **Conteudo**: textos da interface, mensagens, CTAs, erros e documentos legais. Rascunhos, historico e autoria ficam restritos ao admin; o site publico consome apenas entradas `PUBLISHED` por `GET /api/content/public`.
+- **Catalogo operacional**: categorias de anuncios, produtos de monetizacao, precos, planos, boosts e promocoes. O site recebe apenas categorias ativas e produtos habilitados; campos internos de admin nao sao expostos ao front publico.
+
+Fluxo de conteudo:
+
+1. O backend semeia `backend/src/main/resources/content/default-content.json` na primeira subida.
+2. O admin edita um rascunho pelo painel.
+3. Ao publicar, a versao passa a ser carregada em runtime pelo frontend, sem redeploy.
+4. Documentos legais publicados alimentam as paginas do footer e o modal de aceite dos Termos de Uso.
+
+Fluxo de catalogo operacional:
+
+1. O admin altera categorias ou produtos em `CRM operacional`.
+2. Ao salvar, o backend valida codigos, duplicidades, preco promocional e pelo menos uma categoria ativa.
+3. Categorias ativas sao refletidas em `GET /api/categories`.
+4. Produtos habilitados sao refletidos em `GET /api/monetization/products` e na conta de monetizacao.
+
+Promocoes:
+
+- `price` e o preco atual cobrado.
+- `originalPrice` e exibido como preco "de" somente quando `promotional=true`.
+- `promotionLabel` permite mostrar um selo curto, como `Oferta de lancamento`.
+
+Categorias:
+
+- O codigo deve ser estavel, em caixa alta, usando letras, numeros, `_` ou `-`.
+- Interesses e itens de vendedor gravam o codigo da categoria, permitindo novas categorias sem enum fixo no codigo.
+- Categorias inativas deixam de aparecer nos formularios e filtros, mas registros antigos continuam preservados.
+
+Boost:
+
+- O usuario nao marca boost ao cadastrar interesse.
+- O interesse nasce sem destaque.
+- Depois de publicado/aprovado, o usuario pode comprar um produto do tipo `BOOST`.
+- Quando o pagamento e processado, o backend grava `boostedUntil`; a busca usa esse campo para priorizar o anuncio enquanto estiver vigente.
+
 ## Monetizacao e pagamentos
 
 O MVP ja possui produtos de monetizacao configuraveis por ambiente:
@@ -315,30 +358,7 @@ Mesmo sendo publico, o webhook valida a autenticidade da chamada com os headers 
 
 ### Precos configuraveis
 
-Os precos e quantidades nao ficam hardcoded. Use variaveis de ambiente para alterar sem mexer no codigo:
-
-```bash
-APP_PRODUCT_CREDITS_10_PRICE=9.90
-APP_PRODUCT_CREDITS_10_AMOUNT=10
-APP_PRODUCT_CREDITS_30_PRICE=24.90
-APP_PRODUCT_CREDITS_30_AMOUNT=30
-APP_PRODUCT_SELLER_PRO_PRICE=49.90
-APP_PRODUCT_SELLER_PRO_DURATION_DAYS=30
-APP_PRODUCT_BOOST_3_DAYS_PRICE=9.90
-APP_PRODUCT_BOOST_3_DAYS_DURATION_DAYS=3
-APP_PRODUCT_BOOST_7_DAYS_PRICE=19.90
-APP_PRODUCT_BOOST_7_DAYS_DURATION_DAYS=7
-```
-
-Tambem e possivel esconder produtos por ambiente:
-
-```bash
-APP_PRODUCT_CREDITS_10_ENABLED=true
-APP_PRODUCT_CREDITS_30_ENABLED=true
-APP_PRODUCT_SELLER_PRO_ENABLED=true
-APP_PRODUCT_BOOST_3_DAYS_ENABLED=true
-APP_PRODUCT_BOOST_7_DAYS_ENABLED=true
-```
+Precos, quantidades, planos, boosts e promocoes sao gerenciados pelo CRM operacional, nao por texto hardcoded no frontend. O catalogo padrao e semeado pelo backend para a primeira execucao, mas depois passa a ser editavel em runtime pela aba admin.
 
 ## Seguranca para producao
 
@@ -473,6 +493,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 - `POST /api/monetization/purchase`
 - `POST /api/monetization/interests/{interestId}/boost`
 - `POST /api/monetization/mercado-pago/webhook`
+- `GET /api/content/public`
+- `GET /api/admin/content`
+- `POST /api/admin/content`
+- `PUT /api/admin/content/{id}`
+- `POST /api/admin/content/{id}/publish`
+- `POST /api/admin/content/{id}/archive`
+- `GET /api/admin/catalog`
+- `PUT /api/admin/catalog`
 
 ## Testes e cobertura
 

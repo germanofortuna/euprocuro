@@ -9,7 +9,6 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 
-import com.euprocuro.api.domain.model.InterestCategory;
 
 import lombok.Data;
 
@@ -26,7 +25,7 @@ public class CreateInterestRequest {
     private String referenceImageUrl;
 
     @NotNull
-    private InterestCategory category;
+    private String category;
 
     @DecimalMin("0.00")
     private BigDecimal budgetMin;
@@ -35,6 +34,8 @@ public class CreateInterestRequest {
     @DecimalMin("0.00")
     private BigDecimal budgetMax;
 
+    private String postalCode;
+
     @NotBlank
     private String city;
 
@@ -42,11 +43,10 @@ public class CreateInterestRequest {
     private String state;
 
     private String neighborhood;
+    private String country;
     private Integer desiredRadiusKm;
-    private boolean acceptsNationwideOffers;
     private boolean allowsWhatsappContact;
     private String whatsappContact;
-    private boolean boostEnabled;
     private String preferredCondition;
     private String preferredContactMode;
     private List<String> tags = new ArrayList<>();

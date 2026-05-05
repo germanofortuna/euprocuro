@@ -8,7 +8,6 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 
-import com.euprocuro.api.domain.model.InterestCategory;
 
 import lombok.Data;
 
@@ -25,7 +24,7 @@ public class CreateSellerItemRequest {
     private String referenceImageUrl;
 
     @NotNull
-    private InterestCategory category;
+    private String category;
 
     private BigDecimal desiredPrice;
 

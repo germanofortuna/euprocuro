@@ -7,7 +7,6 @@ import java.util.List;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestStatus;
 
 import lombok.AllArgsConstructor;
@@ -28,16 +27,14 @@ public class InterestPostDocument {
     private String title;
     private String description;
     private String referenceImageUrl;
-    private InterestCategory category;
+    private String category;
     private BigDecimal budgetMin;
     private BigDecimal budgetMax;
     private LocationDocument location;
     private List<String> tags;
     private Integer desiredRadiusKm;
-    private boolean acceptsNationwideOffers;
     private boolean allowsWhatsappContact;
     private String whatsappContact;
-    private boolean boostEnabled;
     private Instant boostedUntil;
     private String preferredCondition;
     private String preferredContactMode;

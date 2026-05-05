@@ -1,0 +1,872 @@
+{
+  "version": "2026-05-05",
+  "locale": "pt-BR",
+  "entries": {
+    "global.currency.negotiable": "A combinar",
+    "global.time.now": "Agora",
+    "global.user.fallback": "usuário",
+    "global.item.initial": "I",
+    "global.offer.initial": "O",
+    "global.product.fallback": "Produto",
+    "global.marketplace.name": "Eu Procuro",
+    "global.mercadoPago": "Mercado Pago",
+    "categories.automoveis": "Automóveis",
+    "categories.imoveis": "Imóveis",
+    "categories.servicos": "Serviços",
+    "categories.eletronicos": "Eletrônicos",
+    "categories.instrumentos": "Instrumentos",
+    "categories.outros": "Outros",
+    "categories.feedback.loadError.title": "Falha ao carregar categorias",
+    "common.actions.update": "Atualizar",
+    "common.actions.cancel": "Cancelar",
+    "common.actions.edit": "Editar",
+    "common.actions.remove": "Remover",
+    "common.actions.archive": "Arquivar",
+    "common.actions.publish": "Publicar",
+    "common.actions.saveDraft": "Salvar rascunho",
+    "common.actions.create": "Criar",
+    "common.actions.login": "Entrar",
+    "common.actions.createAccount": "Criar conta",
+    "common.actions.backHome": "Voltar para home",
+    "common.actions.loadMore": "Ver mais",
+    "common.actions.loading": "Carregando...",
+    "common.actions.saving": "Salvando...",
+    "common.actions.sending": "Enviando...",
+    "common.actions.creating": "Criando...",
+    "common.actions.registering": "Cadastrando...",
+    "common.actions.closeModal": "Fechar modal",
+    "common.actions.closeTerms": "Fechar termos",
+    "common.status.active": "ativa",
+    "common.status.inactive": "inativa",
+    "common.empty.none": "Nenhum registro encontrado.",
+    "errors.request.generic": "Não foi possível completar a requisição.",
+    "errors.retry": "Tente novamente.",
+    "errors.platform.load": "Não foi possível carregar a plataforma.",
+    "errors.image.invalid": "Selecione uma imagem válida.",
+    "errors.image.read": "Não foi possível ler a imagem.",
+    "auth.eyebrow": "Acesso",
+    "auth.login.title": "Entrar na plataforma",
+    "auth.register.title": "Criar sua conta",
+    "auth.forgot.title": "Recuperar acesso",
+    "auth.reset.title": "Criar nova senha",
+    "auth.tabs.login": "Entrar",
+    "auth.tabs.register": "Criar conta",
+    "auth.login.email.placeholder": "Seu e-mail",
+    "auth.login.password.placeholder": "Sua senha",
+    "auth.login.forgotPassword": "Esqueci minha senha",
+    "auth.login.submit": "Entrar",
+    "auth.login.submitting": "Entrando...",
+    "auth.register.name.placeholder": "Nome completo",
+    "auth.register.email.placeholder": "E-mail",
+    "auth.register.document.placeholder": "CPF ou CNPJ",
+    "auth.register.password.placeholder": "Senha com letras e números",
+    "auth.register.city.placeholder": "Cidade",
+    "auth.register.state.placeholder": "Estado",
+    "auth.register.terms.acceptance": "Li e aceito os Termos de Uso da plataforma.",
+    "auth.register.terms.prefix": "Li e aceito os",
+    "auth.register.terms.link": "Termos de Uso da plataforma",
+    "auth.register.terms.helper.closed": "Abra os termos para habilitar o aceite.",
+    "auth.register.terms.helper.opened": "Versão dos termos: {{version}}",
+    "auth.register.submit": "Criar conta",
+    "auth.register.submitting": "Criando...",
+    "auth.password.empty": "Use pelo menos 8 caracteres, com letras e números.",
+    "auth.password.short": "Senha curta: use pelo menos 8 caracteres.",
+    "auth.password.invalid": "Inclua letras e números para deixar a senha válida.",
+    "auth.password.valid": "Senha válida.",
+    "auth.forgot.email.placeholder": "E-mail da conta",
+    "auth.forgot.submit": "Enviar instruções",
+    "auth.forgot.submitting": "Enviando...",
+    "auth.reset.token.placeholder": "Token de redefinição",
+    "auth.reset.newPassword.placeholder": "Nova senha",
+    "auth.reset.confirmPassword.placeholder": "Confirmar nova senha",
+    "auth.reset.submit": "Salvar nova senha",
+    "auth.reset.submitting": "Salvando...",
+    "auth.localReset.title": "Teste local de redefinição",
+    "auth.localReset.description": "Como o SMTP não está configurado, use o link abaixo para completar o fluxo.",
+    "auth.feedback.login.success.title": "Login realizado",
+    "auth.feedback.login.success.message": "Você entrou com sucesso na plataforma.",
+    "auth.feedback.login.error.title": "Não foi possível entrar",
+    "auth.feedback.login.error.message": "Confira seu e-mail e senha.",
+    "auth.feedback.login.confirmEmail.title": "Confirme seu e-mail",
+    "auth.feedback.login.confirmEmail.message": "Verifique sua caixa de entrada antes de entrar.",
+    "auth.feedback.register.terms.title": "Aceite os termos",
+    "auth.feedback.register.terms.message": "Abra os Termos de Uso e marque o aceite para criar sua conta.",
+    "auth.feedback.register.success.title": "Confirme seu e-mail",
+    "auth.feedback.register.success.message": "Sua conta foi criada. Confirme seu e-mail para entrar.",
+    "auth.feedback.register.error.title": "Não foi possível criar a conta",
+    "auth.feedback.register.error.message": "Revise os dados e tente novamente.",
+    "auth.feedback.forgot.success.title": "Solicitação enviada",
+    "auth.feedback.forgot.error.title": "Falha ao solicitar redefinição",
+    "auth.feedback.reset.success.title": "Senha redefinida",
+    "auth.feedback.reset.success.message": "Agora você pode entrar com a nova senha.",
+    "auth.feedback.reset.error.title": "Não foi possível redefinir",
+    "auth.feedback.reset.error.message": "Confira o token e tente novamente.",
+    "moderation.feedback.rejected.title": "Anúncio recusado pela moderação",
+    "moderation.feedback.rejected.message": "Seu anúncio foi recusado. Você pode editar e enviar novamente para análise.",
+    "interest.feedback.linkNotAllowed.title": "Link não permitido",
+    "interest.feedback.linkNotAllowed.message": "Remova links da descrição do anúncio antes de enviar para moderação.",
+    "interest.feedback.updateReceived.title": "Alteração recebida",
+    "interest.feedback.createReceived.title": "Interesse recebido",
+    "interest.feedback.updateReceived.message": "Vamos validar a alteração agora. Se houver recusa, você receberá um aviso para editar novamente.",
+    "interest.feedback.createReceived.message": "Vamos validar o anúncio agora. Se houver recusa, você receberá um aviso para ajustar.",
+    "interest.feedback.updateError.title": "Não foi possível atualizar",
+    "interest.feedback.createError.title": "Não foi possível publicar",
+    "interest.form.eyebrow": "Página",
+    "interest.form.editTitle": "Editar anúncio",
+    "interest.form.createTitle": "Cadastrar interesse",
+    "interest.form.expiryNote": "Este anúncio ficará ativo por até {{count}} dias e depois será removido automaticamente.",
+    "interest.form.editing.title": "Você está editando um anúncio",
+    "interest.form.editing.description": "Ajuste os dados abaixo e salve para atualizar o anúncio publicado.",
+    "interest.form.title.placeholder": "Título do interesse",
+    "interest.form.description.placeholder": "Descreva o item ou serviço que você procura",
+    "interest.form.linksNotAllowed": "Links não são permitidos no anúncio.",
+    "interest.form.tags.placeholder": "Tags separadas por vírgula",
+    "interest.form.budgetMin.placeholder": "Orçamento mínimo",
+    "interest.form.budgetMax.placeholder": "Orçamento máximo",
+    "interest.form.radius.placeholder": "Raio em km",
+    "interest.form.neighborhood.placeholder": "Bairro",
+    "interest.form.condition.placeholder": "Condição desejada",
+    "interest.form.contactMode.placeholder": "Canal preferido de contato",
+    "interest.form.referenceImage.label": "Foto de referência",
+    "interest.form.referenceImage.previewAlt": "Prévia do interesse",
+    "interest.form.nationwide": "Aceita propostas de todo o Brasil",
+    "interest.form.whatsappAllowed": "Permitir contato via WhatsApp",
+    "interest.form.whatsapp.placeholder": "WhatsApp para contato",
+    "interest.form.boost": "Destacar interesse",
+    "interest.form.cancelEdit": "Cancelar edição",
+    "interest.form.publishing": "Publicando...",
+    "interest.form.saveChanges": "Salvar alterações",
+    "interest.form.publish": "Publicar interesse",
+    "sellerItem.form.editTitle": "Editar item",
+    "sellerItem.form.createTitle": "Cadastrar item",
+    "sellerItem.form.editSubtitle": "Atualize o item cadastrado",
+    "sellerItem.form.createSubtitle": "Algo que você aceitaria negociar",
+    "sellerItem.form.title.placeholder": "Título do item ou serviço",
+    "sellerItem.form.description.placeholder": "Descreva o que você tem, estado de conservação ou detalhes do serviço",
+    "sellerItem.form.price.placeholder": "Valor que você analisaria",
+    "sellerItem.form.image.label": "Foto do item",
+    "sellerItem.form.image.previewAlt": "Prévia do item",
+    "sellerItem.form.submit": "Cadastrar item",
+    "sellerItem.createCard.title": "Cadastre itens que você aceitaria negociar",
+    "sellerItem.createCard.description": "Ao cadastrar um item, a plataforma mostra interesses parecidos de outros usuários.",
+    "report.feedback.success.title": "Denúncia enviada",
+    "report.feedback.success.message": "Obrigado. O conteúdo será analisado pela moderação.",
+    "report.feedback.error.title": "Não foi possível denunciar",
+    "auth.feedback.verify.success.title": "E-mail verificado",
+    "auth.feedback.verify.success.message": "Seu e-mail foi verificado com sucesso.",
+    "auth.feedback.verify.error.title": "Não foi possível verificar",
+    "auth.feedback.verify.error.message": "O link de verificação pode ter expirado.",
+    "header.logo.alt": "Eu Procuro",
+    "header.brand.eyebrow": "Marketplace reverso",
+    "header.nav.home": "Home",
+    "header.nav.publish": "Novo interesse",
+    "header.nav.credits": "Créditos",
+    "header.credits.title": "Ver créditos e pagamentos",
+    "header.credits.pro": "Pro",
+    "header.credits.planActive": "plano ativo",
+    "header.credits.credits": "créditos",
+    "header.notifications.default": "Notificações",
+    "header.notifications.unread": "Você tem novas mensagens",
+    "header.auth.login": "Entrar",
+    "header.auth.register": "Criar conta",
+    "header.auth.logout": "Sair",
+    "notifications.eyebrow": "Notificações",
+    "notifications.title": "Novidades",
+    "notifications.markAllRead": "Marcar todas como lidas",
+    "notifications.empty.title": "Nada novo por aqui",
+    "notifications.empty.description": "Quando chegar uma mensagem ou um interesse compatível, ele vai aparecer neste painel.",
+    "conversation.eyebrow": "Conversa",
+    "conversation.fallbackTitle": "Oferta recebida",
+    "conversation.loading": "Carregando conversa...",
+    "conversation.empty.title": "Ainda sem mensagens",
+    "conversation.empty.description": "Use o chat abaixo para alinhar detalhes da negociação dentro da plataforma.",
+    "conversation.contact.title": "Contato",
+    "conversation.participantFallback": "Participante da conversa",
+    "conversation.contact.email": "Enviar e-mail",
+    "conversation.contact.chatOnly": "Use o chat abaixo para alinhar os detalhes.",
+    "conversation.offer.title": "Oferta",
+    "conversation.offer.imageAlt": "Foto enviada na oferta",
+    "conversation.offer.buyer": "Comprador: {{name}}",
+    "conversation.form.placeholder": "Escreva sua mensagem para continuar a negociação",
+    "conversation.form.submit": "Enviar mensagem",
+    "footer.legal.aria": "Políticas da plataforma",
+    "footer.copyright": "© {{year}} Eu Procuro. Plataforma de aproximação entre compradores e vendedores.",
+    "legal.version": "Versão {{version}}",
+    "legal.effectiveSince": "Versão vigente desde {{date}}",
+    "legal.fullPage": "Abrir página completa",
+    "legal.understood": "Entendi",
+    "legal.updatedAt": "Atualizado em {{date}}",
+    "contentAdmin.eyebrow": "Conteúdo",
+    "contentAdmin.title": "CRM de conteúdo",
+    "contentAdmin.subtitle": "Edite textos, documentos legais e mensagens publicadas sem redeploy.",
+    "contentAdmin.refresh": "Atualizar conteúdo",
+    "contentAdmin.new": "Novo conteúdo",
+    "contentAdmin.search.placeholder": "Buscar por chave, tela ou texto",
+    "contentAdmin.status.all": "Todos",
+    "contentAdmin.status.DRAFT": "Rascunho",
+    "contentAdmin.status.PUBLISHED": "Publicado",
+    "contentAdmin.status.ARCHIVED": "Arquivado",
+    "contentAdmin.type.TEXT": "Texto",
+    "contentAdmin.type.RICH_TEXT": "Texto rico",
+    "contentAdmin.type.LEGAL_DOCUMENT": "Documento legal",
+    "contentAdmin.type.LABEL": "Label",
+    "contentAdmin.type.CTA": "CTA",
+    "contentAdmin.type.ERROR_MESSAGE": "Mensagem de erro",
+    "contentAdmin.type.EMAIL_TEMPLATE": "Template de e-mail",
+    "contentAdmin.type.CATALOG": "Catálogo operacional",
+    "contentAdmin.form.key": "Chave",
+    "contentAdmin.form.locale": "Locale",
+    "contentAdmin.form.type": "Tipo",
+    "contentAdmin.form.screen": "Tela ou módulo",
+    "contentAdmin.form.description": "Descrição interna",
+    "contentAdmin.form.legalSlug": "Identificador da pagina legal",
+    "contentAdmin.form.legalPageIdentifier": "Pagina legal (URL)",
+    "contentAdmin.form.legalPageIdentifierHelp": "Use apenas em documentos legais. Exemplo: termos-de-uso vira o link publico dessa pagina.",
+    "contentAdmin.form.requiresAcceptance": "Pedir novo aceite ao publicar",
+    "contentAdmin.form.requestAcceptanceOnPublish": "Pedir novo aceite ao publicar",
+    "contentAdmin.form.requestAcceptanceOnPublishHelp": "Marque quando uma nova versao de Termos ou Privacidade precisar ser aceita novamente pelos usuarios.",
+    "contentAdmin.form.value": "Texto ou JSON do conteúdo",
+    "contentAdmin.form.emptyTitle": "Selecione um conteúdo",
+    "contentAdmin.form.emptyDescription": "Escolha uma chave existente ou crie uma nova para editar o rascunho.",
+    "contentAdmin.help.publicSafety": "Somente versões publicadas são carregadas pela interface pública. Rascunhos, histórico e autoria ficam restritos ao admin.",
+    "contentAdmin.empty.title": "Nenhum conteúdo encontrado",
+    "contentAdmin.empty.description": "Ajuste a busca ou crie uma nova chave de conteúdo.",
+    "contentAdmin.feedback.loadError.title": "Não foi possível carregar conteúdo",
+    "contentAdmin.feedback.saveSuccess.title": "Rascunho salvo",
+    "contentAdmin.feedback.saveSuccess.message": "O conteúdo foi salvo sem alterar a versão pública.",
+    "contentAdmin.feedback.saveError.title": "Não foi possível salvar",
+    "contentAdmin.feedback.publishSuccess.title": "Conteúdo publicado",
+    "contentAdmin.feedback.publishSuccess.message": "A nova versão já pode ser carregada em runtime.",
+    "contentAdmin.feedback.publishError.title": "Não foi possível publicar",
+    "contentAdmin.feedback.archiveSuccess.title": "Conteúdo arquivado",
+    "contentAdmin.feedback.archiveSuccess.message": "A chave deixou de ser entregue pelo catálogo público.",
+    "contentAdmin.feedback.archiveError.title": "Não foi possível arquivar",
+    "catalogAdmin.eyebrow": "Catálogo",
+    "catalogAdmin.title": "CRM operacional",
+    "catalogAdmin.subtitle": "Gerencie categorias, créditos, planos e promoções publicados em runtime.",
+    "catalogAdmin.refresh": "Atualizar catálogo",
+    "catalogAdmin.save": "Salvar catálogo",
+    "catalogAdmin.help.publicSafety": "Somente categorias e produtos ativos são entregues ao site. Rascunhos e dados administrativos continuam protegidos por autenticação admin.",
+    "catalogAdmin.updatedAt": "Última publicação: {{date}}.",
+    "catalogAdmin.sortOrder": "Ordem",
+    "catalogAdmin.categories.title": "Categorias dos anúncios",
+    "catalogAdmin.categories.count": "{{count}} categoria(s) ativa(s)",
+    "catalogAdmin.categories.add": "Adicionar categoria",
+    "catalogAdmin.categories.code": "Código",
+    "catalogAdmin.categories.label": "Nome público",
+    "catalogAdmin.products.title": "Preços, planos e promoções",
+    "catalogAdmin.products.description": "Produtos ativos aparecem nas telas de compra e boost.",
+    "catalogAdmin.products.add": "Adicionar produto",
+    "catalogAdmin.products.code": "Código",
+    "catalogAdmin.products.name": "Nome público",
+    "catalogAdmin.products.price": "Preço atual",
+    "catalogAdmin.products.originalPrice": "Preço de",
+    "catalogAdmin.products.credits": "Créditos",
+    "catalogAdmin.products.durationDays": "Dias",
+    "catalogAdmin.products.descriptionField": "Descrição pública",
+    "catalogAdmin.products.promotionLabel": "Selo da promoção",
+    "catalogAdmin.products.promotional": "Promoção",
+    "catalogAdmin.products.type.CREDIT_PACK": "Pacote de créditos",
+    "catalogAdmin.products.type.SUBSCRIPTION": "Plano",
+    "catalogAdmin.products.type.BOOST": "Boost",
+    "catalogAdmin.feedback.loadError.title": "Não foi possível carregar catálogo",
+    "catalogAdmin.feedback.saveSuccess.title": "Catálogo publicado",
+    "catalogAdmin.feedback.saveSuccess.message": "Categorias, preços e promoções já podem ser carregados pelo site.",
+    "catalogAdmin.feedback.saveError.title": "Não foi possível salvar catálogo",
+    "home.hero.title": "Encontre oportunidades publicadas e negocie direto com quem está procurando.",
+    "home.hero.description": "A home mostra os interesses cadastrados na plataforma. Quem quiser publicar um novo interesse ou responder com oferta pode entrar e seguir para a área correta.",
+    "home.hero.primary": "Quero cadastrar um interesse",
+    "home.hero.secondary": "Entrar na conta",
+    "home.hero.card1.title": "O que você encontra aqui",
+    "home.hero.card1.description": "Demandas reais de compra, filtros por categoria e uma forma clara de responder.",
+    "home.hero.card2.title": "Sem conta?",
+    "home.hero.card2.description": "Você pode explorar a home normalmente e criar sua conta apenas quando quiser agir.",
+    "home.panel.eyebrow": "Home",
+    "home.panel.title": "Os usuários estão interessados em...",
+    "home.panel.note": "Use os filtros para buscar serviços, produtos ou regiões.",
+    "home.filters.query": "Buscar por produto, serviço ou palavra-chave",
+    "home.filters.category.all": "Todas as categorias",
+    "home.filters.city": "Cidade",
+    "home.filters.maxBudget": "Orçamento máximo",
+    "home.itemFilter.eyebrow": "Filtro por item",
+    "home.itemFilter.showing": "Mostrando interesses parecidos com: {{title}}",
+    "home.itemFilter.clear": "Limpar filtro",
+    "home.loading.published": "Carregando interesses publicados...",
+    "home.empty.match.title": "Nenhum interesse parecido encontrado",
+    "home.empty.match.description": "Quando aparecer um novo interesse parecido com esse item, ele ficará listado aqui.",
+    "home.empty.logged.title": "Nenhum interesse de outros usuários",
+    "home.empty.logged.description": "Quando outros usuários publicarem interesses, eles aparecerão aqui.",
+    "home.empty.public.title": "Nada publicado ainda",
+    "home.empty.public.description": "Quando os primeiros interesses forem cadastrados, eles aparecerão aqui.",
+    "interest.detail.owner.before": "O usuário",
+    "interest.detail.owner.after": "procura por um(a)",
+    "interest.detail.select": "Selecione um interesse",
+    "interest.detail.loading": "Carregando anúncio...",
+    "interest.detail.category": "Categoria",
+    "interest.detail.location": "Localidade",
+    "interest.detail.priceRange": "Faixa de valor",
+    "interest.detail.priceRangeValue": "{{min}} até {{max}}",
+    "interest.detail.owner": "Publicado por",
+    "interest.detail.status": "Status",
+    "interest.detail.remaining": "Tempo restante",
+    "interest.detail.report": "Denunciar este interesse",
+    "interest.report.loginRequired.title": "Entre para denunciar",
+    "interest.report.loginRequired.message": "Faça login para informar a moderação sobre este interesse.",
+    "interest.detail.own.title": "Este interesse é seu",
+    "interest.detail.own.description": "Use a página de interesses ativos para acompanhar respostas recebidas.",
+    "interest.detail.own.cta": "Ir para interesses ativos",
+    "interest.detail.guest.title": "Gostou desta oportunidade?",
+    "interest.detail.guest.description": "Entre na plataforma para enviar uma oferta ou publicar seu próprio interesse.",
+    "interest.detail.empty.title": "Nada selecionado",
+    "interest.detail.empty.description": "Escolha um interesse para ver mais detalhes.",
+    "share.eyebrow": "Compartilhar",
+    "share.title": "Envie este interesse para alguém",
+    "share.message": "Olha esse interesse no Eu Procuro: {{title}} - {{url}}",
+    "share.xMessage": "Olha esse interesse no Eu Procuro: {{title}}",
+    "share.whatsapp": "Compartilhar no WhatsApp",
+    "share.x": "Compartilhar no X",
+    "share.copy": "Copiar link",
+    "share.prompt": "Copie o link do interesse:",
+    "share.feedback.success.title": "Link copiado",
+    "share.feedback.success.message": "Agora você pode compartilhar esse interesse.",
+    "offer.form.eyebrow": "Responder",
+    "offer.form.title": "Enviar oferta",
+    "offer.form.price": "Valor ofertado",
+    "offer.form.phone": "Telefone ou WhatsApp",
+    "offer.form.message": "Explique como sua oferta atende ao interesse",
+    "offer.form.highlights": "Destaques separados por vírgula",
+    "offer.form.delivery": "Inclui entrega ou deslocamento",
+    "offer.form.submit": "Enviar oferta",
+    "offer.form.submitting": "Enviando...",
+    "offer.fallback.interest": "Interesse",
+    "offer.fallback.seller": "Sem anunciante",
+    "offer.list.receivedSecondary": "{{price}} - {{title}}",
+    "offer.list.incomingSecondary": "{{price}} • {{date}}",
+    "offer.list.outgoingSecondary": "{{price}} • {{seller}}",
+    "boost.activeUntil": "Destaque ativo até {{date}}",
+    "offers.noCredits": "Você não possui créditos ativos para enviar ofertas.",
+    "moderation.status.PENDING": "Em análise",
+    "moderation.status.APPROVED": "Aprovado",
+    "moderation.status.REVIEW_REQUIRED": "Em revisão",
+    "moderation.status.REJECTED": "Rejeitado",
+    "moderation.status.HIDDEN": "Oculto",
+    "moderation.status.REPORTED": "Denunciado",
+    "moderation.status.OPEN": "Publicado",
+    "moderation.status.CLOSED": "Desativado",
+    "payment.status.APPROVED": "Aprovado",
+    "payment.status.PENDING": "Pendente",
+    "payment.status.CREATED": "Pendente",
+    "payment.status.REJECTED": "Reprovado",
+    "payment.status.CANCELLED": "Reprovado",
+    "payment.method.PIX": "Pix",
+    "payment.method.CREDIT_CARD": "Cartão de crédito",
+    "payment.method.DEBIT_CARD": "Cartão de débito",
+    "payment.method.ACCOUNT_MONEY": "Saldo Mercado Pago",
+    "payment.method.TICKET": "Boleto",
+    "credits.purchase.total": "Total selecionado: {{total}}",
+    "listing.expired": "Expirado",
+    "listing.activeDays": "Ativo por até {{count}} dias",
+    "listing.expires.days": "Expira em {{count}} dias",
+    "listing.expires.hours": "Expira em {{count}} horas",
+    "listing.expires.oneHour": "Expira em 1 hora",
+    "listing.expirationNotification.title": "Anúncio perto de expirar",
+    "listing.expirationNotification.message": "Seu anúncio expira em breve. {{remaining}}.",
+    "admin.nav": "Admin",
+    "admin.moderation.nav": "Moderação",
+    "dashboard.stats.myInterests": "Meus Interesses",
+    "dashboard.stats.sentOffers": "Ofertas Enviadas",
+    "dashboard.stats.receivedOffers": "Ofertas Recebidas",
+    "dashboard.nav.newInterest": "Cadastrar interesse",
+    "dashboard.nav.myInterests": "Meus Interesses",
+    "dashboard.nav.sentOffers": "Ofertas enviadas",
+    "dashboard.nav.receivedOffers": "Ofertas recebidas",
+    "dashboard.nav.sellerItems": "Meus itens",
+    "dashboard.nav.credits": "Comprar créditos",
+    "dashboard.loadingPrivate": "Carregando sua área logada...",
+    "admin.moderation.title": "Moderação de conteúdo",
+    "admin.moderation.refreshError.title": "Não foi possível atualizar",
+    "admin.moderation.queue": "Fila manual",
+    "admin.moderation.queueCount": "{{count}} anúncio(s) para revisar",
+    "admin.moderation.rules": "Regras locais",
+    "admin.moderation.newRule": "Nova regra",
+    "admin.moderation.editRule": "Editar regra",
+    "admin.moderation.rule.placeholder": "Palavra ou expressão",
+    "admin.moderation.rule.high": "Alto risco",
+    "admin.moderation.rule.medium": "Médio risco",
+    "admin.moderation.rule.low": "Baixo risco",
+    "admin.moderation.rule.active": "Regra ativa",
+    "admin.moderation.rule.save": "Salvar regra",
+    "admin.moderation.rule.empty.title": "Nenhuma regra cadastrada",
+    "admin.moderation.rule.empty.description": "Cadastre termos locais para bloqueio ou revisão manual.",
+    "admin.moderation.rule.saved.title": "Regra salva",
+    "admin.moderation.rule.saved.message": "A regra de moderação foi atualizada.",
+    "admin.moderation.rule.saveError.title": "Não foi possível salvar a regra",
+    "admin.moderation.rule.deleteConfirm": "Deseja remover esta regra de moderação?",
+    "admin.moderation.rule.removed.title": "Regra removida",
+    "admin.moderation.rule.removed.message": "A regra não será mais usada na moderação local.",
+    "admin.moderation.rule.removeError.title": "Não foi possível remover",
+    "admin.moderation.reports": "Denúncias",
+    "admin.moderation.reportsCount": "{{count}} denúncia(s) abertas",
+    "admin.moderation.reportsContent": "Conteúdo: {{id}}",
+    "admin.moderation.reports.empty.title": "Nenhuma denúncia aberta",
+    "admin.moderation.reports.empty.description": "As denúncias dos usuários aparecerão aqui.",
+    "admin.moderation.empty.title": "Fila vazia",
+    "admin.moderation.empty.description": "Nada pendente de revisão manual agora.",
+    "admin.moderation.approve": "Aprovar anúncio",
+    "admin.moderation.hide": "Ocultar anúncio",
+    "admin.moderation.reject": "Recusar anúncio",
+    "admin.moderation.decisionApplied.title": "Decisão aplicada",
+    "admin.moderation.decisionApplied.message": "Anúncio marcado como {{status}}.",
+    "auth.register.postalCode.placeholder": "CEP",
+    "auth.register.neighborhood.placeholder": "Bairro",
+    "auth.register.country.placeholder": "País",
+    "address.postalCode.placeholder": "CEP",
+    "address.country.placeholder": "País",
+    "address.lookup.loading": "Buscando endereço pelo CEP...",
+    "address.lookup.success": "Endereço preenchido pelo CEP.",
+    "address.lookup.invalid": "Informe um CEP com 8 dígitos.",
+    "address.lookup.error": "Não foi possível buscar o CEP agora.",
+    "interest.detail.publicEyebrow": "Interesse publicado"
+  },
+  "legalPages": {
+    "termos-de-uso": {
+      "title": "Termos de Uso",
+      "label": "Termos de Uso",
+      "updatedAt": "05/05/2026",
+      "effectiveAt": "05/05/2026",
+      "summary": "Regras gerais para uso do Eu Procuro, publicação de interesses, envio de propostas, moderação e responsabilidades dos usuários.",
+      "sections": [
+        {
+          "title": "1. Sobre o Eu Procuro",
+          "paragraphs": [
+            "O Eu Procuro é uma plataforma de marketplace reverso: usuários compradores publicam interesses de compra e usuários vendedores podem enviar propostas relacionadas a esses interesses.",
+            "A plataforma atua como ambiente de aproximação entre compradores e vendedores. O Eu Procuro não é parte das negociações realizadas entre usuários, não garante a qualidade, disponibilidade, entrega, procedência, regularidade ou adequação dos produtos e serviços ofertados, e não substitui a diligência que cada usuário deve adotar antes de fechar qualquer negócio."
+          ]
+        },
+        {
+          "title": "2. Aceite dos termos",
+          "paragraphs": [
+            "Ao criar uma conta, acessar ou usar a plataforma, o usuário declara que leu, compreendeu e aceitou estes Termos de Uso, a Política de Privacidade, a Política de Conteúdo Proibido e a Política de Denúncia e Remoção.",
+            "Se o usuário não concordar com qualquer regra, não deve criar conta nem utilizar a plataforma. O aceite poderá ser registrado com data, horário, versão dos termos e dados técnicos necessários para comprovação."
+          ]
+        },
+        {
+          "title": "3. Cadastro e conta",
+          "paragraphs": [
+            "O usuário deve fornecer informações verdadeiras, atualizadas e compatíveis com sua identidade ou atuação comercial. Contas com dados falsos, enganosos, de terceiros sem autorização ou usados para fraude poderão ser bloqueadas ou removidas.",
+            "O usuário é responsável por manter a confidencialidade de suas credenciais, por todas as atividades realizadas em sua conta e por avisar a plataforma caso identifique acesso indevido."
+          ],
+          "items": [
+            "A plataforma é destinada a pessoas capazes de contratar. Menores de idade somente podem utilizar o serviço com autorização e supervisão de responsável legal.",
+            "A criação de múltiplas contas para burlar moderação, avaliações, limites ou medidas de segurança é proibida.",
+            "Perfis de vendedores devem respeitar exigências legais, fiscais, profissionais e regulatórias aplicáveis à atividade anunciada."
+          ]
+        },
+        {
+          "title": "4. Publicação de interesses e propostas",
+          "paragraphs": [
+            "Ao publicar um interesse, o comprador deve descrever de forma clara o que procura, informar categoria, localidade, faixa de orçamento e demais dados relevantes para que os vendedores possam apresentar propostas adequadas.",
+            "Ao enviar uma proposta, o vendedor declara que possui legitimidade para oferecer o produto ou serviço, que as informações prestadas são verdadeiras e que cumprirá as condições combinadas diretamente com o comprador."
+          ],
+          "items": [
+            "É proibido publicar ou propor itens, serviços, dados, atividades ou ofertas vedadas pela Política de Conteúdo Proibido.",
+            "Fotos, textos, marcas, descrições e anexos usados na plataforma devem respeitar direitos de terceiros.",
+            "Preço, entrega, garantia, suporte, arrependimento, troca, reembolso e nota fiscal devem ser combinados e cumpridos pelos usuários responsáveis pela negociação, conforme a legislação aplicável."
+          ]
+        },
+        {
+          "title": "5. Responsabilidades dos usuários",
+          "paragraphs": [
+            "Cada usuário é responsável por suas publicações, propostas, mensagens, dados de contato e condutas dentro e fora da plataforma quando a interação tiver origem no Eu Procuro.",
+            "O usuário deve agir com boa-fé, transparência, urbanidade e respeito às leis brasileiras, incluindo regras de proteção ao consumidor, proteção de dados pessoais, propriedade intelectual, publicidade, concorrência e normas setoriais aplicáveis."
+          ],
+          "items": [
+            "Não usar a plataforma para fraude, golpe, lavagem de dinheiro, phishing, engenharia social, coleta abusiva de dados ou manipulação de avaliações.",
+            "Não assediar, ameaçar, discriminar, expor dados pessoais de terceiros ou pressionar outro usuário a negociar fora de condições claras e verificáveis.",
+            "Não tentar explorar falhas técnicas, interferir na segurança, automatizar acessos não autorizados ou contornar ferramentas de moderação."
+          ]
+        },
+        {
+          "title": "6. Moderação e segurança",
+          "paragraphs": [
+            "A plataforma poderá usar ferramentas automatizadas, incluindo serviços de inteligência artificial e revisão humana, para identificar conteúdos proibidos, abusos, riscos de fraude e violações destes termos.",
+            "A moderação pode gerar alertas, redução de alcance, bloqueio temporário, remoção de conteúdo, suspensão ou encerramento de contas. Em situações de risco, fraude, ordem legal ou violação grave, medidas podem ser adotadas sem aviso prévio."
+          ],
+          "items": [
+            "A aprovação automatizada de um conteúdo não significa endosso, garantia ou validação jurídica pela plataforma.",
+            "A plataforma pode preservar registros necessários para apuração, segurança, exercício regular de direitos, cumprimento legal ou cooperação com autoridades competentes.",
+            "Usuários podem contestar medidas de moderação pelos canais indicados na Política de Denúncia e Remoção."
+          ]
+        },
+        {
+          "title": "7. Conteúdo proibido",
+          "paragraphs": [
+            "Os usuários devem observar integralmente a Política de Conteúdo Proibido. Entre outros exemplos, são vedadas ofertas ilegais, fraudulentas, discriminatórias, perigosas, enganosas, invasivas à privacidade ou que envolvam bens e serviços sujeitos a autorização especial sem comprovação adequada.",
+            "A plataforma poderá remover conteúdos que, mesmo não listados expressamente, apresentem risco jurídico, reputacional, operacional ou de segurança para usuários, terceiros ou para o próprio serviço."
+          ]
+        },
+        {
+          "title": "8. Denúncias e remoções",
+          "paragraphs": [
+            "Qualquer pessoa pode reportar conteúdo, perfil, proposta ou conduta potencialmente irregular pelos canais descritos na Política de Denúncia e Remoção.",
+            "A plataforma analisará denúncias com base nas informações disponíveis, poderá solicitar dados adicionais e adotará medidas proporcionais ao risco identificado."
+          ]
+        },
+        {
+          "title": "9. Privacidade e dados pessoais",
+          "paragraphs": [
+            "O tratamento de dados pessoais na plataforma está descrito na Política de Privacidade. Ao usar o serviço, o usuário reconhece que determinados dados de perfil, interesses e propostas podem ser exibidos a outros usuários para viabilizar a operação do marketplace.",
+            "O usuário não deve inserir dados pessoais sensíveis, documentos, senhas, dados financeiros completos ou informações de terceiros que não sejam necessários para a negociação."
+          ]
+        },
+        {
+          "title": "10. Alterações, disponibilidade e encerramento",
+          "paragraphs": [
+            "A plataforma poderá alterar funcionalidades, regras, políticas, limites e estes Termos de Uso para refletir mudanças legais, operacionais, de segurança ou de produto. Quando a alteração for relevante, a plataforma buscará comunicar os usuários por meios razoáveis.",
+            "O serviço pode sofrer interrupções por manutenção, incidentes, mudanças técnicas ou fatores externos. A plataforma poderá encerrar contas inativas, fraudulentas ou incompatíveis com estes termos."
+          ]
+        },
+        {
+          "title": "11. Contato",
+          "paragraphs": [
+            "Dúvidas sobre estes Termos de Uso podem ser enviadas para contato@euprocuro.com. Solicitações sobre privacidade devem ser enviadas para privacidade@euprocuro.com. Denúncias de conteúdo ou conduta devem ser enviadas para denuncias@euprocuro.com."
+          ]
+        }
+      ]
+    },
+    "politica-de-privacidade": {
+      "title": "Política de Privacidade",
+      "label": "Privacidade",
+      "updatedAt": "05/05/2026",
+      "effectiveAt": "05/05/2026",
+      "summary": "Como o Eu Procuro coleta, usa, compartilha, protege e elimina dados pessoais no funcionamento do marketplace.",
+      "sections": [
+        {
+          "title": "1. Objetivo e controlador",
+          "paragraphs": [
+            "Esta Política de Privacidade explica, de forma transparente, como o Eu Procuro trata dados pessoais de usuários, visitantes, compradores, vendedores, denunciantes e demais pessoas que interagem com a plataforma.",
+            "Para fins da Lei Geral de Proteção de Dados Pessoais, o Eu Procuro atua como controlador dos dados tratados para operação da plataforma. O canal de contato sobre privacidade é privacidade@euprocuro.com."
+          ]
+        },
+        {
+          "title": "2. Dados que podemos coletar",
+          "paragraphs": [
+            "Coletamos dados fornecidos diretamente pelo usuário, dados gerados durante o uso da plataforma e dados necessários para segurança, moderação e cumprimento de obrigações legais."
+          ],
+          "items": [
+            "Dados cadastrais: nome, e-mail, cidade, estado, bio, data de aceite dos termos e versão aceita.",
+            "Dados de uso do marketplace: interesses publicados, categorias, orçamento, localização informada, tags, propostas, mensagens, destaques e dados de contato inseridos pelos usuários.",
+            "Dados técnicos e de segurança: endereço IP, identificadores de sessão, registros de acesso, navegador, dispositivo, data e hora de eventos, logs de erro e sinais de abuso.",
+            "Dados de moderação e denúncia: conteúdo reportado, motivo da denúncia, evidências enviadas, histórico de análise, medidas adotadas e comunicações com denunciantes ou usuários afetados.",
+            "Dados de provedores: informações recebidas de serviços de hospedagem, analytics, e-mail, suporte, antifraude, moderação automatizada, incluindo provedores de inteligência artificial, quando necessários para o funcionamento da plataforma."
+          ]
+        },
+        {
+          "title": "3. Finalidades do tratamento",
+          "paragraphs": [
+            "Tratamos dados pessoais para fornecer, manter, melhorar e proteger a plataforma, sempre observando necessidade, adequação e transparência."
+          ],
+          "items": [
+            "Criar e administrar contas de usuários.",
+            "Permitir a publicação de interesses, o envio de propostas e a comunicação entre compradores e vendedores.",
+            "Personalizar buscas, filtros, categorias, localização e recomendações operacionais.",
+            "Detectar, prevenir e investigar fraude, abuso, spam, conteúdo proibido, incidentes de segurança e violações dos termos.",
+            "Enviar comunicações operacionais, avisos de segurança, respostas de suporte e informações relevantes sobre a conta.",
+            "Cumprir obrigações legais, regulatórias, judiciais ou requisições de autoridades competentes.",
+            "Produzir estatísticas agregadas ou anonimizadas para melhoria do serviço e tomada de decisão."
+          ]
+        },
+        {
+          "title": "4. Bases legais",
+          "paragraphs": [
+            "O tratamento poderá se apoiar em diferentes bases legais previstas na LGPD, conforme a finalidade específica."
+          ],
+          "items": [
+            "Execução de contrato e procedimentos preliminares relacionados ao uso da plataforma.",
+            "Cumprimento de obrigação legal ou regulatória.",
+            "Exercício regular de direitos em processos administrativos, judiciais ou arbitrais.",
+            "Legítimo interesse para segurança, prevenção a fraudes, melhoria do serviço, suporte, moderação e proteção de usuários, sempre com avaliação de necessidade e impacto.",
+            "Consentimento, quando exigido, como para cookies não essenciais, comunicações opcionais ou tratamentos específicos que dependam de autorização."
+          ]
+        },
+        {
+          "title": "5. Compartilhamento de dados",
+          "paragraphs": [
+            "Podemos compartilhar dados pessoais quando isso for necessário para operar o marketplace, proteger usuários, cumprir a lei ou atender solicitações válidas."
+          ],
+          "items": [
+            "Com outros usuários, quando dados de perfil, interesses, propostas e contatos forem necessários para a negociação.",
+            "Com fornecedores de infraestrutura, hospedagem, banco de dados, e-mail, suporte, analytics, segurança, antifraude e moderação.",
+            "Com serviços de inteligência artificial ou moderação automatizada para classificar, detectar ou bloquear conteúdo proibido e abuso.",
+            "Com autoridades públicas, órgãos reguladores, Poder Judiciário ou terceiros legitimados, quando houver obrigação legal, ordem válida ou necessidade de exercício regular de direitos.",
+            "Em operações societárias, reorganização, aquisição ou transferência de ativos, sempre respeitando esta política e a legislação aplicável."
+          ]
+        },
+        {
+          "title": "6. Cookies e tecnologias semelhantes",
+          "paragraphs": [
+            "A plataforma poderá usar cookies e tecnologias semelhantes para manter sessão, preservar preferências, melhorar desempenho, medir uso, prevenir fraude e oferecer funcionalidades essenciais.",
+            "Cookies estritamente necessários podem ser usados sem consentimento adicional. Cookies analíticos, publicitários ou opcionais deverão observar consentimento ou outra base legal aplicável, com meios de gerenciamento quando implementados."
+          ]
+        },
+        {
+          "title": "7. Retenção e eliminação",
+          "paragraphs": [
+            "Os dados serão mantidos pelo tempo necessário para cumprir as finalidades informadas, atender obrigações legais, preservar segurança, prevenir fraude e viabilizar o exercício regular de direitos.",
+            "Quando os dados não forem mais necessários, poderão ser eliminados, anonimizados ou bloqueados, observadas hipóteses legais de conservação, registros de auditoria, prevenção a abuso e ordens de autoridades competentes."
+          ]
+        },
+        {
+          "title": "8. Segurança",
+          "paragraphs": [
+            "Adotamos medidas técnicas e organizacionais proporcionais ao estágio do produto e aos riscos envolvidos para proteger dados pessoais contra acessos não autorizados, perda, alteração, divulgação indevida ou uso incompatível.",
+            "Nenhum sistema é totalmente imune a incidentes. Caso ocorra incidente relevante de segurança, a plataforma avaliará impactos, adotará medidas de contenção e realizará comunicações exigidas pela legislação aplicável."
+          ]
+        },
+        {
+          "title": "9. Direitos dos titulares",
+          "paragraphs": [
+            "Nos termos da LGPD, titulares de dados pessoais podem solicitar confirmação de tratamento, acesso, correção, anonimização, bloqueio ou eliminação de dados desnecessários ou tratados em desconformidade, portabilidade quando aplicável, informação sobre compartilhamentos, revisão de decisões automatizadas, revogação de consentimento e oposição a tratamentos irregulares.",
+            "Para exercer direitos, envie solicitação para privacidade@euprocuro.com. Poderemos solicitar informações adicionais para confirmar identidade, proteger a conta e evitar acesso indevido a dados de terceiros."
+          ]
+        },
+        {
+          "title": "10. Dados de terceiros e dados sensíveis",
+          "paragraphs": [
+            "O usuário não deve publicar dados pessoais de terceiros sem base legal ou autorização adequada. Também deve evitar inserir documentos, dados financeiros completos, senhas, informações íntimas ou dados pessoais sensíveis em interesses, propostas, mensagens ou denúncias.",
+            "Conteúdos que exponham indevidamente dados pessoais poderão ser removidos e gerar medidas de conta."
+          ]
+        },
+        {
+          "title": "11. Crianças e adolescentes",
+          "paragraphs": [
+            "A plataforma não é direcionada a crianças. Usuários menores de idade somente podem usar o serviço com autorização e supervisão de responsável legal, e a plataforma poderá remover contas ou conteúdos quando identificar uso incompatível com essa regra."
+          ]
+        },
+        {
+          "title": "12. Transferência internacional",
+          "paragraphs": [
+            "Alguns fornecedores de tecnologia, hospedagem, segurança, analytics ou moderação podem tratar dados fora do Brasil. Quando isso ocorrer, adotaremos medidas razoáveis para exigir proteção compatível com a LGPD e com esta política."
+          ]
+        },
+        {
+          "title": "13. Alterações e contato",
+          "paragraphs": [
+            "Esta Política de Privacidade poderá ser atualizada para refletir mudanças legais, operacionais, tecnológicas ou de produto. Alterações relevantes poderão ser comunicadas por meios razoáveis.",
+            "Dúvidas e solicitações relacionadas a privacidade devem ser enviadas para privacidade@euprocuro.com."
+          ]
+        }
+      ]
+    },
+    "politica-de-conteudo-proibido": {
+      "title": "Política de Conteúdo Proibido",
+      "label": "Conteúdo Proibido",
+      "updatedAt": "05/05/2026",
+      "effectiveAt": "05/05/2026",
+      "summary": "O que não pode ser publicado, solicitado, ofertado ou negociado no Eu Procuro.",
+      "sections": [
+        {
+          "title": "1. Princípio geral",
+          "paragraphs": [
+            "O Eu Procuro existe para aproximar compradores e vendedores legítimos. Não permitimos conteúdos, interesses, propostas, perfis, mensagens ou condutas que sejam ilegais, enganosos, abusivos, discriminatórios, perigosos, invasivos à privacidade ou incompatíveis com a segurança da comunidade.",
+            "Esta política vale para todo conteúdo inserido na plataforma, incluindo textos, tags, preços, descrições, contatos, imagens, anexos, links, mensagens e dados enviados em denúncias."
+          ]
+        },
+        {
+          "title": "2. Itens e serviços ilegais ou regulados",
+          "paragraphs": [
+            "É proibido solicitar, ofertar ou facilitar a negociação de bens, serviços ou atividades vedados pela lei ou sujeitos a autorização especial sem comprovação adequada."
+          ],
+          "items": [
+            "Drogas ilícitas, substâncias controladas, produtos falsificados, contrabandeados, furtados, roubados ou de procedência irregular.",
+            "Armas, munições, explosivos, dispositivos de dano, instruções de fabricação ou serviços que facilitem violência.",
+            "Medicamentos, procedimentos de saúde, serviços profissionais regulados ou produtos que exijam habilitação, receita, registro, licença ou autorização sem comprovação compatível.",
+            "Documentos, credenciais, contas, acessos, dados pessoais, bases de dados, meios de pagamento, cartões, chaves, senhas ou qualquer item que facilite fraude.",
+            "Serviços financeiros, investimentos, crédito, consórcio, apostas, sorteios, pirâmides ou promessas de ganho que violem leis ou regras setoriais."
+          ]
+        },
+        {
+          "title": "3. Fraude, golpe e engano",
+          "paragraphs": [
+            "Não permitimos conteúdo destinado a enganar usuários, manipular decisões, obter vantagem indevida ou ocultar riscos relevantes."
+          ],
+          "items": [
+            "Falsidade sobre identidade, localização, posse, preço, disponibilidade, qualidade, garantia, entrega ou autorização para vender.",
+            "Phishing, links maliciosos, engenharia social, pedidos suspeitos de pagamento, golpes de intermediação ou tentativa de contornar mecanismos de segurança.",
+            "Avaliações falsas, manipulação de reputação, criação de escassez artificial ou uso de contas coordenadas para induzir confiança.",
+            "Anúncios ou propostas que prometam resultados impossíveis, ganhos garantidos ou condições incompatíveis com a realidade do mercado."
+          ]
+        },
+        {
+          "title": "4. Conteúdo ofensivo, discriminatório ou violento",
+          "paragraphs": [
+            "A plataforma não permite conteúdo que promova violência, humilhação, ameaça, exploração, ódio, assédio ou discriminação."
+          ],
+          "items": [
+            "Ataques ou exclusão com base em origem, raça, cor, etnia, nacionalidade, religião, deficiência, idade, gênero, orientação sexual, condição social ou outro atributo protegido.",
+            "Ameaças, intimidação, extorsão, chantagem, perseguição, exposição vexatória ou incentivo a dano contra pessoas ou grupos.",
+            "Conteúdo sexual explícito, exploração sexual, nudez não consentida, aliciamento, serviços sexuais ou qualquer conteúdo sexual envolvendo menores de idade.",
+            "Imagens ou descrições de violência extrema usadas para chocar, ameaçar ou promover dano."
+          ]
+        },
+        {
+          "title": "5. Privacidade e dados pessoais",
+          "paragraphs": [
+            "É proibido publicar, vender, solicitar ou compartilhar dados pessoais de terceiros sem autorização ou base legal adequada."
+          ],
+          "items": [
+            "Documentos, endereços, telefones, e-mails, dados financeiros, prontuários, dados biométricos, credenciais, localização em tempo real ou informações privadas de terceiros.",
+            "Bases de leads, listas de contatos, dados vazados, dados obtidos por raspagem abusiva ou qualquer informação usada para spam, fraude ou perseguição.",
+            "Conteúdo que exponha conversa privada, imagem íntima, segredo comercial ou informação confidencial sem autorização."
+          ]
+        },
+        {
+          "title": "6. Propriedade intelectual e autenticidade",
+          "paragraphs": [
+            "O usuário deve respeitar direitos autorais, marcas, patentes, desenhos industriais, software, fotos, textos, catálogos e demais materiais protegidos."
+          ],
+          "items": [
+            "Produtos falsificados, réplicas enganosas, desbloqueios ilegais, pirataria, chaves de licença irregulares ou serviços para burlar proteção tecnológica.",
+            "Uso de marcas, logos, imagens ou textos de terceiros de forma que confunda o usuário sobre origem, autorização ou vínculo comercial.",
+            "Ofertas de bens ou serviços sem autorização do titular quando essa autorização for exigida."
+          ]
+        },
+        {
+          "title": "7. Categorias sensíveis para marketplace",
+          "paragraphs": [
+            "Algumas categorias exigem cuidado adicional. Mesmo quando não forem proibidas, poderão ser limitadas, moderadas ou removidas se não houver informações suficientes de legalidade, segurança e responsabilidade."
+          ],
+          "items": [
+            "Veículos, imóveis e serviços profissionais devem trazer informações verídicas, compatíveis com registros, licenças, condições de posse, disponibilidade e regras setoriais.",
+            "Produtos usados devem ser descritos com condição real, defeitos conhecidos, acessórios incluídos e limitações relevantes.",
+            "Serviços locais devem respeitar normas municipais, estaduais, profissionais, trabalhistas, sanitárias e de segurança aplicáveis."
+          ]
+        },
+        {
+          "title": "8. Links, contatos e negociação fora da plataforma",
+          "paragraphs": [
+            "Links, telefones e contatos podem ser usados para viabilizar propostas legítimas, mas não podem servir para fraude, spam, evasão de moderação, cobrança enganosa ou envio de conteúdo proibido.",
+            "A plataforma poderá remover links suspeitos, mascarados, encurtados, maliciosos ou incompatíveis com a finalidade do marketplace."
+          ]
+        },
+        {
+          "title": "9. Medidas de moderação",
+          "paragraphs": [
+            "Conteúdos proibidos podem gerar remoção, bloqueio, redução de alcance, solicitação de ajuste, suspensão, encerramento de conta, preservação de registros e comunicação a autoridades quando cabível.",
+            "A tentativa de burlar esta política por variações de grafia, imagens, códigos, links externos, contas alternativas ou mensagens privadas também é proibida."
+          ]
+        },
+        {
+          "title": "10. Dúvidas e denúncias",
+          "paragraphs": [
+            "Se houver dúvida sobre a permissão de um item ou serviço, entre em contato por contato@euprocuro.com antes de publicar. Para denunciar violação, use denuncias@euprocuro.com ou os canais de denúncia disponíveis na plataforma."
+          ]
+        }
+      ]
+    },
+    "politica-de-denuncia-e-remocao": {
+      "title": "Política de Denúncia e Remoção",
+      "label": "Denúncia e Remoção",
+      "updatedAt": "05/05/2026",
+      "effectiveAt": "05/05/2026",
+      "summary": "Como denunciar conteúdo, proposta, perfil ou conduta irregular, e como a plataforma analisa e remove violações.",
+      "sections": [
+        {
+          "title": "1. Objetivo",
+          "paragraphs": [
+            "Esta política define como o Eu Procuro recebe, prioriza, analisa e trata denúncias relacionadas a conteúdo proibido, fraude, abuso, violação de privacidade, propriedade intelectual, risco à segurança ou descumprimento dos Termos de Uso.",
+            "A política também explica como um usuário afetado pode contestar uma remoção, bloqueio ou suspensão."
+          ]
+        },
+        {
+          "title": "2. Quem pode denunciar",
+          "paragraphs": [
+            "Qualquer usuário, visitante, titular de direito, representante legal, autoridade ou pessoa impactada pode enviar denúncia sobre conteúdo, perfil, proposta, mensagem ou conduta que considere irregular."
+          ]
+        },
+        {
+          "title": "3. Canais de denúncia",
+          "paragraphs": [
+            "Enquanto o botão de denúncia dentro do produto não estiver disponível, denúncias devem ser enviadas para denuncias@euprocuro.com. Solicitações de privacidade devem ser enviadas para privacidade@euprocuro.com.",
+            "Quando houver recurso de denúncia na interface, o usuário deverá preferencialmente usá-lo, pois o formulário poderá anexar identificadores do conteúdo denunciado e acelerar a análise."
+          ]
+        },
+        {
+          "title": "4. Informações recomendadas",
+          "paragraphs": [
+            "Para permitir análise eficiente, a denúncia deve trazer o máximo possível de informações objetivas."
+          ],
+          "items": [
+            "Link, título, ID, print ou descrição do conteúdo, perfil, proposta ou conversa denunciada.",
+            "Motivo da denúncia e política potencialmente violada.",
+            "Evidências relevantes, como mensagens, comprovantes, documentos ou contexto da negociação.",
+            "Dados de contato do denunciante, quando desejar receber retorno ou quando a análise exigir complementação.",
+            "No caso de propriedade intelectual, identificação do titular, obra ou marca protegida e comprovação de legitimidade para solicitar remoção."
+          ]
+        },
+        {
+          "title": "5. Priorização",
+          "paragraphs": [
+            "Denúncias são priorizadas conforme risco e urgência. Casos com ameaça à integridade física, fraude em andamento, exposição de dados pessoais, conteúdo sexual não consentido, exploração de menores, ordem de autoridade ou risco jurídico elevado podem receber medidas imediatas.",
+            "Casos menos urgentes serão analisados em fila, de acordo com volume, completude das informações e gravidade aparente."
+          ]
+        },
+        {
+          "title": "6. Análise e medidas possíveis",
+          "paragraphs": [
+            "A plataforma pode combinar análise automatizada, revisão humana, histórico da conta, evidências enviadas e contexto da publicação para decidir a medida adequada."
+          ],
+          "items": [
+            "Nenhuma violação identificada, com manutenção do conteúdo.",
+            "Solicitação de ajuste, complementação de informação ou comprovação de regularidade.",
+            "Remoção parcial ou total do conteúdo.",
+            "Bloqueio temporário de publicação, proposta, perfil ou conta.",
+            "Suspensão ou encerramento definitivo de conta em caso de violação grave ou reincidência.",
+            "Preservação de registros e comunicação a autoridades competentes quando houver obrigação legal, ordem válida ou risco relevante."
+          ]
+        },
+        {
+          "title": "7. Prazos orientativos",
+          "paragraphs": [
+            "A plataforma buscará acusar recebimento de denúncias recebidas por e-mail em prazo razoável, especialmente quando houver dados de contato válidos.",
+            "Casos urgentes poderão ser analisados prioritariamente. Casos comuns serão tratados conforme a fila operacional e a complexidade da apuração. Estes prazos são orientativos e podem variar conforme volume, necessidade de informações adicionais ou exigências legais."
+          ]
+        },
+        {
+          "title": "8. Notificação do usuário afetado",
+          "paragraphs": [
+            "Quando apropriado e seguro, o usuário cujo conteúdo foi removido ou cuja conta sofreu restrição poderá receber comunicação com indicação geral do motivo e caminho para contestação.",
+            "A plataforma poderá deixar de notificar previamente quando isso puder comprometer investigação, segurança, cumprimento legal, proteção de vítimas, prevenção a fraude ou preservação de evidências."
+          ]
+        },
+        {
+          "title": "9. Contestação",
+          "paragraphs": [
+            "O usuário que discordar de uma remoção, bloqueio ou suspensão pode enviar contestação para denuncias@euprocuro.com, informando o e-mail da conta, conteúdo afetado, motivo da discordância e evidências de regularidade.",
+            "A contestação será reavaliada por critérios de proporcionalidade, contexto, risco e políticas aplicáveis. A reversão não é garantida e poderá depender de ajustes no conteúdo ou documentação adicional."
+          ]
+        },
+        {
+          "title": "10. Denúncias abusivas",
+          "paragraphs": [
+            "Denúncias falsas, coordenadas, repetitivas, discriminatórias, feitas de má-fé ou destinadas a prejudicar concorrentes e usuários legítimos podem gerar restrições ao denunciante.",
+            "O uso do canal de denúncia não autoriza exposição pública, assédio ou contato abusivo com usuários envolvidos."
+          ]
+        },
+        {
+          "title": "11. Autoridades e medidas externas",
+          "paragraphs": [
+            "A plataforma pode cooperar com autoridades competentes quando houver obrigação legal, ordem válida ou risco relevante. Em situações de emergência ou crime em andamento, o denunciante também deve acionar diretamente as autoridades competentes.",
+            "A remoção de conteúdo na plataforma não substitui medidas judiciais, administrativas ou policiais que possam ser necessárias."
+          ]
+        },
+        {
+          "title": "12. O que não está coberto agora",
+          "paragraphs": [
+            "Esta política não cria, neste momento, fluxo de reembolso, garantia comercial, mediação obrigatória de disputa de compra e venda ou ouvidoria formal. Esses temas poderão ser tratados em políticas próprias no futuro."
+          ]
+        }
+      ]
+    }
+  }
+}
