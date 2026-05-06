@@ -51,6 +51,8 @@ class AdminModerationServiceTest {
     private EventPublisherGateway eventPublisherGateway;
     @Mock
     private RealtimeMessageGateway realtimeMessageGateway;
+    @Mock
+    private PublicCacheService publicCacheService;
 
     @InjectMocks
     private AdminModerationService adminModerationService;

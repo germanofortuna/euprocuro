@@ -41,6 +41,8 @@ O backend segue uma separacao clara entre camadas:
 - Busca publica por texto, categoria, cidade e teto de orcamento
 - Monetizacao MVP com creditos para vendedores, plano Pro e boost pago de interesses apos a publicacao
 - CRM administrativo para textos, politicas legais, categorias, precos, planos e promocoes em runtime
+- Cache publico server-side para conteudo, catalogo, CEP e vitrine de interesses, com invalidacao manual no admin
+- Indices Mongo para as consultas publicas mais frequentes e contrato de busca dedicado para evoluir para Atlas Search/OpenSearch
 - Checkout local simulado e Checkout Pro Mercado Pago com confirmacao por webhook
 - E-mails transacionais para reset de senha, nova oferta, mensagem, compra e boost
 - Modais de feedback para mensagens de sucesso ou erro
@@ -309,6 +311,59 @@ Boost:
 - Depois de publicado/aprovado, o usuario pode comprar um produto do tipo `BOOST`.
 - Quando o pagamento e processado, o backend grava `boostedUntil`; a busca usa esse campo para priorizar o anuncio enquanto estiver vigente.
 
+## Cache, indices e busca
+
+A aplicacao usa cache server-side apenas para dados publicos e reconstruiveis:
+
+- `content`: catalogo publico de textos publicados (`GET /api/content/public`)
+- `catalog`: categorias e produtos publicados do CRM operacional
+- `marketplace`: listagens publicas de interesses com `openOnly=true`
+- `address`: resultado de consulta de CEP
+
+Dados privados, admin, sessoes, dashboard, notificacoes, conversas, creditos e pagamentos nao entram em cache compartilhado. As respostas da API recebem `Cache-Control: no-store`; o ganho de performance vem do cache interno do backend, nao do navegador.
+
+Configuracao por ambiente:
+
+```bash
+APP_PUBLIC_CACHE_ENABLED=true
+APP_PUBLIC_CACHE_MAX_ENTRIES=2000
+APP_PUBLIC_CACHE_CONTENT_TTL_SECONDS=300
+APP_PUBLIC_CACHE_CATALOG_TTL_SECONDS=300
+APP_PUBLIC_CACHE_MARKETPLACE_TTL_SECONDS=60
+APP_PUBLIC_CACHE_ADDRESS_TTL_SECONDS=2592000
+```
+
+Invalidacao automatica:
+
+- publicar ou arquivar conteudo invalida `content`
+- salvar catalogo operacional invalida `catalog`
+- criar, editar, renovar, desativar, ativar, excluir, moderar, denunciar ou impulsionar interesse invalida `marketplace`
+
+Invalidacao manual:
+
+```bash
+GET  /api/admin/cache
+POST /api/admin/cache/invalidate?scope=all
+POST /api/admin/cache/invalidate?scope=content
+POST /api/admin/cache/invalidate?scope=catalog
+POST /api/admin/cache/invalidate?scope=marketplace
+POST /api/admin/cache/invalidate?scope=address
+```
+
+O botao `Limpar cache` fica no CRM de conteudo e chama a invalidacao global. O acesso usa o mesmo controle admin de `APP_ADMIN_ALLOWED_EMAILS`.
+
+O store atual e `LOCAL_MEMORY`, suficiente para desenvolvimento, HML e uma instancia simples. Para varias instancias, o desenho ja esta isolado em `PublicCacheService`; o proximo passo natural e trocar esse store por Redis mantendo as mesmas chaves, TTLs e namespaces.
+
+O Mongo cria indices automaticamente via `spring.data.mongodb.auto-index-creation=true`. Hoje existem indices para:
+
+- vitrine de interesses por `status`, `location.city`, `category`, `boostedUntil`, `createdAt` e expiracao
+- interesses por dono
+- itens do vendedor por dono, status ativo, categoria e cidade
+- conteudo publicado por `locale`, `status` e `key`
+- text indexes em titulo, descricao e tags de interesses/itens
+
+A busca publica continua usando Mongo, mas a regra de busca ficou atras do contrato `InterestSearchGateway`. Para uma busca dedicada no futuro, crie outro adapter para esse contrato, por exemplo Atlas Search ou OpenSearch, sem alterar o caso de uso do marketplace.
+
 ## Monetizacao e pagamentos
 
 O MVP ja possui produtos de monetizacao configuraveis por ambiente:
@@ -522,6 +577,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 - `POST /api/admin/content/{id}/archive`
 - `GET /api/admin/catalog`
 - `PUT /api/admin/catalog`
+- `GET /api/admin/cache`
+- `POST /api/admin/cache/invalidate?scope=all`
 
 ## Testes e cobertura
 

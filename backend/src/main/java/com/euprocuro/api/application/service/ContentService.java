@@ -16,6 +16,7 @@ import javax.annotation.PostConstruct;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -52,7 +53,11 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
     private final ContentEntryGateway contentEntryGateway;
     private final ContentRevisionGateway contentRevisionGateway;
     private final ObjectMapper objectMapper;
+    private final PublicCacheService publicCacheService;
     private final AtomicBoolean defaultsSeeded = new AtomicBoolean(false);
+
+    @Value("${application.cache.public.content-ttl-seconds:300}")
+    private long contentCacheTtlSeconds = 300;
 
     @PostConstruct
     public void seedDefaultsOnStartup() {
@@ -63,12 +68,25 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
     public PublicContentCatalogView getPublishedContent(String locale, List<String> keys) {
         ensureDefaultContentSeeded();
         String resolvedLocale = resolveLocale(locale);
+        List<String> sanitizedKeys = keys == null || keys.isEmpty()
+                ? List.of()
+                : sanitizeKeys(keys).stream().sorted().collect(Collectors.toList());
+
+        return publicCacheService.getOrLoad(
+                PublicCacheService.CONTENT,
+                publishedContentCacheKey(resolvedLocale, sanitizedKeys),
+                contentCacheTtlSeconds,
+                () -> getPublishedContentUncached(resolvedLocale, sanitizedKeys)
+        );
+    }
+
+    private PublicContentCatalogView getPublishedContentUncached(String resolvedLocale, List<String> keys) {
         List<ContentEntry> entries = keys == null || keys.isEmpty()
                 ? contentEntryGateway.findByStatusAndLocale(ContentEntryStatus.PUBLISHED, resolvedLocale)
                 : contentEntryGateway.findByStatusAndLocaleAndKeyIn(
                         ContentEntryStatus.PUBLISHED,
                         resolvedLocale,
-                        sanitizeKeys(keys)
+                        keys
                 );
         List<ContentEntryView> publishedEntries = entries.stream()
                 .filter(entry -> entry.getType() != ContentEntryType.CATALOG)
@@ -162,6 +180,7 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
                 .publishedAt(now)
                 .build());
 
+        publicCacheService.invalidate(PublicCacheService.CONTENT);
         return toAdminView(published);
     }
 
@@ -173,11 +192,13 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
                 .orElseThrow(() -> new ResourceNotFoundException("Conteudo nao encontrado."));
         Instant now = Instant.now();
 
-        return toAdminView(contentEntryGateway.save(existing.toBuilder()
+        ContentEntry archived = contentEntryGateway.save(existing.toBuilder()
                 .status(ContentEntryStatus.ARCHIVED)
                 .updatedAt(now)
                 .updatedBy(admin.getId())
-                .build()));
+                .build());
+        publicCacheService.invalidate(PublicCacheService.CONTENT);
+        return toAdminView(archived);
     }
 
     @Override
@@ -317,6 +338,10 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
 
     private String resolveLocale(String locale) {
         return StringUtils.hasText(locale) ? locale.trim() : DEFAULT_LOCALE;
+    }
+
+    private String publishedContentCacheKey(String locale, List<String> keys) {
+        return locale + "|keys=" + String.join(",", Optional.ofNullable(keys).orElse(List.of()));
     }
 
     private String resolveScreen(String screen, String key) {

@@ -14,6 +14,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Component;
 
 import com.euprocuro.api.domain.gateway.InterestGateway;
+import com.euprocuro.api.domain.gateway.InterestSearchGateway;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestSearchCriteria;
 import com.euprocuro.api.domain.model.InterestStatus;
@@ -25,7 +26,7 @@ import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor
-public class InterestGatewayAdapter implements InterestGateway {
+public class InterestGatewayAdapter implements InterestGateway, InterestSearchGateway {
 
     private final SpringDataInterestRepository repository;
     private final MongoTemplate mongoTemplate;

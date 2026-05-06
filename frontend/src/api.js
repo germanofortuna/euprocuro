@@ -420,6 +420,13 @@ export async function saveAdminCatalog(payload) {
   });
 }
 
+export async function invalidatePublicCache(scope = "all") {
+  const params = new URLSearchParams({ scope });
+  return request(`/admin/cache/invalidate?${params.toString()}`, {
+    method: "POST"
+  });
+}
+
 export async function saveModerationRule(ruleId, payload) {
   const path = ruleId ? `/admin/moderation/rules/${ruleId}` : "/admin/moderation/rules";
   return request(path, {

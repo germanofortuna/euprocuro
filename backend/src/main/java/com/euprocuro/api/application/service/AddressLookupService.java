@@ -21,11 +21,15 @@ public class AddressLookupService {
     private static final String BRAZIL = "Brasil";
 
     private final RestTemplate restTemplate;
+    private final PublicCacheService publicCacheService;
 
     @Value("${application.address.lookup.viacep-base-url:https://viacep.com.br/ws}")
     private String viaCepBaseUrl;
+    @Value("${application.cache.public.address-ttl-seconds:2592000}")
+    private long addressCacheTtlSeconds = 2_592_000;
 
-    public AddressLookupService(RestTemplateBuilder restTemplateBuilder) {
+    public AddressLookupService(RestTemplateBuilder restTemplateBuilder, PublicCacheService publicCacheService) {
+        this.publicCacheService = publicCacheService;
         this.restTemplate = restTemplateBuilder
                 .setConnectTimeout(Duration.ofSeconds(2))
                 .setReadTimeout(Duration.ofSeconds(3))
@@ -38,6 +42,15 @@ public class AddressLookupService {
             throw new BusinessException("Informe um CEP valido com 8 digitos.");
         }
 
+        return publicCacheService.getOrLoad(
+                PublicCacheService.ADDRESS,
+                digits,
+                addressCacheTtlSeconds,
+                () -> lookupBrazilianPostalCodeUncached(digits)
+        );
+    }
+
+    private AddressLookupView lookupBrazilianPostalCodeUncached(String digits) {
         ViaCepResponse response;
         try {
             response = restTemplate.getForObject(

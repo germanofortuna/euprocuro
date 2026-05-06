@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -50,18 +51,32 @@ public class OperationalCatalogService {
     private final ContentEntryGateway contentEntryGateway;
     private final ContentRevisionGateway contentRevisionGateway;
     private final ObjectMapper objectMapper;
+    private final PublicCacheService publicCacheService;
     private final AtomicBoolean defaultsSeeded = new AtomicBoolean(false);
 
+    @Value("${application.cache.public.catalog-ttl-seconds:300}")
+    private long catalogCacheTtlSeconds = 300;
+
     public List<CatalogCategoryView> listActiveCategories() {
-        return listCategories().stream()
-                .filter(CatalogCategoryView::isActive)
-                .collect(Collectors.toList());
+        return publicCacheService.getOrLoad(
+                PublicCacheService.CATALOG,
+                "active-categories",
+                catalogCacheTtlSeconds,
+                () -> listCategories().stream()
+                        .filter(CatalogCategoryView::isActive)
+                        .collect(Collectors.toList())
+        );
     }
 
     public List<MonetizationProductView> listActiveProducts() {
-        return listProducts().stream()
-                .filter(MonetizationProductView::isEnabled)
-                .collect(Collectors.toList());
+        return publicCacheService.getOrLoad(
+                PublicCacheService.CATALOG,
+                "active-products",
+                catalogCacheTtlSeconds,
+                () -> listProducts().stream()
+                        .filter(MonetizationProductView::isEnabled)
+                        .collect(Collectors.toList())
+        );
     }
 
     public String requireActiveCategory(String code) {
@@ -90,6 +105,7 @@ public class OperationalCatalogService {
 
         saveCatalogEntry(CATEGORY_KEY, "Categorias de anuncios", categories, admin.getId());
         saveCatalogEntry(PRODUCT_KEY, "Produtos, planos e promocoes", products, admin.getId());
+        publicCacheService.invalidate(PublicCacheService.CATALOG);
         return buildAdminView();
     }
 

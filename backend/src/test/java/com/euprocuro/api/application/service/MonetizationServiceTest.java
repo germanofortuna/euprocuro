@@ -67,6 +67,8 @@ class MonetizationServiceTest {
     private PaymentCheckoutGateway paymentCheckoutGateway;
     @Mock
     private PaymentStatusGateway paymentStatusGateway;
+    @Mock
+    private PublicCacheService publicCacheService;
 
     @InjectMocks
     private MonetizationService monetizationService;

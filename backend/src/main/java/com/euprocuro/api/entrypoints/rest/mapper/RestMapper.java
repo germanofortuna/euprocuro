@@ -29,6 +29,7 @@ import com.euprocuro.api.application.view.AdminModerationView;
 import com.euprocuro.api.application.view.AdminOperationalCatalogView;
 import com.euprocuro.api.application.view.AddressLookupView;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
+import com.euprocuro.api.application.view.CacheInvalidationView;
 import com.euprocuro.api.application.view.CatalogCategoryView;
 import com.euprocuro.api.application.view.CheckoutView;
 import com.euprocuro.api.application.view.ConversationMessageView;
@@ -529,6 +530,17 @@ public final class RestMapper {
                                 (left, right) -> right,
                                 java.util.LinkedHashMap::new
                         )))
+                .build();
+    }
+
+    public static CacheInvalidationResponse toResponse(CacheInvalidationView view) {
+        return CacheInvalidationResponse.builder()
+                .scope(view.getScope())
+                .enabled(view.isEnabled())
+                .provider(view.getProvider())
+                .entries(view.getEntries())
+                .versions(view.getVersions())
+                .invalidatedAt(view.getInvalidatedAt())
                 .build();
     }
 

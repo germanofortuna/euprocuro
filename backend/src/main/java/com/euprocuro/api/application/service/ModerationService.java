@@ -52,6 +52,7 @@ public class ModerationService implements ModerationUseCase {
     private final ContentReportGateway contentReportGateway;
     private final AiModerationGateway aiModerationGateway;
     private final RealtimeMessageGateway realtimeMessageGateway;
+    private final PublicCacheService publicCacheService;
 
     @Value("${application.moderation.local.blocked-terms:}")
     private String defaultBlockedTerms;
@@ -133,6 +134,7 @@ public class ModerationService implements ModerationUseCase {
                 .moderation(mergeModeration(interest.getModeration()
                 ))
                 .build());
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         realtimeMessageGateway.publishInterestModerationUpdated(
                 interest.getOwnerId(),
                 interest.getId(),
@@ -165,6 +167,7 @@ public class ModerationService implements ModerationUseCase {
                         .checkedAt(Instant.now())
                         .build())
                 .build());
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         realtimeMessageGateway.publishInterestModerationUpdated(saved.getOwnerId(), saved.getId(), status.name(), reason);
     }
 

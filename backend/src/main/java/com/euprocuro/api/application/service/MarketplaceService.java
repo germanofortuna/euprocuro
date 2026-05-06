@@ -27,6 +27,7 @@ import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
+import com.euprocuro.api.domain.gateway.InterestSearchGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
@@ -52,11 +53,15 @@ public class MarketplaceService implements MarketplaceUseCase {
     private final RealtimeMessageGateway realtimeMessageGateway;
     private final BlockedTermValidationGateway blockedTermValidationGateway;
     private final OperationalCatalogService operationalCatalogService;
+    private final InterestSearchGateway interestSearchGateway;
+    private final PublicCacheService publicCacheService;
 
     @Value("${application.listings.expiration-days:30}")
     private long listingExpirationDays = 30;
     @Value("${application.listings.renewal-days:30}")
     private long listingRenewalDays = 30;
+    @Value("${application.cache.public.marketplace-ttl-seconds:60}")
+    private long marketplaceCacheTtlSeconds = 60;
 
     @Override
     public InterestPost createInterest(String currentUserId, CreateInterestCommand command) {
@@ -103,6 +108,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 });
 
         InterestPost saved = interestGateway.save(interestPost);
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.created", Map.of(
                 "interestId", saved.getId(),
                 "ownerId", owner.getId(),
@@ -126,6 +132,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         InterestPost saved = interestGateway.save(closedInterest);
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.closed", Map.of(
                 "interestId", saved.getId(),
                 "ownerId", saved.getOwnerId()
@@ -151,6 +158,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         InterestPost saved = interestGateway.save(activatedInterest);
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.activated", Map.of(
                 "interestId", saved.getId(),
                 "ownerId", saved.getOwnerId()
@@ -167,6 +175,7 @@ public class MarketplaceService implements MarketplaceUseCase {
         }
 
         interestGateway.deleteById(interestId);
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.deleted", Map.of(
                 "interestId", interestId,
                 "ownerId", currentUserId
@@ -216,6 +225,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 });
 
         InterestPost saved = interestGateway.save(updatedInterest);
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.updated", Map.of(
                 "interestId", saved.getId(),
                 "ownerId", saved.getOwnerId(),
@@ -254,6 +264,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         InterestPost saved = interestGateway.save(renewedInterest);
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.renewed", Map.of(
                 "interestId", saved.getId(),
                 "ownerId", saved.getOwnerId(),
@@ -283,13 +294,30 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     @Override
     public List<InterestPost> listInterests(InterestSearchFilter filter, int offset, int limit) {
-        return interestGateway.search(InterestSearchCriteria.builder()
+        InterestSearchCriteria criteria = InterestSearchCriteria.builder()
                 .category(filter.getCategory())
                 .city(filter.getCity())
                 .maxBudget(filter.getMaxBudget())
                 .query(filter.getQuery())
                 .openOnly(filter.isOpenOnly())
-                .build(), Math.max(0, offset), Math.max(1, Math.min(limit, 50)))
+                .build();
+        int safeOffset = Math.max(0, offset);
+        int safeLimit = Math.max(1, Math.min(limit, 50));
+
+        if (!criteria.isOpenOnly()) {
+            return searchInterests(criteria, safeOffset, safeLimit);
+        }
+
+        return publicCacheService.getOrLoad(
+                PublicCacheService.MARKETPLACE,
+                interestSearchCacheKey(criteria, safeOffset, safeLimit),
+                marketplaceCacheTtlSeconds,
+                () -> searchInterests(criteria, safeOffset, safeLimit)
+        );
+    }
+
+    private List<InterestPost> searchInterests(InterestSearchCriteria criteria, int offset, int limit) {
+        return interestSearchGateway.search(criteria, offset, limit)
                 .stream()
                 .filter(this::isNotExpired)
                 .collect(Collectors.toList());
@@ -472,5 +500,17 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     private String safe(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private String interestSearchCacheKey(InterestSearchCriteria criteria, int offset, int limit) {
+        return String.join("|",
+                "category=" + safe(criteria.getCategory()),
+                "city=" + safe(criteria.getCity()),
+                "query=" + safe(criteria.getQuery()),
+                "maxBudget=" + Optional.ofNullable(criteria.getMaxBudget()).map(BigDecimal::toPlainString).orElse(""),
+                "openOnly=" + criteria.isOpenOnly(),
+                "offset=" + offset,
+                "limit=" + limit
+        );
     }
 }

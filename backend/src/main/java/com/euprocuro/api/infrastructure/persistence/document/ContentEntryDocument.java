@@ -4,6 +4,7 @@ import java.time.Instant;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -20,7 +21,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document("content_entries")
-@CompoundIndex(name = "content_key_locale_unique", def = "{'key': 1, 'locale': 1}", unique = true)
+@CompoundIndexes({
+        @CompoundIndex(name = "content_key_locale_unique", def = "{'key': 1, 'locale': 1}", unique = true),
+        @CompoundIndex(name = "content_public_locale_status_key", def = "{'locale': 1, 'status': 1, 'key': 1}")
+})
 public class ContentEntryDocument {
     @Id
     private String id;

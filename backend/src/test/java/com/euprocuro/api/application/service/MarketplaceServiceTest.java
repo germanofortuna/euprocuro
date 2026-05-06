@@ -3,7 +3,10 @@ package com.euprocuro.api.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,8 +16,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import com.euprocuro.api.domain.gateway.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -56,9 +61,19 @@ class MarketplaceServiceTest {
     private BlockedTermValidationGateway blockedTermValidationGateway;
     @Mock
     private OperationalCatalogService operationalCatalogService;
+    @Mock
+    private InterestSearchGateway interestSearchGateway;
+    @Mock
+    private PublicCacheService publicCacheService;
 
     @InjectMocks
     private MarketplaceService marketplaceService;
+
+    @BeforeEach
+    void setUpCache() {
+        lenient().when(publicCacheService.getOrLoad(anyString(), anyString(), anyLong(), any()))
+                .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
+    }
 
     @Test
     void createInterestShouldPersistNormalizedInterest() {
@@ -453,7 +468,7 @@ class MarketplaceServiceTest {
         expired.setId("expired");
         expired.setExpiresAt(Instant.now().minus(1, ChronoUnit.HOURS));
 
-        when(interestGateway.search(any(InterestSearchCriteria.class), eq(0), eq(50)))
+        when(interestSearchGateway.search(any(InterestSearchCriteria.class), eq(0), eq(50)))
                 .thenReturn(List.of(active, expired));
 
         List<InterestPost> result = marketplaceService.listInterests(InterestSearchFilter.builder()

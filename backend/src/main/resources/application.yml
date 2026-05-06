@@ -99,6 +99,14 @@ application:
     cleanup:
       enabled: ${APP_LISTING_CLEANUP_ENABLED:true}
       fixed-delay-ms: ${APP_LISTING_CLEANUP_FIXED_DELAY_MS:3600000}
+  cache:
+    public:
+      enabled: ${APP_PUBLIC_CACHE_ENABLED:true}
+      max-entries: ${APP_PUBLIC_CACHE_MAX_ENTRIES:2000}
+      content-ttl-seconds: ${APP_PUBLIC_CACHE_CONTENT_TTL_SECONDS:300}
+      catalog-ttl-seconds: ${APP_PUBLIC_CACHE_CATALOG_TTL_SECONDS:300}
+      marketplace-ttl-seconds: ${APP_PUBLIC_CACHE_MARKETPLACE_TTL_SECONDS:60}
+      address-ttl-seconds: ${APP_PUBLIC_CACHE_ADDRESS_TTL_SECONDS:2592000}
   hml:
     access:
       enabled: ${APP_HML_ACCESS_ENABLED:false}

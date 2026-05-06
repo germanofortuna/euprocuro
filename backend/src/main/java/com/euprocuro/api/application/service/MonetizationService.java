@@ -50,6 +50,7 @@ public class MonetizationService implements MonetizationUseCase {
     private final PaymentOrderGateway paymentOrderGateway;
     private final PaymentCheckoutGateway paymentCheckoutGateway;
     private final PaymentStatusGateway paymentStatusGateway;
+    private final PublicCacheService publicCacheService;
 
     @Value("${application.monetization.provider:LOCAL_MOCK}")
     private String checkoutProvider = "LOCAL_MOCK";
@@ -466,6 +467,7 @@ public class MonetizationService implements MonetizationUseCase {
                 .boostedUntil(boostedUntil)
                 .updatedAt(now)
                 .build());
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
 
         UserProfile owner = requireUser(userId);
         emailGateway.sendBoostActivatedEmail(owner, saved.getTitle(), boostedUntil.toString());

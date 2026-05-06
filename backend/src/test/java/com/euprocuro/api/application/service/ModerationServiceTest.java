@@ -53,6 +53,8 @@ class ModerationServiceTest {
     private AiModerationGateway aiModerationGateway;
     @Mock
     private RealtimeMessageGateway realtimeMessageGateway;
+    @Mock
+    private PublicCacheService publicCacheService;
 
     @InjectMocks
     private ModerationService moderationService;

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   archiveContentEntry,
   fetchAdminContent,
+  invalidatePublicCache,
   publishContentEntry,
   saveContentEntry
 } from "../api";
@@ -66,6 +67,7 @@ export default function ContentAdminPanel({ onFeedback }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isInvalidatingCache, setIsInvalidatingCache] = useState(false);
 
   const selectedEntry = useMemo(
     () => entries.find((entry) => entry.id === selectedId) ?? null,
@@ -187,6 +189,18 @@ export default function ContentAdminPanel({ onFeedback }) {
     }
   }
 
+  async function handleInvalidateCache() {
+    setIsInvalidatingCache(true);
+    try {
+      await invalidatePublicCache("all");
+      showFeedback("success", "contentAdmin.feedback.cacheInvalidated.title", "contentAdmin.feedback.cacheInvalidated.message");
+    } catch (error) {
+      onFeedback?.("error", t("contentAdmin.feedback.cacheInvalidationError.title"), error.message);
+    } finally {
+      setIsInvalidatingCache(false);
+    }
+  }
+
   return (
     <article className="admin-card admin-card--content">
       <div className="content-admin__header">
@@ -196,6 +210,9 @@ export default function ContentAdminPanel({ onFeedback }) {
           <p>{t("contentAdmin.subtitle")}</p>
         </div>
         <div className="inline-actions">
+          <button type="button" className="ghost-button ghost-button--small" onClick={handleInvalidateCache} disabled={isInvalidatingCache}>
+            {isInvalidatingCache ? t("common.actions.loading") : t("contentAdmin.cache.invalidate")}
+          </button>
           <button type="button" className="ghost-button ghost-button--small" onClick={loadContent} disabled={isLoading}>
             {isLoading ? t("common.actions.loading") : t("contentAdmin.refresh")}
           </button>
