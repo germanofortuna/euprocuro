@@ -47,6 +47,7 @@ management:
 application:
   auth:
     session-hours: ${APP_AUTH_SESSION_HOURS:168}
+    session-renewal-threshold-hours: ${APP_AUTH_SESSION_RENEWAL_THRESHOLD_HOURS:24}
     password-reset-hours: ${APP_AUTH_PASSWORD_RESET_HOURS:2}
     email-verification-hours: ${APP_AUTH_EMAIL_VERIFICATION_HOURS:24}
     email-verification-required: ${APP_AUTH_EMAIL_VERIFICATION_REQUIRED:true}

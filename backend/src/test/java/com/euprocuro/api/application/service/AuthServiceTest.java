@@ -68,6 +68,7 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(authService, "sessionHours", 24L);
+        ReflectionTestUtils.setField(authService, "sessionRenewalThresholdHours", 0L);
         ReflectionTestUtils.setField(authService, "passwordResetHours", 2L);
         ReflectionTestUtils.setField(authService, "emailVerificationHours", 24L);
         ReflectionTestUtils.setField(authService, "resetBaseUrl", "https://app.euprocuro.com");
@@ -446,6 +447,56 @@ class AuthServiceTest {
         assertThat(result.getUser().getId()).isEqualTo("user-1");
         assertThat(result.getToken()).isNotBlank();
         verify(eventPublisherGateway).publish(eq("auth.login"), any(Map.class));
+    }
+
+    @Test
+    void requireAuthenticatedSessionShouldRenewExpiringSession() {
+        ReflectionTestUtils.setField(authService, "sessionRenewalThresholdHours", 6L);
+        AuthSession session = AuthSession.builder()
+                .id("session-1")
+                .token("token-123")
+                .userId("user-1")
+                .createdAt(Instant.now().minus(23, ChronoUnit.HOURS))
+                .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+        UserProfile user = baseUser();
+
+        when(authSessionGateway.findByToken("token-123")).thenReturn(Optional.of(session));
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+
+        AuthenticatedSessionView result = authService.requireAuthenticatedSession("token-123");
+
+        assertThat(result.isRenewed()).isTrue();
+        assertThat(result.getUser().getId()).isEqualTo("user-1");
+        assertThat(result.getExpiresAt()).isAfter(session.getExpiresAt());
+
+        ArgumentCaptor<AuthSession> sessionCaptor = ArgumentCaptor.forClass(AuthSession.class);
+        verify(authSessionGateway).save(sessionCaptor.capture());
+        assertThat(sessionCaptor.getValue().getToken()).isEqualTo("token-123");
+        assertThat(sessionCaptor.getValue().getExpiresAt()).isAfter(session.getExpiresAt());
+    }
+
+    @Test
+    void requireAuthenticatedSessionShouldKeepFreshSessionUntouched() {
+        ReflectionTestUtils.setField(authService, "sessionRenewalThresholdHours", 6L);
+        AuthSession session = AuthSession.builder()
+                .id("session-1")
+                .token("token-123")
+                .userId("user-1")
+                .createdAt(Instant.now())
+                .expiresAt(Instant.now().plus(12, ChronoUnit.HOURS))
+                .build();
+        UserProfile user = baseUser();
+
+        when(authSessionGateway.findByToken("token-123")).thenReturn(Optional.of(session));
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+
+        AuthenticatedSessionView result = authService.requireAuthenticatedSession("token-123");
+
+        assertThat(result.isRenewed()).isFalse();
+        assertThat(result.getExpiresAt()).isEqualTo(session.getExpiresAt());
+        verify(authSessionGateway, never()).save(any(AuthSession.class));
     }
 
     @Test

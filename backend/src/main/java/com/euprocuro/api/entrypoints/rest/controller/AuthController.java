@@ -59,7 +59,9 @@ public class AuthController {
     @GetMapping("/me")
     public MeResponse me(HttpServletRequest request) {
         String userId = CurrentUserContext.userId(request);
-        return RestMapper.toMeResponse(authUseCase.meByUserId(userId));
+        MeResponse response = RestMapper.toMeResponse(authUseCase.meByUserId(userId));
+        CurrentUserContext.optionalSessionExpiresAt(request).ifPresent(response::setExpiresAt);
+        return response;
     }
 
     @PostMapping("/logout")

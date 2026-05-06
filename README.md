@@ -379,6 +379,7 @@ Precos, quantidades, planos, boosts e promocoes sao gerenciados pelo CRM operaci
 ## Seguranca para producao
 
 - Cookies de sessao HTTP-only com configuracao por ambiente
+- Sessao deslizante: usuarios ativos renovam a expiracao quando a sessao entra na janela final configurada
 - `Strict-Transport-Security`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` e `Permissions-Policy`
 - `CORS` limitado por `APP_CORS_ALLOWED_ORIGINS`
 - Rate limit para login, cadastro, reset de senha e envio de mensagens
@@ -394,8 +395,12 @@ APP_AUTH_COOKIE_SAME_SITE=Lax
 APP_AUTH_COOKIE_DOMAIN=.seudominio.com
 APP_AUTH_EXPOSE_RESET_PREVIEW=false
 APP_AUTH_EXPOSE_SESSION_TOKEN=false
+APP_AUTH_SESSION_HOURS=168
+APP_AUTH_SESSION_RENEWAL_THRESHOLD_HOURS=24
 APP_RESET_BASE_URL=https://app.seudominio.com
 ```
+
+`APP_AUTH_SESSION_HOURS` define o tempo maximo de inatividade. `APP_AUTH_SESSION_RENEWAL_THRESHOLD_HOURS` define quando renovar: com os defaults, uma sessao dura 7 dias e, se o usuario continuar ativo quando faltar menos de 24h, o backend renova por mais 7 dias.
 
 ## Configuracao de RabbitMQ
 

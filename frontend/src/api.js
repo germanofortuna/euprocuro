@@ -34,6 +34,19 @@ function buildErrorMessage(payload, fallbackMessage) {
   return fallbackMessage;
 }
 
+export class ApiError extends Error {
+  constructor(message, { status, payload } = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status ?? null;
+    this.payload = payload ?? null;
+  }
+}
+
+export function isAuthError(error) {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+}
+
 async function request(path, options = {}) {
   const session = getStoredSession();
   const headers = new Headers(options.headers ?? {});
@@ -55,12 +68,15 @@ async function request(path, options = {}) {
   if (!response.ok) {
     let payload = null;
     try {
-      payload = await response.json();
+      payload = await response.clone().json();
     } catch (error) {
-      payload = await response.text();
+      payload = await response.text().catch(() => null);
     }
 
-    throw new Error(buildErrorMessage(payload, GENERIC_REQUEST_ERROR));
+    throw new ApiError(
+      buildErrorMessage(payload, GENERIC_REQUEST_ERROR),
+      { status: response.status, payload }
+    );
   }
 
   return response.status === 204 ? null : response.json();
@@ -286,6 +302,12 @@ export async function closeInterest(interestId) {
   });
 }
 
+export async function activateInterest(interestId) {
+  return request(`/interests/${interestId}/activate`, {
+    method: "PATCH"
+  });
+}
+
 export async function deleteInterest(interestId) {
   return request(`/interests/${interestId}`, {
     method: "DELETE"
@@ -342,6 +364,12 @@ export async function updateSellerItem(itemId, payload) {
 
 export async function deactivateSellerItem(itemId) {
   return request(`/seller-items/${itemId}/deactivate`, {
+    method: "PATCH"
+  });
+}
+
+export async function activateSellerItem(itemId) {
+  return request(`/seller-items/${itemId}/activate`, {
     method: "PATCH"
   });
 }

@@ -633,7 +633,6 @@ textarea:focus {
   background: transparent;
   color: var(--accent-strong);
   border: 1px solid rgba(11, 79, 187, 0.18);
-  margin-bottom: 10px;
 }
 
 .text-button {
@@ -1436,6 +1435,7 @@ textarea:focus {
 
 .detail-block > .detail-row:last-child {
   border-bottom: none;
+  padding-bottom: 0;
 }
 
 .detail-row a {
@@ -2147,6 +2147,10 @@ textarea:focus {
 
 .seller-item-tab--inactive {
   opacity: 0.72;
+}
+
+.accordion-card--inactive {
+  opacity: 0.76;
 }
 
 .seller-items-toggle {

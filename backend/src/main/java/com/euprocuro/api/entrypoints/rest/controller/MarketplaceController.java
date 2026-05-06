@@ -133,6 +133,13 @@ public class MarketplaceController {
         );
     }
 
+    @PatchMapping("/interests/{id}/activate")
+    public InterestResponse activateInterest(@PathVariable String id, HttpServletRequest request) {
+        return RestMapper.toResponse(
+                marketplaceUseCase.activateInterest(CurrentUserContext.userId(request), id)
+        );
+    }
+
     @DeleteMapping("/interests/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteInterest(@PathVariable String id, HttpServletRequest request) {

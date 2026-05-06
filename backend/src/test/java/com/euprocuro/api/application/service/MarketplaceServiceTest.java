@@ -382,6 +382,32 @@ class MarketplaceServiceTest {
     }
 
     @Test
+    void activateInterestShouldSendClosedInterestBackToModeration() {
+        InterestPost closed = baseInterest();
+        closed.setStatus(InterestStatus.CLOSED);
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(closed));
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        InterestPost result = marketplaceService.activateInterest("buyer-1", "interest-1");
+
+        assertThat(result.getStatus()).isEqualTo(InterestStatus.PENDING);
+        assertThat(result.getModeration()).isNull();
+        verify(eventPublisherGateway).publish(eq("interest.activated"), any(Map.class));
+        verify(eventPublisherGateway).publish(eq("interest.moderation.requested"), any(Map.class));
+    }
+
+    @Test
+    void activateInterestShouldRejectDifferentOwner() {
+        InterestPost closed = baseInterest();
+        closed.setStatus(InterestStatus.CLOSED);
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(closed));
+
+        assertThatThrownBy(() -> marketplaceService.activateInterest("other-user", "interest-1"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("dono do interesse");
+    }
+
+    @Test
     void deleteInterestShouldRemoveOwnedInterest() {
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
 

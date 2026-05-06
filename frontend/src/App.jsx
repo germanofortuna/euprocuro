@@ -1,6 +1,8 @@
 ﻿import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  activateInterest,
+  activateSellerItem,
   cancelSubscription,
   clearSession,
   boostInterest,
@@ -25,6 +27,7 @@ import {
   fetchSellerItems,
   forgotPassword,
   getStoredSession,
+  isAuthError,
   login,
   lookupAddressByPostalCode,
   logout,
@@ -94,9 +97,11 @@ const initialSellerItemForm = {
   referenceImageUrl: "",
   category: "SERVICOS",
   desiredPrice: "",
+  postalCode: "",
   city: "",
   state: "",
   neighborhood: "",
+  country: "Brasil",
   tags: ""
 };
 
@@ -423,9 +428,11 @@ function buildSellerItemPayload(itemForm) {
     referenceImageUrl: itemForm.referenceImageUrl || null,
     category: itemForm.category,
     desiredPrice: itemForm.desiredPrice || null,
+    postalCode: itemForm.postalCode,
     city: itemForm.city,
     state: itemForm.state,
     neighborhood: itemForm.neighborhood,
+    country: itemForm.country,
     tags: itemForm.tags
       .split(",")
       .map((tag) => tag.trim())
@@ -441,9 +448,11 @@ function mapSellerItemToForm(groupOrItem) {
     referenceImageUrl: item?.referenceImageUrl ?? "",
     category: item?.category ?? "SERVICOS",
     desiredPrice: item?.desiredPrice ?? "",
+    postalCode: item?.location?.postalCode ?? "",
     city: item?.location?.city ?? "",
     state: item?.location?.state ?? "",
     neighborhood: item?.location?.neighborhood ?? "",
+    country: item?.location?.country ?? "Brasil",
     tags: item?.tags?.join(", ") ?? ""
   };
 }
@@ -627,6 +636,7 @@ export default function App() {
   const [sellerItems, setSellerItems] = useState([]);
   const [selectedSellerItemId, setSelectedSellerItemId] = useState(null);
   const [showInactiveSellerItems, setShowInactiveSellerItems] = useState(false);
+  const [showInactiveInterests, setShowInactiveInterests] = useState(false);
   const [authMode, setAuthMode] = useState(initialResetState.mode);
   const [isAuthModalVisible, setIsAuthModalVisible] = useState(initialResetState.mode === "reset");
   const [loginForm, setLoginForm] = useState(initialLoginForm);
@@ -681,7 +691,8 @@ export default function App() {
   const [feedbackModal, setFeedbackModal] = useState(null);
   const [addressLookupState, setAddressLookupState] = useState({
     register: { isLoading: false, message: "" },
-    interest: { isLoading: false, message: "" }
+    interest: { isLoading: false, message: "" },
+    sellerItem: { isLoading: false, message: "" }
   });
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -699,12 +710,20 @@ export default function App() {
   const debouncedQuery = useDebouncedValue(filters.query, 350);
   const deferredQuery = useDeferredValue(debouncedQuery);
   const currentUser = session?.user ?? null;
-  const myInterests = useMemo(
+  const allMyInterests = useMemo(
     () => (dashboard?.myInterests ?? [])
-      .filter((interest) => !["CLOSED", "HIDDEN"].includes(interest.status))
+      .filter((interest) => interest.status !== "HIDDEN")
       .slice()
       .sort(byNewest),
     [dashboard?.myInterests]
+  );
+  const activeMyInterests = useMemo(
+    () => allMyInterests.filter((interest) => interest.status !== "CLOSED"),
+    [allMyInterests]
+  );
+  const myInterests = useMemo(
+    () => showInactiveInterests ? allMyInterests : activeMyInterests,
+    [activeMyInterests, allMyInterests, showInactiveInterests]
   );
   const sentOffers = useMemo(() => (dashboard?.offersSent ?? []).slice().sort(byNewest), [dashboard?.offersSent]);
   const receivedOffers = useMemo(() => (dashboard?.offersReceived ?? []).slice().sort(byNewest), [dashboard?.offersReceived]);
@@ -1333,15 +1352,24 @@ export default function App() {
         setIsAdmin(false);
       }
     } catch (requestError) {
-      clearSession();
-      setSession(null);
-      setDashboard(null);
-      setMonetizationAccount(null);
-      setSellerItems([]);
-      setAdminModeration(null);
-      setIsAdmin(false);
-      setLoggedSection(loggedSections.EXPLORE);
-      openFeedback("error", "Sessão encerrada", requestError.message || "Entre novamente para continuar.");
+      if (isAuthError(requestError)) {
+        clearSession();
+        setSession(null);
+        setDashboard(null);
+        setMonetizationAccount(null);
+        setSellerItems([]);
+        setAdminModeration(null);
+        setIsAdmin(false);
+        setLoggedSection(loggedSections.EXPLORE);
+        openFeedback("error", "Sessão encerrada", requestError.message || "Entre novamente para continuar.");
+        return;
+      }
+
+      openFeedback(
+        "error",
+        "Instabilidade temporária",
+        requestError.message || "Não foi possível atualizar seus dados agora. Sua sessão foi mantida."
+      );
     } finally {
       if (!silent) {
         setIsLoadingPrivate(false);
@@ -1794,7 +1822,7 @@ export default function App() {
       })
       .filter(Boolean);
 
-    const expiringInterestEntries = myInterests
+    const expiringInterestEntries = activeMyInterests
       .filter((interest) => ["OPEN", "APPROVED"].includes(interest.status) && isListingExpiringSoon(interest))
       .map((interest) => {
         const expiresAt = listingExpiresAt(interest);
@@ -1815,7 +1843,7 @@ export default function App() {
       })
       .filter(Boolean);
 
-    const moderationEntries = myInterests
+    const moderationEntries = activeMyInterests
       .filter((interest) => ["REJECTED", "REVIEW_REQUIRED", "REPORTED"].includes(interest.status))
       .map((interest) => {
         const notificationId = `interest-moderation:${interest.id}:${interest.status}:${interest.updatedAt ?? ""}`;
@@ -1872,7 +1900,7 @@ export default function App() {
 
     setNotifications(unreadEntries);
     setHasUnreadMessages(unreadEntries.length > 0);
-  }, [session, currentUser?.id, receivedOffers, sentOffers, sellerItems, myInterests, isAdmin, adminModeration?.openReports, messageSyncKey]);
+  }, [session, currentUser?.id, receivedOffers, sentOffers, sellerItems, activeMyInterests, isAdmin, adminModeration?.openReports, messageSyncKey]);
 
   useEffect(() => {
     if (!session) {
@@ -2126,6 +2154,20 @@ export default function App() {
       openFeedback("success", "Anúncio desativado", "Seu anúncio não aparecerá mais para outros usuários.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível desativar", requestError.message || "Tente novamente.");
+    }
+  }
+
+  async function handleActivateInterest(interestId) {
+    if (!interestId) {
+      return;
+    }
+
+    try {
+      await activateInterest(interestId);
+      await Promise.all([refreshPrivateData(), refreshPublicData()]);
+      openFeedback("success", "Anúncio enviado para análise", "Seu interesse foi reativado e será validado antes de voltar à vitrine.");
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível ativar", requestError.message || "Tente novamente.");
     }
   }
 
@@ -2421,6 +2463,20 @@ export default function App() {
       openFeedback("success", "Item desativado", "Você pode cadastrar outro item quando quiser.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível desativar", requestError.message || "Tente novamente.");
+    }
+  }
+
+  async function handleActivateSellerItem(itemId) {
+    if (!itemId) {
+      return;
+    }
+
+    try {
+      await activateSellerItem(itemId);
+      await refreshPrivateData();
+      openFeedback("success", "Item ativado", "Seu item voltou a participar dos cruzamentos com interesses.");
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível ativar", requestError.message || "Tente novamente.");
     }
   }
 
@@ -3061,7 +3117,7 @@ export default function App() {
     return (
       <article
         key={interest.id}
-        className={`accordion-card ${isSelected ? "accordion-card--selected" : ""}`}
+        className={`accordion-card ${isSelected ? "accordion-card--selected" : ""} ${interest.status === "CLOSED" ? "accordion-card--inactive" : ""}`}
       >
         <button
           type="button"
@@ -3531,6 +3587,23 @@ export default function App() {
 
         <div className="three-columns">
           <input
+            placeholder={t("address.postalCode.placeholder")}
+            value={sellerItemForm.postalCode}
+            onChange={(event) =>
+              setSellerItemForm((current) => ({ ...current, postalCode: formatCep(event.target.value) }))
+            }
+            onBlur={() => handlePostalCodeLookup("sellerItem", sellerItemForm.postalCode, (address) => {
+              setSellerItemForm((current) => ({
+                ...current,
+                postalCode: address.postalCode ?? current.postalCode,
+                city: address.city ?? current.city,
+                state: address.state ?? current.state,
+                neighborhood: address.neighborhood ?? current.neighborhood,
+                country: address.country ?? current.country
+              }));
+            })}
+          />
+          <input
             placeholder={t("auth.register.city.placeholder")}
             value={sellerItemForm.city}
             onChange={(event) => setSellerItemForm((current) => ({ ...current, city: event.target.value }))}
@@ -3546,6 +3619,16 @@ export default function App() {
             onChange={(event) => setSellerItemForm((current) => ({ ...current, neighborhood: event.target.value }))}
           />
         </div>
+        {addressLookupState.sellerItem.message ? (
+          <small
+            className={`address-lookup-note ${addressLookupState.sellerItem.isLoading ? "is-loading" : ""}`}
+            role="status"
+            aria-live="polite"
+            aria-busy={addressLookupState.sellerItem.isLoading}
+          >
+            {addressLookupState.sellerItem.message}
+          </small>
+        ) : null}
 
         <input
           placeholder={t("interest.form.tags.placeholder")}
@@ -3700,7 +3783,15 @@ export default function App() {
                       >
                         Desativar item
                       </button>
-                    ) : null}
+                    ) : (
+                      <button
+                        type="button"
+                        className="primary-button primary-button--compact"
+                        onClick={() => handleActivateSellerItem(selectedItem.id)}
+                      >
+                        Ativar item
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : null}
@@ -4101,9 +4192,17 @@ export default function App() {
               <div className="panel__header">
                 <div>
                   <span className="eyebrow">Página</span>
-                  <h2>Interesses ativos</h2>
+                  <h2>{showInactiveInterests ? "Meus interesses" : "Interesses ativos"}</h2>
                 </div>
               </div>
+              <label className="seller-items-toggle">
+                <input
+                  type="checkbox"
+                  checked={showInactiveInterests}
+                  onChange={(event) => setShowInactiveInterests(event.target.checked)}
+                />
+                <span>Mostrar interesses desativados</span>
+              </label>
 
               {myInterests.length ? (
                 <div className="accordion-list">{myInterests.map(renderInterestListItem)}</div>
@@ -4135,12 +4234,14 @@ export default function App() {
                   ) : null}
 
                   <p className="detail-description">{selectedInterest.description}</p>
-                  {["PENDING", "REVIEW_REQUIRED", "REJECTED", "REPORTED"].includes(selectedInterest.status) ? (
+                  {["PENDING", "REVIEW_REQUIRED", "REJECTED", "REPORTED", "CLOSED"].includes(selectedInterest.status) ? (
                     <div className={`moderation-callout moderation-callout--${moderationStatusTone(selectedInterest.status)}`}>
                       <strong>{moderationStatusLabel(selectedInterest.status, t)}</strong>
                       <p>
                         {selectedInterest.status === "REJECTED"
                           ? "Seu anúncio foi rejeitado. Edite para enviar novamente para análise ou exclua se preferir."
+                          : selectedInterest.status === "CLOSED"
+                            ? "Este anúncio está desativado e não aparece para outros usuários."
                           : (selectedInterest.moderation?.reason ?? "Seu anúncio ainda não está disponível publicamente.")}
                       </p>
                     </div>
@@ -4173,13 +4274,23 @@ export default function App() {
                     >
                       Editar anúncio
                     </button>
-                    <button
-                      type="button"
-                      className="ghost-button action-button--compact"
-                      onClick={() => handleCloseInterest(selectedInterest.id)}
-                    >
-                      Desativar anúncio
-                    </button>
+                    {selectedInterest.status === "CLOSED" ? (
+                      <button
+                        type="button"
+                        className="primary-button action-button--compact"
+                        onClick={() => handleActivateInterest(selectedInterest.id)}
+                      >
+                        Ativar anúncio
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="ghost-button action-button--compact"
+                        onClick={() => handleCloseInterest(selectedInterest.id)}
+                      >
+                        Desativar anúncio
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="danger-button action-button--compact"

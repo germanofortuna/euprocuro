@@ -15,8 +15,10 @@ public class CreateSellerItemCommand {
     String referenceImageUrl;
     String category;
     BigDecimal desiredPrice;
+    String postalCode;
     String city;
     String state;
     String neighborhood;
+    String country;
     List<String> tags;
 }

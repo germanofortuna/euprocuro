@@ -29,8 +29,10 @@ public class CreateSellerItemRequest {
 
     private BigDecimal desiredPrice;
 
+    private String postalCode;
     private String city;
     private String state;
     private String neighborhood;
+    private String country;
     private List<String> tags = new ArrayList<>();
 }

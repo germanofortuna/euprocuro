@@ -134,6 +134,32 @@ public class MarketplaceService implements MarketplaceUseCase {
     }
 
     @Override
+    public InterestPost activateInterest(String currentUserId, String interestId) {
+        InterestPost existingInterest = loadInterest(interestId);
+        if (!Objects.equals(existingInterest.getOwnerId(), currentUserId)) {
+            throw new ForbiddenException("Apenas o dono do interesse pode ativar esse anuncio.");
+        }
+
+        if (existingInterest.getStatus() != InterestStatus.CLOSED) {
+            throw new BusinessException("Apenas anuncios desativados podem ser ativados novamente.");
+        }
+
+        InterestPost activatedInterest = existingInterest.toBuilder()
+                .status(InterestStatus.PENDING)
+                .moderation(null)
+                .updatedAt(Instant.now())
+                .build();
+
+        InterestPost saved = interestGateway.save(activatedInterest);
+        eventPublisherGateway.publish("interest.activated", Map.of(
+                "interestId", saved.getId(),
+                "ownerId", saved.getOwnerId()
+        ));
+        publishModerationRequest(saved);
+        return saved;
+    }
+
+    @Override
     public void deleteInterest(String currentUserId, String interestId) {
         InterestPost existingInterest = loadInterest(interestId);
         if (!Objects.equals(existingInterest.getOwnerId(), currentUserId)) {

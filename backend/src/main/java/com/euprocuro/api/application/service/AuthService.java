@@ -7,6 +7,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -64,6 +65,9 @@ public class AuthService implements AuthUseCase {
 
     @Value("${application.auth.session-hours:168}")
     private long sessionHours;
+
+    @Value("${application.auth.session-renewal-threshold-hours:24}")
+    private long sessionRenewalThresholdHours;
 
     @Value("${application.auth.password-reset-hours:2}")
     private long passwordResetHours;
@@ -369,9 +373,22 @@ public class AuthService implements AuthUseCase {
 
     @Override
     public UserProfile requireAuthenticatedUser(String token) {
+        return requireAuthenticatedSession(token).getUser();
+    }
+
+    @Override
+    public AuthenticatedSessionView requireAuthenticatedSession(String token) {
         AuthSession session = getValidSession(token);
-        return userGateway.findById(session.getUserId())
+        AuthSession validSession = renewSessionIfNeeded(session);
+        UserProfile user = userGateway.findById(validSession.getUserId())
                 .orElseThrow(() -> new UnauthorizedException("Sessao invalida."));
+
+        return AuthenticatedSessionView.builder()
+                .token(validSession.getToken())
+                .expiresAt(validSession.getExpiresAt())
+                .user(user)
+                .renewed(!Objects.equals(session.getExpiresAt(), validSession.getExpiresAt()))
+                .build();
     }
 
     private AuthSession createSession(UserProfile user) {
@@ -397,6 +414,22 @@ public class AuthService implements AuthUseCase {
         }
 
         return session;
+    }
+
+    private AuthSession renewSessionIfNeeded(AuthSession session) {
+        if (sessionRenewalThresholdHours <= 0) {
+            return session;
+        }
+
+        Instant now = Instant.now();
+        Instant renewalBoundary = now.plus(sessionRenewalThresholdHours, ChronoUnit.HOURS);
+        if (session.getExpiresAt().isAfter(renewalBoundary)) {
+            return session;
+        }
+
+        return authSessionGateway.save(session.toBuilder()
+                .expiresAt(now.plus(sessionHours, ChronoUnit.HOURS))
+                .build());
     }
 
     private void validateName(String name) {

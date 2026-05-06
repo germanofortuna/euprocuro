@@ -18,5 +18,7 @@ public interface SellerItemUseCase {
 
     SellerItem deactivateItem(String currentUserId, String itemId);
 
+    SellerItem activateItem(String currentUserId, String itemId);
+
     Offer shareItemAsOffer(String currentUserId, String itemId, String interestId, ShareSellerItemCommand command);
 }

@@ -266,9 +266,11 @@ public final class RestMapper {
                 .referenceImageUrl(request.getReferenceImageUrl())
                 .category(request.getCategory())
                 .desiredPrice(request.getDesiredPrice())
+                .postalCode(request.getPostalCode())
                 .city(request.getCity())
                 .state(request.getState())
                 .neighborhood(request.getNeighborhood())
+                .country(request.getCountry())
                 .tags(Optional.ofNullable(request.getTags()).orElse(List.of()))
                 .build();
     }
@@ -289,9 +291,11 @@ public final class RestMapper {
                 .referenceImageUrl(request.getReferenceImageUrl())
                 .category(request.getCategory())
                 .desiredPrice(request.getDesiredPrice())
+                .postalCode(request.getPostalCode())
                 .city(request.getCity())
                 .state(request.getState())
                 .neighborhood(request.getNeighborhood())
+                .country(request.getCountry())
                 .tags(Optional.ofNullable(request.getTags()).orElse(List.of()))
                 .build();
     }
@@ -329,6 +333,7 @@ public final class RestMapper {
                 .neighborhood(session.getUser().getNeighborhood())
                 .country(session.getUser().getCountry())
                 .credits(session.getUser().getSellerCredits())
+                .expiresAt(session.getExpiresAt())
                 .build();
     }
 

@@ -75,9 +75,11 @@ public class SellerItemService implements SellerItemUseCase {
                 .category(operationalCatalogService.requireActiveCategory(command.getCategory()))
                 .desiredPrice(command.getDesiredPrice())
                 .location(LocationInfo.builder()
+                        .postalCode(normalizePostalCode(command.getPostalCode()))
                         .city(command.getCity())
                         .state(command.getState())
                         .neighborhood(command.getNeighborhood())
+                        .country(normalizeCountry(command.getCountry()))
                         .remote(false)
                         .build())
                 .tags(Optional.ofNullable(command.getTags()).orElse(List.of()))
@@ -104,9 +106,11 @@ public class SellerItemService implements SellerItemUseCase {
                 .category(operationalCatalogService.requireActiveCategory(command.getCategory()))
                 .desiredPrice(command.getDesiredPrice())
                 .location(LocationInfo.builder()
+                        .postalCode(normalizePostalCode(command.getPostalCode()))
                         .city(command.getCity())
                         .state(command.getState())
                         .neighborhood(command.getNeighborhood())
+                        .country(normalizeCountry(command.getCountry()))
                         .remote(false)
                         .build())
                 .tags(Optional.ofNullable(command.getTags()).orElse(List.of()))
@@ -127,6 +131,15 @@ public class SellerItemService implements SellerItemUseCase {
         SellerItem item = requireOwnedItem(currentUserId, itemId);
         return sellerItemGateway.save(item.toBuilder()
                 .active(false)
+                .updatedAt(Instant.now())
+                .build());
+    }
+
+    @Override
+    public SellerItem activateItem(String currentUserId, String itemId) {
+        SellerItem item = requireOwnedItem(currentUserId, itemId);
+        return sellerItemGateway.save(item.toBuilder()
+                .active(true)
                 .updatedAt(Instant.now())
                 .build());
     }
@@ -202,6 +215,21 @@ public class SellerItemService implements SellerItemUseCase {
 
     private String normalize(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String normalizePostalCode(String value) {
+        String digits = Optional.ofNullable(value).orElse("").replaceAll("\\D", "");
+        if (!StringUtils.hasText(digits)) {
+            return null;
+        }
+        if (digits.length() != 8) {
+            throw new BusinessException("Informe um CEP valido com 8 digitos.");
+        }
+        return digits.substring(0, 5) + "-" + digits.substring(5);
+    }
+
+    private String normalizeCountry(String value) {
+        return StringUtils.hasText(value) ? value.trim() : "Brasil";
     }
 
     private String safe(String value) {
