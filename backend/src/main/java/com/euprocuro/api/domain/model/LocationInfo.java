@@ -10,8 +10,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LocationInfo {
+    private String postalCode;
     private String city;
     private String state;
     private String neighborhood;
+    private String country;
     private boolean remote;
 }

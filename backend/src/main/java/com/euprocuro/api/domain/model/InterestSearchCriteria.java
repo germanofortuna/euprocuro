@@ -8,7 +8,7 @@ import lombok.Value;
 @Value
 @Builder
 public class InterestSearchCriteria {
-    InterestCategory category;
+    String category;
     String city;
     BigDecimal maxBudget;
     String query;

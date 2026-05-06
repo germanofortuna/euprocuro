@@ -18,6 +18,8 @@ public interface MarketplaceUseCase {
 
     InterestPost closeInterest(String currentUserId, String interestId);
 
+    InterestPost activateInterest(String currentUserId, String interestId);
+
     void deleteInterest(String currentUserId, String interestId);
 
     List<InterestPost> listInterests(InterestSearchFilter filter);

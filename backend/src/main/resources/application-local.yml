@@ -6,6 +6,9 @@ spring:
 application:
   auth:
     email-verification-required: ${APP_AUTH_EMAIL_VERIFICATION_REQUIRED:false}
+    expose-reset-preview: ${APP_AUTH_EXPOSE_RESET_PREVIEW:true}
+  admin:
+    allowed-emails: ${APP_ADMIN_ALLOWED_EMAILS:gfortuna@outlook.com}
   monetization:
     provider: ${APP_MONETIZATION_PROVIDER:LOCAL_CHECKOUT_MOCK}
     local-checkout:

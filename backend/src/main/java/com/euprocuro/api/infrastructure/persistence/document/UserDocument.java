@@ -26,8 +26,11 @@ public class UserDocument {
     private String documentNumber;
     private String documentType;
     private String passwordHash;
+    private String postalCode;
     private String city;
     private String state;
+    private String neighborhood;
+    private String country;
     private Boolean emailVerified;
     private double buyerRating;
     private double sellerRating;
@@ -36,4 +39,7 @@ public class UserDocument {
     private String subscriptionPlan;
     private Instant subscriptionActiveUntil;
     private String ipAddress;
+    private Boolean termsAccepted;
+    private Instant termsAcceptedAt;
+    private String termsVersion;
 }

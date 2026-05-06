@@ -59,7 +59,9 @@ public class AuthController {
     @GetMapping("/me")
     public MeResponse me(HttpServletRequest request) {
         String userId = CurrentUserContext.userId(request);
-        return RestMapper.toMeResponse(authUseCase.meByUserId(userId));
+        MeResponse response = RestMapper.toMeResponse(authUseCase.meByUserId(userId));
+        CurrentUserContext.optionalSessionExpiresAt(request).ifPresent(response::setExpiresAt);
+        return response;
     }
 
     @PostMapping("/logout")
@@ -90,11 +92,10 @@ public class AuthController {
     }
 
     private AuthResponse toCookieAuthResponse(
-            com.euprocuro.api.application.view.AuthenticatedSessionView session,
-            HttpServletResponse response
+        com.euprocuro.api.application.view.AuthenticatedSessionView session,
+        HttpServletResponse response
     ) {
         authCookieManager.writeSessionCookie(response, session.getToken(), session.getExpiresAt());
-        response.addHeader("X-Auth-Expose-Session-Token", String.valueOf(exposeSessionToken));
 
         return AuthResponse.builder()
                 .token(exposeSessionToken ? session.getToken() : null)

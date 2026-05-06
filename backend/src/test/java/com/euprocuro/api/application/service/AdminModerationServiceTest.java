@@ -30,7 +30,6 @@ import com.euprocuro.api.domain.gateway.ModerationRuleGateway;
 import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
 import com.euprocuro.api.domain.model.ContentReport;
 import com.euprocuro.api.domain.model.ContentReportStatus;
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.ModerationRiskLevel;
@@ -52,6 +51,8 @@ class AdminModerationServiceTest {
     private EventPublisherGateway eventPublisherGateway;
     @Mock
     private RealtimeMessageGateway realtimeMessageGateway;
+    @Mock
+    private PublicCacheService publicCacheService;
 
     @InjectMocks
     private AdminModerationService adminModerationService;
@@ -216,7 +217,7 @@ class AdminModerationServiceTest {
                 .ownerName("Ana")
                 .title("Procuro item")
                 .description("Descricao curta")
-                .category(InterestCategory.OUTROS)
+                .category("OUTROS")
                 .budgetMax(new BigDecimal("100"))
                 .status(status)
                 .createdAt(Instant.now())

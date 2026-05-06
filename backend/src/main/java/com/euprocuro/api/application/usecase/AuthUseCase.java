@@ -16,6 +16,8 @@ public interface AuthUseCase {
 
     UserProfile meByUserId(String userId);
 
+    AuthenticatedSessionView requireAuthenticatedSession(String token);
+
     void logout(String token);
 
     void logoutIfPresent(String token);

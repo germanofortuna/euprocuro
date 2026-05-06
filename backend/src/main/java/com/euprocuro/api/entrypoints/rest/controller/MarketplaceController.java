@@ -1,7 +1,6 @@
 package com.euprocuro.api.entrypoints.rest.controller;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -23,10 +22,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.euprocuro.api.application.command.InterestSearchFilter;
+import com.euprocuro.api.application.service.OperationalCatalogService;
 import com.euprocuro.api.application.usecase.DashboardUseCase;
 import com.euprocuro.api.application.usecase.MarketplaceUseCase;
 import com.euprocuro.api.application.usecase.ModerationUseCase;
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.entrypoints.rest.dto.request.CreateInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.CreateOfferRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ReportInterestRequest;
@@ -50,10 +49,12 @@ public class MarketplaceController {
     private final MarketplaceUseCase marketplaceUseCase;
     private final DashboardUseCase dashboardUseCase;
     private final ModerationUseCase moderationUseCase;
+    private final OperationalCatalogService operationalCatalogService;
 
     @GetMapping("/categories")
     public List<CategoryOptionResponse> listCategories() {
-        return Arrays.stream(InterestCategory.values())
+        return operationalCatalogService.listActiveCategories()
+                .stream()
                 .map(RestMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -65,7 +66,8 @@ public class MarketplaceController {
 
     @GetMapping("/interests")
     public List<InterestResponse> listInterests(
-            @RequestParam(required = false) InterestCategory category,
+            HttpServletRequest request,
+            @RequestParam(required = false) String category,
             @RequestParam(required = false) String city,
             @RequestParam(required = false) BigDecimal maxBudget,
             @RequestParam(required = false) String query,
@@ -83,13 +85,16 @@ public class MarketplaceController {
 
         return marketplaceUseCase.listInterests(filter, offset, limit)
                 .stream()
-                .map(RestMapper::toResponse)
+                .map(interest -> RestMapper.toResponse(interest, CurrentUserContext.optionalUserId(request).isPresent()))
                 .collect(Collectors.toList());
     }
 
     @GetMapping("/interests/{id}")
-    public InterestResponse getInterest(@PathVariable String id) {
-        return RestMapper.toResponse(marketplaceUseCase.getInterest(id));
+    public InterestResponse getInterest(@PathVariable String id, HttpServletRequest request) {
+        return RestMapper.toResponse(
+                marketplaceUseCase.getInterest(id),
+                CurrentUserContext.optionalUserId(request).isPresent()
+        );
     }
 
     @PostMapping("/interests")
@@ -125,6 +130,13 @@ public class MarketplaceController {
     public InterestResponse closeInterest(@PathVariable String id, HttpServletRequest request) {
         return RestMapper.toResponse(
                 marketplaceUseCase.closeInterest(CurrentUserContext.userId(request), id)
+        );
+    }
+
+    @PatchMapping("/interests/{id}/activate")
+    public InterestResponse activateInterest(@PathVariable String id, HttpServletRequest request) {
+        return RestMapper.toResponse(
+                marketplaceUseCase.activateInterest(CurrentUserContext.userId(request), id)
         );
     }
 

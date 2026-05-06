@@ -28,4 +28,9 @@ public class EmailVerificationTokenGatewayAdapter implements EmailVerificationTo
     public Optional<EmailVerificationToken> findByToken(String token) {
         return repository.findByToken(token).map(EmailVerificationTokenPersistenceMapper::toDomain);
     }
+
+    @Override
+    public void deleteByToken(String token) {
+        repository.findByToken(token).ifPresent(repository::delete);
+    }
 }

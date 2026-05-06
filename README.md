@@ -39,7 +39,10 @@ O backend segue uma separacao clara entre camadas:
   - cadastro de novo interesse
 - Publicacao de interesses com imagem de referencia
 - Busca publica por texto, categoria, cidade e teto de orcamento
-- Monetizacao MVP com creditos para vendedores, plano Pro e boost de interesses
+- Monetizacao MVP com creditos para vendedores, plano Pro e boost pago de interesses apos a publicacao
+- CRM administrativo para textos, politicas legais, categorias, precos, planos e promocoes em runtime
+- Cache publico server-side para conteudo, catalogo, CEP e vitrine de interesses, com invalidacao manual no admin
+- Indices Mongo para as consultas publicas mais frequentes e contrato de busca dedicado para evoluir para Atlas Search/OpenSearch
 - Checkout local simulado e Checkout Pro Mercado Pago com confirmacao por webhook
 - E-mails transacionais para reset de senha, nova oferta, mensagem, compra e boost
 - Modais de feedback para mensagens de sucesso ou erro
@@ -197,7 +200,23 @@ APP_EMAIL_FROM=no-reply@euprocuro.local
 APP_RESET_BASE_URL=http://localhost:5173
 ```
 
-Para MailerSend, use exatamente o `Username` e `Password` do usuario SMTP, nao o login da conta nem o API token. O `APP_EMAIL_FROM` precisa ser um e-mail do dominio validado ou do dominio de teste do MailerSend, por exemplo `no-reply@seu-dominio.mlsender.net`.
+Para MailerSend via SMTP, use exatamente o `Username` e `Password` do usuario SMTP, nao o login da conta nem o API token. O `APP_EMAIL_FROM` precisa ser um e-mail do dominio validado ou do dominio de teste do MailerSend, por exemplo `no-reply@seu-dominio.mlsender.net`.
+
+Para usar templates HTML salvos no MailerSend, configure o envio pela API em vez do SMTP texto puro:
+
+```bash
+APP_EMAIL_PROVIDER=MAILERSEND_API
+APP_EMAIL_FROM=no-reply@seudominio.com
+APP_EMAIL_FROM_NAME=Eu Procuro
+APP_EMAIL_APP_URL=https://app.seudominio.com
+APP_EMAIL_TERMS_URL=https://app.seudominio.com#termos-de-uso
+APP_EMAIL_PRIVACY_URL=https://app.seudominio.com#politica-de-privacidade
+APP_EMAIL_SUPPORT_URL=mailto:suporte@euprocuro.com
+MAILERSEND_API_KEY=sua-chave-api-mailersend
+MAILERSEND_TEMPLATE_ID_DEFAULT=id-do-template-html
+```
+
+Tambem e possivel informar templates diferentes por evento com `MAILERSEND_TEMPLATE_ID_EMAIL_VERIFICATION`, `MAILERSEND_TEMPLATE_ID_PASSWORD_RESET`, `MAILERSEND_TEMPLATE_ID_OFFER_RECEIVED`, `MAILERSEND_TEMPLATE_ID_CONVERSATION_MESSAGE`, `MAILERSEND_TEMPLATE_ID_PURCHASE_CONFIRMATION` e `MAILERSEND_TEMPLATE_ID_BOOST_ACTIVATED`. Se essas variaveis ficarem vazias, a aplicacao usa `MAILERSEND_TEMPLATE_ID_DEFAULT`.
 
 Sem SMTP valido, a API registra no log o link de verificacao/redefinicao como fallback local.
 No profile `prod`, o preview de reset fica desabilitado por padrao.
@@ -249,6 +268,101 @@ APP_ADMIN_ALLOWED_EMAILS=seu-email@dominio.com,outro-admin@dominio.com
 ```
 
 Depois reinicie o backend local ou faca redeploy no Render. Ao logar com um e-mail liberado, a opcao `Moderacao` aparece na area logada.
+
+## CRM administrativo
+
+A aba `Moderacao` tambem concentra o CRM interno da plataforma. O acesso e sempre protegido pelo backend: somente usuarios autenticados cujo e-mail esteja em `APP_ADMIN_ALLOWED_EMAILS` conseguem ler ou alterar dados administrativos.
+
+O CRM possui duas frentes:
+
+- **Conteudo**: textos da interface, mensagens, CTAs, erros e documentos legais. Rascunhos, historico e autoria ficam restritos ao admin; o site publico consome apenas entradas `PUBLISHED` por `GET /api/content/public`.
+- **Catalogo operacional**: categorias de anuncios, produtos de monetizacao, precos, planos, boosts e promocoes. O site recebe apenas categorias ativas e produtos habilitados; campos internos de admin nao sao expostos ao front publico.
+
+Fluxo de conteudo:
+
+1. O backend semeia `backend/src/main/resources/content/default-content.json` na primeira subida.
+2. O admin edita um rascunho pelo painel.
+3. Ao publicar, a versao passa a ser carregada em runtime pelo frontend, sem redeploy.
+4. Documentos legais publicados alimentam as paginas do footer e o modal de aceite dos Termos de Uso.
+
+Fluxo de catalogo operacional:
+
+1. O admin altera categorias ou produtos em `CRM operacional`.
+2. Ao salvar, o backend valida codigos, duplicidades, preco promocional e pelo menos uma categoria ativa.
+3. Categorias ativas sao refletidas em `GET /api/categories`.
+4. Produtos habilitados sao refletidos em `GET /api/monetization/products` e na conta de monetizacao.
+
+Promocoes:
+
+- `price` e o preco atual cobrado.
+- `originalPrice` e exibido como preco "de" somente quando `promotional=true`.
+- `promotionLabel` permite mostrar um selo curto, como `Oferta de lancamento`.
+
+Categorias:
+
+- O codigo deve ser estavel, em caixa alta, usando letras, numeros, `_` ou `-`.
+- Interesses e itens de vendedor gravam o codigo da categoria, permitindo novas categorias sem enum fixo no codigo.
+- Categorias inativas deixam de aparecer nos formularios e filtros, mas registros antigos continuam preservados.
+
+Boost:
+
+- O usuario nao marca boost ao cadastrar interesse.
+- O interesse nasce sem destaque.
+- Depois de publicado/aprovado, o usuario pode comprar um produto do tipo `BOOST`.
+- Quando o pagamento e processado, o backend grava `boostedUntil`; a busca usa esse campo para priorizar o anuncio enquanto estiver vigente.
+
+## Cache, indices e busca
+
+A aplicacao usa cache server-side apenas para dados publicos e reconstruiveis:
+
+- `content`: catalogo publico de textos publicados (`GET /api/content/public`)
+- `catalog`: categorias e produtos publicados do CRM operacional
+- `marketplace`: listagens publicas de interesses com `openOnly=true`
+- `address`: resultado de consulta de CEP
+
+Dados privados, admin, sessoes, dashboard, notificacoes, conversas, creditos e pagamentos nao entram em cache compartilhado. As respostas da API recebem `Cache-Control: no-store`; o ganho de performance vem do cache interno do backend, nao do navegador.
+
+Configuracao por ambiente:
+
+```bash
+APP_PUBLIC_CACHE_ENABLED=true
+APP_PUBLIC_CACHE_MAX_ENTRIES=2000
+APP_PUBLIC_CACHE_CONTENT_TTL_SECONDS=300
+APP_PUBLIC_CACHE_CATALOG_TTL_SECONDS=300
+APP_PUBLIC_CACHE_MARKETPLACE_TTL_SECONDS=60
+APP_PUBLIC_CACHE_ADDRESS_TTL_SECONDS=2592000
+```
+
+Invalidacao automatica:
+
+- publicar ou arquivar conteudo invalida `content`
+- salvar catalogo operacional invalida `catalog`
+- criar, editar, renovar, desativar, ativar, excluir, moderar, denunciar ou impulsionar interesse invalida `marketplace`
+
+Invalidacao manual:
+
+```bash
+GET  /api/admin/cache
+POST /api/admin/cache/invalidate?scope=all
+POST /api/admin/cache/invalidate?scope=content
+POST /api/admin/cache/invalidate?scope=catalog
+POST /api/admin/cache/invalidate?scope=marketplace
+POST /api/admin/cache/invalidate?scope=address
+```
+
+O botao `Limpar cache` fica no CRM de conteudo e chama a invalidacao global. O acesso usa o mesmo controle admin de `APP_ADMIN_ALLOWED_EMAILS`.
+
+O store atual e `LOCAL_MEMORY`, suficiente para desenvolvimento, HML e uma instancia simples. Para varias instancias, o desenho ja esta isolado em `PublicCacheService`; o proximo passo natural e trocar esse store por Redis mantendo as mesmas chaves, TTLs e namespaces.
+
+O Mongo cria indices automaticamente via `spring.data.mongodb.auto-index-creation=true`. Hoje existem indices para:
+
+- vitrine de interesses por `status`, `location.city`, `category`, `boostedUntil`, `createdAt` e expiracao
+- interesses por dono
+- itens do vendedor por dono, status ativo, categoria e cidade
+- conteudo publicado por `locale`, `status` e `key`
+- text indexes em titulo, descricao e tags de interesses/itens
+
+A busca publica continua usando Mongo, mas a regra de busca ficou atras do contrato `InterestSearchGateway`. Para uma busca dedicada no futuro, crie outro adapter para esse contrato, por exemplo Atlas Search ou OpenSearch, sem alterar o caso de uso do marketplace.
 
 ## Monetizacao e pagamentos
 
@@ -315,34 +429,12 @@ Mesmo sendo publico, o webhook valida a autenticidade da chamada com os headers 
 
 ### Precos configuraveis
 
-Os precos e quantidades nao ficam hardcoded. Use variaveis de ambiente para alterar sem mexer no codigo:
-
-```bash
-APP_PRODUCT_CREDITS_10_PRICE=9.90
-APP_PRODUCT_CREDITS_10_AMOUNT=10
-APP_PRODUCT_CREDITS_30_PRICE=24.90
-APP_PRODUCT_CREDITS_30_AMOUNT=30
-APP_PRODUCT_SELLER_PRO_PRICE=49.90
-APP_PRODUCT_SELLER_PRO_DURATION_DAYS=30
-APP_PRODUCT_BOOST_3_DAYS_PRICE=9.90
-APP_PRODUCT_BOOST_3_DAYS_DURATION_DAYS=3
-APP_PRODUCT_BOOST_7_DAYS_PRICE=19.90
-APP_PRODUCT_BOOST_7_DAYS_DURATION_DAYS=7
-```
-
-Tambem e possivel esconder produtos por ambiente:
-
-```bash
-APP_PRODUCT_CREDITS_10_ENABLED=true
-APP_PRODUCT_CREDITS_30_ENABLED=true
-APP_PRODUCT_SELLER_PRO_ENABLED=true
-APP_PRODUCT_BOOST_3_DAYS_ENABLED=true
-APP_PRODUCT_BOOST_7_DAYS_ENABLED=true
-```
+Precos, quantidades, planos, boosts e promocoes sao gerenciados pelo CRM operacional, nao por texto hardcoded no frontend. O catalogo padrao e semeado pelo backend para a primeira execucao, mas depois passa a ser editavel em runtime pela aba admin.
 
 ## Seguranca para producao
 
 - Cookies de sessao HTTP-only com configuracao por ambiente
+- Sessao deslizante: usuarios ativos renovam a expiracao quando a sessao entra na janela final configurada
 - `Strict-Transport-Security`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` e `Permissions-Policy`
 - `CORS` limitado por `APP_CORS_ALLOWED_ORIGINS`
 - Rate limit para login, cadastro, reset de senha e envio de mensagens
@@ -358,8 +450,12 @@ APP_AUTH_COOKIE_SAME_SITE=Lax
 APP_AUTH_COOKIE_DOMAIN=.seudominio.com
 APP_AUTH_EXPOSE_RESET_PREVIEW=false
 APP_AUTH_EXPOSE_SESSION_TOKEN=false
+APP_AUTH_SESSION_HOURS=168
+APP_AUTH_SESSION_RENEWAL_THRESHOLD_HOURS=24
 APP_RESET_BASE_URL=https://app.seudominio.com
 ```
+
+`APP_AUTH_SESSION_HOURS` define o tempo maximo de inatividade. `APP_AUTH_SESSION_RENEWAL_THRESHOLD_HOURS` define quando renovar: com os defaults, uma sessao dura 7 dias e, se o usuario continuar ativo quando faltar menos de 24h, o backend renova por mais 7 dias.
 
 ## Configuracao de RabbitMQ
 
@@ -473,6 +569,16 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 - `POST /api/monetization/purchase`
 - `POST /api/monetization/interests/{interestId}/boost`
 - `POST /api/monetization/mercado-pago/webhook`
+- `GET /api/content/public`
+- `GET /api/admin/content`
+- `POST /api/admin/content`
+- `PUT /api/admin/content/{id}`
+- `POST /api/admin/content/{id}/publish`
+- `POST /api/admin/content/{id}/archive`
+- `GET /api/admin/catalog`
+- `PUT /api/admin/catalog`
+- `GET /api/admin/cache`
+- `POST /api/admin/cache/invalidate?scope=all`
 
 ## Testes e cobertura
 

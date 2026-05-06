@@ -11,8 +11,11 @@ public class UserResponse {
     String id;
     String name;
     String email;
+    String postalCode;
     String city;
     String state;
+    String neighborhood;
+    String country;
     boolean emailVerified;
     double buyerRating;
     double sellerRating;

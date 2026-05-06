@@ -15,6 +15,11 @@ public class MonetizationProductResponse {
     String description;
     MonetizationProductType type;
     BigDecimal price;
+    BigDecimal originalPrice;
+    boolean promotional;
+    String promotionLabel;
     Integer credits;
     Integer durationDays;
+    boolean enabled;
+    Integer sortOrder;
 }

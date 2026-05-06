@@ -31,13 +31,13 @@ import com.euprocuro.api.application.usecase.MarketplaceUseCase;
 import com.euprocuro.api.application.view.SellerItemMatchesView;
 import com.euprocuro.api.domain.gateway.SellerItemGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.SellerItem;
 import com.euprocuro.api.domain.model.UserProfile;
+import org.junit.jupiter.api.BeforeEach;
 
 @ExtendWith(MockitoExtension.class)
 class SellerItemServiceTest {
@@ -50,10 +50,17 @@ class SellerItemServiceTest {
     private MarketplaceUseCase marketplaceUseCase;
     @Mock
     private BlockedTermValidationGateway blockedTermValidationGateway;
+    @Mock
+    private OperationalCatalogService operationalCatalogService;
 
 
     @InjectMocks
     private SellerItemService sellerItemService;
+
+    @BeforeEach
+    void setUpCatalog() {
+        lenient().when(operationalCatalogService.requireActiveCategory(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     @Test
     void createItemShouldPersistActiveItemForCurrentUser() {
@@ -68,10 +75,12 @@ class SellerItemServiceTest {
                 .title("Celta 2012")
                 .description("Carro conservado")
                 .referenceImageUrl("  foto  ")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .desiredPrice(new BigDecimal("22000"))
+                .postalCode("99709164")
                 .city("Erechim")
                 .state("RS")
+                .neighborhood("Centro")
                 .tags(List.of("celta", "chevrolet"))
                 .build());
 
@@ -79,7 +88,32 @@ class SellerItemServiceTest {
         assertThat(result.isActive()).isTrue();
         assertThat(result.getReferenceImageUrl()).isEqualTo("foto");
         assertThat(result.getOwnerName()).isEqualTo("Carlos Seller");
+        assertThat(result.getLocation().getPostalCode()).isEqualTo("99709-164");
         assertThat(result.getLocation().getCity()).isEqualTo("Erechim");
+        assertThat(result.getLocation().getCountry()).isEqualTo("Brasil");
+    }
+
+    @Test
+    void createItemShouldRejectBlockedTermsBeforeSaving() {
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(baseUser()));
+        when(blockedTermValidationGateway.validateBlockedTerms(any(SellerItem.class)))
+                .thenReturn(Optional.of(new BlockedTermValidationGateway.BlockedTermValidationResult(
+                        "bloqueado",
+                        "Termo bloqueado"
+                )));
+
+        assertThatThrownBy(() -> sellerItemService.createItem(
+                "seller-1",
+                CreateSellerItemCommand.builder()
+                        .title("Produto bloqueado")
+                        .description("Descricao")
+                        .category("AUTOMOVEIS")
+                        .build()
+        ))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Termo bloqueado");
+
+        verify(sellerItemGateway, never()).save(any(SellerItem.class));
     }
 
     @Test
@@ -97,7 +131,7 @@ class SellerItemServiceTest {
                 UpdateSellerItemCommand.builder()
                         .title("Produto bloqueado")
                         .description("Descricao")
-                        .category(InterestCategory.AUTOMOVEIS)
+                        .category("AUTOMOVEIS")
                         .build()
         ))
                 .isInstanceOf(BusinessException.class)
@@ -118,7 +152,7 @@ class SellerItemServiceTest {
                 .id("interest-1")
                 .title("Procuro Celta 2012")
                 .description("Quero um carro pequeno")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .tags(List.of("celta"))
                 .build();
         InterestPost ownInterest = matchingInterest.toBuilder()
@@ -148,7 +182,7 @@ class SellerItemServiceTest {
                 .id("interest-1")
                 .title("Procuro Celta 2012")
                 .description("Quero um carro pequeno")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .tags(List.of("celta"))
                 .build();
 
@@ -215,6 +249,20 @@ class SellerItemServiceTest {
     }
 
     @Test
+    void activateItemShouldSaveActiveItemForOwner() {
+        SellerItem inactiveItem = baseSellerItem().toBuilder()
+                .active(false)
+                .build();
+        when(sellerItemGateway.findById("item-1")).thenReturn(Optional.of(inactiveItem));
+        when(sellerItemGateway.save(any(SellerItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SellerItem result = sellerItemService.activateItem("seller-1", "item-1");
+
+        assertThat(result.isActive()).isTrue();
+        verify(sellerItemGateway).save(any(SellerItem.class));
+    }
+
+    @Test
     void updateItemShouldPersistEditedItemForOwner() {
         when(sellerItemGateway.findById("item-1")).thenReturn(Optional.of(baseSellerItem()));
         when(sellerItemGateway.save(any(SellerItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -223,18 +271,39 @@ class SellerItemServiceTest {
                 .title("Celta 2012 completo")
                 .description("Carro revisado")
                 .referenceImageUrl(" nova-foto ")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .desiredPrice(new BigDecimal("23000"))
+                .postalCode("99010-000")
                 .city("Passo Fundo")
                 .state("RS")
+                .neighborhood("Centro")
+                .country("Brasil")
                 .tags(List.of("celta", "completo"))
                 .build());
 
         assertThat(result.getTitle()).isEqualTo("Celta 2012 completo");
         assertThat(result.getReferenceImageUrl()).isEqualTo("nova-foto");
         assertThat(result.getDesiredPrice()).isEqualTo(new BigDecimal("23000"));
+        assertThat(result.getLocation().getPostalCode()).isEqualTo("99010-000");
         assertThat(result.getLocation().getCity()).isEqualTo("Passo Fundo");
+        assertThat(result.getLocation().getNeighborhood()).isEqualTo("Centro");
         assertThat(result.getTags()).containsExactly("celta", "completo");
+    }
+
+    @Test
+    void createItemShouldRejectInvalidPostalCode() {
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(baseUser()));
+
+        assertThatThrownBy(() -> sellerItemService.createItem("seller-1", CreateSellerItemCommand.builder()
+                .title("Celta")
+                .description("Carro")
+                .category("AUTOMOVEIS")
+                .postalCode("123")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("CEP");
+
+        verify(sellerItemGateway, never()).save(any());
     }
 
     @Test
@@ -253,7 +322,7 @@ class SellerItemServiceTest {
         assertThatThrownBy(() -> sellerItemService.createItem("seller-1", CreateSellerItemCommand.builder()
                 .title("Celta")
                 .description("Carro")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .build()))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Usuario");
@@ -265,14 +334,14 @@ class SellerItemServiceTest {
         InterestPost differentCategory = baseInterest().toBuilder()
                 .id("interest-1")
                 .title("Procuro apartamento")
-                .category(InterestCategory.IMOVEIS)
+                .category("IMOVEIS")
                 .tags(List.of("apartamento"))
                 .build();
         InterestPost noTextMatch = baseInterest().toBuilder()
                 .id("interest-2")
                 .title("Procuro Gol")
                 .description("Outro modelo")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .tags(List.of("gol"))
                 .build();
 
@@ -301,7 +370,7 @@ class SellerItemServiceTest {
                 .title("Celta 2012")
                 .description("Carro conservado")
                 .referenceImageUrl("foto")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .desiredPrice(new BigDecimal("22000"))
                 .location(LocationInfo.builder().city("Erechim").state("RS").build())
                 .tags(List.of("celta", "chevrolet"))

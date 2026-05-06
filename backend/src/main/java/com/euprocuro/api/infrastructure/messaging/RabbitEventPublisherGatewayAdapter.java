@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -22,9 +23,11 @@ public class RabbitEventPublisherGatewayAdapter implements EventPublisherGateway
 
     public RabbitEventPublisherGatewayAdapter(
             RabbitTemplate rabbitTemplate,
+            MessageConverter jacksonMessageConverter,
             @Value("${application.messaging.rabbit.exchange:euprocuro.exchange}") String exchange
     ) {
         this.rabbitTemplate = rabbitTemplate;
+        this.rabbitTemplate.setMessageConverter(jacksonMessageConverter);
         this.exchange = exchange;
     }
 

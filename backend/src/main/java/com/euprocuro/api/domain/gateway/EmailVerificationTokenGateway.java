@@ -8,4 +8,6 @@ public interface EmailVerificationTokenGateway {
     EmailVerificationToken save(EmailVerificationToken token);
 
     Optional<EmailVerificationToken> findByToken(String token);
+
+    void deleteByToken(String token);
 }

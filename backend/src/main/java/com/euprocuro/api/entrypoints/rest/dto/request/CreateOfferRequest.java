@@ -24,6 +24,7 @@ public class CreateOfferRequest {
     @Size(max = 120)
     private String message;
 
+    @Size(max = 1500000)
     private String offerImageUrl;
 
     private boolean includesDelivery;
