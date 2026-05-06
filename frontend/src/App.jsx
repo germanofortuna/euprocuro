@@ -3033,7 +3033,6 @@ export default function App() {
                             sellerPhone: event.target.value
                           }))
                         }
-                        required
                       />
                       <textarea
                         rows="4"

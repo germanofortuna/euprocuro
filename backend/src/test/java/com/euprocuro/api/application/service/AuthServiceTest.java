@@ -61,6 +61,8 @@ class AuthServiceTest {
     private EmailGateway emailGateway;
     @Mock
     private EventPublisherGateway eventPublisherGateway;
+    @Mock
+    private AuditLogService auditLogService;
 
     @InjectMocks
     private AuthService authService;

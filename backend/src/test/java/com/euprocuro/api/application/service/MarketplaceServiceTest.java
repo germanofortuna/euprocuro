@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -65,6 +66,8 @@ class MarketplaceServiceTest {
     private InterestSearchGateway interestSearchGateway;
     @Mock
     private PublicCacheService publicCacheService;
+    @Mock
+    private AuditLogService auditLogService;
 
     @InjectMocks
     private MarketplaceService marketplaceService;
@@ -352,6 +355,36 @@ class MarketplaceServiceTest {
         assertThat(result.getId()).isEqualTo("offer-1");
         assertThat(result.getStatus()).isEqualTo(OfferStatus.SENT);
         verify(eventPublisherGateway).publish(eq("offer.created"), any(Map.class));
+    }
+
+    @Test
+    void createOfferShouldAllowMissingSellerPhone() {
+        InterestPost interest = baseInterest();
+        UserProfile seller = UserProfile.builder()
+                .id("seller-1")
+                .name("Carlos")
+                .email("carlos@teste.com")
+                .sellerCredits(5)
+                .build();
+
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(offerGateway.save(any(Offer.class))).thenAnswer(invocation -> {
+            Offer offer = invocation.getArgument(0);
+            offer.setId("offer-1");
+            return offer;
+        });
+
+        Offer result = marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
+                .offeredPrice(new BigDecimal("450"))
+                .sellerPhone("   ")
+                .message("Tenho um violao nessa faixa")
+                .build());
+
+        assertThat(result.getSellerPhone()).isNull();
+        verify(offerGateway).save(argThat(offer -> offer.getSellerPhone() == null));
     }
 
     @Test

@@ -55,6 +55,7 @@ public class MarketplaceService implements MarketplaceUseCase {
     private final OperationalCatalogService operationalCatalogService;
     private final InterestSearchGateway interestSearchGateway;
     private final PublicCacheService publicCacheService;
+    private final AuditLogService auditLogService;
 
     @Value("${application.listings.expiration-days:30}")
     private long listingExpirationDays = 30;
@@ -108,6 +109,8 @@ public class MarketplaceService implements MarketplaceUseCase {
                 });
 
         InterestPost saved = interestGateway.save(interestPost);
+        auditLogService.record("INTEREST_CREATED", owner.getId(), owner.getEmail(), "INTEREST", saved.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("category", saved.getCategory()));
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.created", Map.of(
                 "interestId", saved.getId(),
@@ -132,6 +135,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         InterestPost saved = interestGateway.save(closedInterest);
+        auditLogService.record("INTEREST_CLOSED", currentUserId, null, "INTEREST", saved.getId());
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.closed", Map.of(
                 "interestId", saved.getId(),
@@ -158,6 +162,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         InterestPost saved = interestGateway.save(activatedInterest);
+        auditLogService.record("INTEREST_ACTIVATED", currentUserId, null, "INTEREST", saved.getId());
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.activated", Map.of(
                 "interestId", saved.getId(),
@@ -175,6 +180,7 @@ public class MarketplaceService implements MarketplaceUseCase {
         }
 
         interestGateway.deleteById(interestId);
+        auditLogService.record("INTEREST_DELETED", currentUserId, null, "INTEREST", interestId);
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.deleted", Map.of(
                 "interestId", interestId,
@@ -225,6 +231,8 @@ public class MarketplaceService implements MarketplaceUseCase {
                 });
 
         InterestPost saved = interestGateway.save(updatedInterest);
+        auditLogService.record("INTEREST_UPDATED", currentUserId, null, "INTEREST", saved.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("category", saved.getCategory()));
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.updated", Map.of(
                 "interestId", saved.getId(),
@@ -264,6 +272,8 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         InterestPost saved = interestGateway.save(renewedInterest);
+        auditLogService.record("INTEREST_RENEWED", currentUserId, owner.getEmail(), "INTEREST", saved.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("creditsRemaining", availableCredits - 1));
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.renewed", Map.of(
                 "interestId", saved.getId(),
@@ -373,7 +383,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .sellerId(seller.getId())
                 .sellerName(seller.getName())
                 .sellerEmail(seller.getEmail())
-                .sellerPhone(command.getSellerPhone())
+                .sellerPhone(trimToNull(command.getSellerPhone()))
                 .offeredPrice(command.getOfferedPrice())
                 .message(command.getMessage())
                 .offerImageUrl(null)
@@ -384,6 +394,8 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         Offer saved = offerGateway.save(offer);
+        auditLogService.record("OFFER_CREATED", seller.getId(), seller.getEmail(), "OFFER", saved.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("interestId", interestId));
         String sellerName = seller.getName();
         userGateway.findById(interestPost.getOwnerId())
                 .ifPresent(owner -> emailGateway.sendOfferReceivedEmail(owner, interestPost.getTitle(), sellerName));
@@ -477,6 +489,10 @@ public class MarketplaceService implements MarketplaceUseCase {
         }
 
         return referenceImageUrl.trim();
+    }
+
+    private String trimToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private String normalizePostalCode(String value) {

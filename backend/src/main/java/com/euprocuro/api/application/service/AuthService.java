@@ -62,6 +62,7 @@ public class AuthService implements AuthUseCase {
     private final PasswordEncoder passwordEncoder;
     private final EmailGateway emailGateway;
     private final EventPublisherGateway eventPublisherGateway;
+    private final AuditLogService auditLogService;
 
     @Value("${application.auth.session-hours:168}")
     private long sessionHours;
@@ -139,6 +140,8 @@ public class AuthService implements AuthUseCase {
                 .build());
 
         boolean verificationSent = emailVerificationRequired && sendRequiredEmailVerification(user);
+        auditLogService.record("USER_REGISTERED", user.getId(), user.getEmail(), "USER", user.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("emailVerificationRequired", emailVerificationRequired));
 
         eventPublisherGateway.publish("user.registered", Map.of(
                 "userId", user.getId(),
@@ -214,6 +217,8 @@ public class AuthService implements AuthUseCase {
         }
 
         AuthSession session = createSession(user);
+        auditLogService.record("AUTH_LOGIN", user.getId(), user.getEmail(), "AUTH_SESSION", session.getToken(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("expiresAt", session.getExpiresAt()));
         eventPublisherGateway.publish("auth.login", Map.of(
                 "userId", user.getId(),
                 "email", user.getEmail(),
@@ -241,6 +246,7 @@ public class AuthService implements AuthUseCase {
     public void logout(String token) {
         UserProfile user = requireAuthenticatedUser(token);
         authSessionGateway.deleteByToken(token);
+        auditLogService.record("AUTH_LOGOUT", user.getId(), user.getEmail(), "AUTH_SESSION", token);
         eventPublisherGateway.publish("auth.logout", Map.of(
                 "userId", user.getId(),
                 "email", user.getEmail()
@@ -360,6 +366,7 @@ public class AuthService implements AuthUseCase {
         userGateway.save(user.toBuilder()
                 .emailVerified(true)
                 .build());
+        auditLogService.record("AUTH_EMAIL_VERIFIED", user.getId(), user.getEmail(), "USER", user.getId());
 
         emailVerificationTokenGateway.save(verificationToken.toBuilder()
                 .usedAt(Instant.now())

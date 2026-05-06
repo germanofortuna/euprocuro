@@ -12,6 +12,7 @@ public class AdminCacheService {
 
     private final AdminAccessService adminAccessService;
     private final PublicCacheService publicCacheService;
+    private final AuditLogService auditLogService;
 
     public CacheInvalidationView getStatus(String currentUserId) {
         adminAccessService.requireAdmin(currentUserId);
@@ -19,7 +20,9 @@ public class AdminCacheService {
     }
 
     public CacheInvalidationView invalidate(String currentUserId, String scope) {
-        adminAccessService.requireAdmin(currentUserId);
-        return publicCacheService.invalidate(scope);
+        var admin = adminAccessService.requireAdmin(currentUserId);
+        CacheInvalidationView view = publicCacheService.invalidate(scope);
+        auditLogService.record("CACHE_INVALIDATED", admin.getId(), admin.getEmail(), "CACHE", scope);
+        return view;
     }
 }

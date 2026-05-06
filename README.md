@@ -364,6 +364,62 @@ O Mongo cria indices automaticamente via `spring.data.mongodb.auto-index-creatio
 
 A busca publica continua usando Mongo, mas a regra de busca ficou atras do contrato `InterestSearchGateway`. Para uma busca dedicada no futuro, crie outro adapter para esse contrato, por exemplo Atlas Search ou OpenSearch, sem alterar o caso de uso do marketplace.
 
+## Logs de auditoria e integracoes externas
+
+A aplicacao grava dois tipos de registro operacional no MongoDB:
+
+- `audit_events`: eventos internos de negocio e administracao, como cadastro, login, logout, criacao/edicao de interesse, envio de oferta e invalidacao manual de cache.
+- `external_integration_logs`: chamadas para servicos externos, com request/response agrupados para facilitar inspecao no Mongo.
+
+Os logs externos usam uma estrutura intencionalmente simples:
+
+```json
+{
+  "createdAt": "2026-05-06T20:00:00Z",
+  "operation": "OPEN_AI_MODERATION",
+  "correlationId": "interest-123",
+  "request": {
+    "method": "POST",
+    "url": "/v1/moderations",
+    "headers": {
+      "Authorization": "***"
+    },
+    "body": {
+      "model": "omni-moderation-latest",
+      "input": []
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {}
+  },
+  "durationMs": 123,
+  "success": true,
+  "errorMessage": null
+}
+```
+
+Operacoes registradas atualmente:
+
+- `OPEN_AI_MODERATION`: chamada de moderacao para a OpenAI.
+- `VIA_CEP`: consulta de endereco por CEP.
+- `MERCADO_PAGO_CREATE_CHECKOUT_PREFERENCE`: criacao de preferencia no Checkout Pro.
+- `MERCADO_PAGO_FIND_PAYMENT`: consulta de pagamento no Mercado Pago.
+
+Headers sensiveis sao mascarados antes de salvar (`Authorization`, tokens, API keys, cookies, passwords e secrets). Bodies grandes sao truncados por seguranca e controle de volume.
+
+Configuracao:
+
+```bash
+APP_AUDIT_TTL_SECONDS=604800
+APP_EXTERNAL_LOG_TTL_SECONDS=604800
+APP_EXTERNAL_LOG_BODY_MAX_LENGTH=4000
+```
+
+Por padrao, os registros expiram em 7 dias por indice TTL. Esse prazo e adequado para testes, HML e investigacao curta; para producao, ajuste conforme necessidade juridica/operacional.
+
+Observacao importante sobre OpenAI: o log `OPEN_AI_MODERATION` so aparece quando a chamada real para a OpenAI acontece. No fluxo atual, a criacao de interesse publica um evento de moderacao no RabbitMQ; se o consumidor nao estiver rodando, se o RabbitMQ estiver indisponivel, se `APP_OPENAI_MODERATION_ENABLED=false` ou se `OPENAI_API_KEY` estiver ausente/invalida, nao havera request externo para registrar nessa collection.
+
 ## Monetizacao e pagamentos
 
 O MVP ja possui produtos de monetizacao configuraveis por ambiente:

@@ -34,6 +34,13 @@ springdoc:
     tags-sorter: alpha
     doc-expansion: none
 
+feign:
+  client:
+    config:
+      viaCepClient:
+        connectTimeout: ${APP_VIACEP_CONNECT_TIMEOUT_MS:2000}
+        readTimeout: ${APP_VIACEP_READ_TIMEOUT_MS:3000}
+
 server:
   port: ${PORT:8080}
   forward-headers-strategy: framework
@@ -107,12 +114,16 @@ application:
       catalog-ttl-seconds: ${APP_PUBLIC_CACHE_CATALOG_TTL_SECONDS:300}
       marketplace-ttl-seconds: ${APP_PUBLIC_CACHE_MARKETPLACE_TTL_SECONDS:60}
       address-ttl-seconds: ${APP_PUBLIC_CACHE_ADDRESS_TTL_SECONDS:2592000}
+  audit:
+    ttl-seconds: ${APP_AUDIT_TTL_SECONDS:604800}
+    external-log-ttl-seconds: ${APP_EXTERNAL_LOG_TTL_SECONDS:604800}
+    external-log-body-max-length: ${APP_EXTERNAL_LOG_BODY_MAX_LENGTH:4000}
   hml:
     access:
       enabled: ${APP_HML_ACCESS_ENABLED:false}
       allowed-emails: ${APP_HML_ALLOWED_EMAILS:}
   admin:
-    allowed-emails: ${APP_ADMIN_ALLOWED_EMAILS:}
+    allowed-emails: ${APP_ADMIN_ALLOWED_EMAILS:gfortuna@outlook.com}
   moderation:
     local:
       blocked-terms: ${APP_MODERATION_BLOCKED_TERMS:}
