@@ -32,10 +32,8 @@ public final class InterestPersistenceMapper {
                 .location(toDomain(document.getLocation()))
                 .tags(document.getTags() == null ? new ArrayList<>() : document.getTags())
                 .desiredRadiusKm(document.getDesiredRadiusKm())
-                .acceptsNationwideOffers(document.isAcceptsNationwideOffers())
                 .allowsWhatsappContact(document.isAllowsWhatsappContact())
                 .whatsappContact(document.getWhatsappContact())
-                .boostEnabled(document.isBoostEnabled())
                 .boostedUntil(document.getBoostedUntil())
                 .preferredCondition(document.getPreferredCondition())
                 .preferredContactMode(document.getPreferredContactMode())
@@ -65,10 +63,8 @@ public final class InterestPersistenceMapper {
                 .location(toDocument(domain.getLocation()))
                 .tags(domain.getTags())
                 .desiredRadiusKm(domain.getDesiredRadiusKm())
-                .acceptsNationwideOffers(domain.isAcceptsNationwideOffers())
                 .allowsWhatsappContact(domain.isAllowsWhatsappContact())
                 .whatsappContact(domain.getWhatsappContact())
-                .boostEnabled(domain.isBoostEnabled())
                 .boostedUntil(domain.getBoostedUntil())
                 .preferredCondition(domain.getPreferredCondition())
                 .preferredContactMode(domain.getPreferredContactMode())
@@ -122,9 +118,11 @@ public final class InterestPersistenceMapper {
         }
 
         return LocationInfo.builder()
+                .postalCode(document.getPostalCode())
                 .city(document.getCity())
                 .state(document.getState())
                 .neighborhood(document.getNeighborhood())
+                .country(document.getCountry())
                 .remote(document.isRemote())
                 .build();
     }
@@ -135,9 +133,11 @@ public final class InterestPersistenceMapper {
         }
 
         return LocationDocument.builder()
+                .postalCode(domain.getPostalCode())
                 .city(domain.getCity())
                 .state(domain.getState())
                 .neighborhood(domain.getNeighborhood())
+                .country(domain.getCountry())
                 .remote(domain.isRemote())
                 .build();
     }

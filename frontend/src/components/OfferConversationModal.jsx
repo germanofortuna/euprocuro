@@ -1,5 +1,6 @@
 import { memo } from "react";
 
+import { useContentText } from "../content/ContentContext";
 import EmptyState from "./EmptyState";
 
 const timestampFormatter = new Intl.DateTimeFormat("pt-BR", {
@@ -12,28 +13,28 @@ const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   currency: "BRL"
 });
 
-function formatTimestamp(value) {
+function formatTimestamp(value, t) {
   if (!value) {
-    return "Agora";
+    return t("global.time.now");
   }
 
   return timestampFormatter.format(new Date(value));
 }
 
-function currency(value) {
+function currency(value, t) {
   if (value === null || value === undefined || value === "") {
-    return "A combinar";
+    return t("global.currency.negotiable");
   }
 
   return currencyFormatter.format(Number(value));
 }
 
-const ConversationThread = memo(function ConversationThread({ messages, currentUserId }) {
+const ConversationThread = memo(function ConversationThread({ messages, currentUserId, t }) {
   if (messages.length === 0) {
     return (
       <EmptyState
-        title="Ainda sem mensagens"
-        description="Use o chat abaixo para alinhar detalhes da negociação dentro da plataforma."
+        title={t("conversation.empty.title")}
+        description={t("conversation.empty.description")}
       />
     );
   }
@@ -47,13 +48,15 @@ const ConversationThread = memo(function ConversationThread({ messages, currentU
       >
         <strong>{message.senderName}</strong>
         <p>{message.content}</p>
-        <span>{formatTimestamp(message.createdAt)}</span>
+        <span>{formatTimestamp(message.createdAt, t)}</span>
       </article>
     );
   });
 });
 
 export default function OfferConversationModal({ modal, currentUserId, onClose, onDraftChange, onSubmit }) {
+  const { t } = useContentText();
+
   if (!modal?.visible) {
     return null;
   }
@@ -73,33 +76,33 @@ export default function OfferConversationModal({ modal, currentUserId, onClose, 
       <div className="conversation-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <div className="feedback-modal__header">
           <div>
-            <span className="eyebrow">Conversa</span>
-            <h2>{modal.data?.interestTitle ?? "Oferta recebida"}</h2>
+            <span className="eyebrow">{t("conversation.eyebrow")}</span>
+            <h2>{modal.data?.interestTitle ?? t("conversation.fallbackTitle")}</h2>
           </div>
           <button
             type="button"
             className="modal-close-button"
             onClick={onClose}
-            aria-label="Fechar modal"
+            aria-label={t("common.actions.closeModal")}
           >
             X
           </button>
         </div>
 
         {modal.isLoading ? (
-          <div className="loading-card">Carregando conversa...</div>
+          <div className="loading-card">{t("conversation.loading")}</div>
         ) : (
           <>
             <div className="conversation-meta">
               <div className="hero-card">
-                <strong>Contato</strong>
-                <p>{counterpartyName ?? "Participante da conversa"}</p>
+                <strong>{t("conversation.contact.title")}</strong>
+                <p>{counterpartyName ?? t("conversation.participantFallback")}</p>
                 {counterpartyEmail ? <p>{counterpartyEmail}</p> : null}
                 {counterpartyPhone ? <p>{counterpartyPhone}</p> : null}
                 <div className="contact-actions">
                   {mailtoLink ? (
                     <a className="ghost-button" href={mailtoLink} target="_blank" rel="noreferrer">
-                      Enviar e-mail
+                      {t("conversation.contact.email")}
                     </a>
                   ) : null}
                   {whatsappLink ? (
@@ -109,41 +112,41 @@ export default function OfferConversationModal({ modal, currentUserId, onClose, 
                   ) : null}
                   {!mailtoLink && !whatsappLink ? (
                     <span className="muted-inline">
-                      Use o chat abaixo para alinhar os detalhes.
+                      {t("conversation.contact.chatOnly")}
                     </span>
                   ) : null}
                 </div>
               </div>
               <div className="hero-card">
-                <strong>Oferta</strong>
+                <strong>{t("conversation.offer.title")}</strong>
                 {modal.data?.offerImageUrl ? (
                   <img
                     className="offer-card__image"
                     src={modal.data.offerImageUrl}
-                    alt="Foto enviada na oferta"
+                    alt={t("conversation.offer.imageAlt")}
                     loading="lazy"
                     decoding="async"
                   />
                 ) : null}
-                <p>{currency(modal.data?.offeredPrice)}</p>
-                <p>Comprador: {modal.data?.buyerName}</p>
+                <p>{currency(modal.data?.offeredPrice, t)}</p>
+                <p>{t("conversation.offer.buyer", { name: modal.data?.buyerName ?? "" })}</p>
               </div>
             </div>
 
             <div className="conversation-thread">
-              <ConversationThread messages={conversationMessages} currentUserId={currentUserId} />
+              <ConversationThread messages={conversationMessages} currentUserId={currentUserId} t={t} />
             </div>
 
             <form className="conversation-form" onSubmit={onSubmit}>
               <textarea
                 rows="3"
-                placeholder="Escreva sua mensagem para continuar a negociação"
+                placeholder={t("conversation.form.placeholder")}
                 value={modal.draftMessage}
                 onChange={(event) => onDraftChange(event.target.value)}
                 required
               />
               <button type="submit" className="primary-button" disabled={modal.isSending}>
-                {modal.isSending ? "Enviando..." : "Enviar mensagem"}
+                {modal.isSending ? t("common.actions.sending") : t("conversation.form.submit")}
               </button>
             </form>
           </>

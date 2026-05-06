@@ -7,7 +7,6 @@ import com.euprocuro.api.application.command.PurchaseProductCommand;
 import com.euprocuro.api.application.view.CheckoutView;
 import com.euprocuro.api.application.view.MonetizationAccountView;
 import com.euprocuro.api.application.view.MonetizationProductView;
-import com.euprocuro.api.domain.model.InterestPost;
 
 public interface MonetizationUseCase {
     List<MonetizationProductView> listProducts();
@@ -18,7 +17,7 @@ public interface MonetizationUseCase {
 
     MonetizationAccountView cancelSubscription(String userId);
 
-    InterestPost boostInterest(String userId, String interestId, BoostInterestCommand command);
+    CheckoutView boostInterest(String userId, String interestId, BoostInterestCommand command);
 
     void confirmPayment(String providerPaymentId);
 

@@ -1,4 +1,8 @@
+import { useContentText } from "../content/ContentContext";
+
 export default function FeedbackModal({ modal, onClose }) {
+  const { t } = useContentText();
+
   if (!modal) {
     return null;
   }
@@ -17,14 +21,14 @@ export default function FeedbackModal({ modal, onClose }) {
             type="button"
             className="modal-close-button"
             onClick={onClose}
-            aria-label="Fechar modal"
+            aria-label={t("common.actions.closeModal")}
           >
-            ×
+            X
           </button>
         </div>
         <p>{modal.message}</p>
         <button type="button" className="primary-button primary-button--compact" onClick={onClose}>
-          Entendi
+          {t("legal.understood")}
         </button>
       </div>
     </div>

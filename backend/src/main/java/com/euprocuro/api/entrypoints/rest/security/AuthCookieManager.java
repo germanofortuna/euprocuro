@@ -52,12 +52,6 @@ public class AuthCookieManager {
         ResponseCookie cookie = builder.build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
-
-        response.addHeader("X-Auth-Cookie-Debug",
-                "name=" + cookieName
-                        + "; secure=" + secureCookie
-                        + "; sameSite=" + sameSite
-                        + "; maxAge=" + maxAgeSeconds);
     }
 
     public void clearSessionCookie(HttpServletResponse response) {

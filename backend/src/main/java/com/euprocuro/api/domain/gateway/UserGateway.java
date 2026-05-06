@@ -17,4 +17,6 @@ public interface UserGateway {
     Optional<UserProfile> findByDocumentNumber(String documentNumber);
 
     long count();
+
+    void deleteById(String id);
 }

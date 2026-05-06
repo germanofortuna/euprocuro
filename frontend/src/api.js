@@ -1,16 +1,15 @@
+import defaultContent from "./content/default-content.json";
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080/api";
 const SESSION_STORAGE_KEY = "eu-procuro-session";
+const GENERIC_REQUEST_ERROR = defaultContent.entries["errors.request.generic"];
 
-function buildWebSocketUrl(token) {
+function buildWebSocketUrl() {
   const configuredBase = import.meta.env.VITE_WS_BASE;
   const apiUrl = new URL(API_BASE, window.location.origin);
   const defaultProtocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
   const defaultBase = `${defaultProtocol}//${apiUrl.host}/ws/chat`;
   const url = new URL(configuredBase || defaultBase, window.location.origin);
-
-  if (token) {
-    url.searchParams.set("token", token);
-  }
 
   return url.toString();
 }
@@ -35,6 +34,19 @@ function buildErrorMessage(payload, fallbackMessage) {
   return fallbackMessage;
 }
 
+export class ApiError extends Error {
+  constructor(message, { status, payload } = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status ?? null;
+    this.payload = payload ?? null;
+  }
+}
+
+export function isAuthError(error) {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+}
+
 async function request(path, options = {}) {
   const session = getStoredSession();
   const headers = new Headers(options.headers ?? {});
@@ -56,12 +68,15 @@ async function request(path, options = {}) {
   if (!response.ok) {
     let payload = null;
     try {
-      payload = await response.json();
+      payload = await response.clone().json();
     } catch (error) {
-      payload = await response.text();
+      payload = await response.text().catch(() => null);
     }
 
-    throw new Error(buildErrorMessage(payload, "Nao foi possivel completar a requisicao."));
+    throw new ApiError(
+      buildErrorMessage(payload, GENERIC_REQUEST_ERROR),
+      { status: response.status, payload }
+    );
   }
 
   return response.status === 204 ? null : response.json();
@@ -119,12 +134,12 @@ export function clearSession() {
   window.localStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
-export function connectChatSocket({ token, onMessage, onOpen, onClose, onError } = {}) {
+export function connectChatSocket({ onMessage, onOpen, onClose, onError } = {}) {
   if (typeof WebSocket === "undefined") {
     return null;
   }
 
-  const socket = new WebSocket(buildWebSocketUrl(token));
+  const socket = new WebSocket(buildWebSocketUrl());
 
   socket.onopen = () => {
     onOpen?.();
@@ -192,6 +207,14 @@ export async function verifyEmail(token) {
   return request(`/auth/verify-email?${params.toString()}`);
 }
 
+export async function fetchPublicContent(keys = []) {
+  const params = new URLSearchParams({ locale: "pt-BR" });
+  if (keys.length) {
+    params.set("keys", keys.join(","));
+  }
+  return request(`/content/public?${params.toString()}`);
+}
+
 export async function fetchDashboard() {
   return request("/dashboard");
 }
@@ -229,6 +252,11 @@ export async function boostInterest(interestId, payload) {
 
 export async function fetchCategories() {
   return request("/categories");
+}
+
+export async function lookupAddressByPostalCode(postalCode) {
+  const normalizedPostalCode = String(postalCode ?? "").replace(/\D/g, "");
+  return request(`/addresses/postal-code/${normalizedPostalCode}`);
 }
 
 export async function fetchInterests(filters = {}) {
@@ -270,6 +298,12 @@ export async function renewInterest(interestId) {
 
 export async function closeInterest(interestId) {
   return request(`/interests/${interestId}/close`, {
+    method: "PATCH"
+  });
+}
+
+export async function activateInterest(interestId) {
+  return request(`/interests/${interestId}/activate`, {
     method: "PATCH"
   });
 }
@@ -334,6 +368,12 @@ export async function deactivateSellerItem(itemId) {
   });
 }
 
+export async function activateSellerItem(itemId) {
+  return request(`/seller-items/${itemId}/activate`, {
+    method: "PATCH"
+  });
+}
+
 export async function shareSellerItemOffer(itemId, interestId, payload) {
   return request(`/seller-items/${itemId}/interests/${interestId}/offer`, {
     method: "POST",
@@ -343,6 +383,48 @@ export async function shareSellerItemOffer(itemId, interestId, payload) {
 
 export async function fetchAdminModeration() {
   return request("/admin/moderation");
+}
+
+export async function fetchAdminContent() {
+  return request("/admin/content");
+}
+
+export async function saveContentEntry(entryId, payload) {
+  const path = entryId ? `/admin/content/${entryId}` : "/admin/content";
+  return request(path, {
+    method: entryId ? "PUT" : "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function publishContentEntry(entryId) {
+  return request(`/admin/content/${entryId}/publish`, {
+    method: "POST"
+  });
+}
+
+export async function archiveContentEntry(entryId) {
+  return request(`/admin/content/${entryId}/archive`, {
+    method: "POST"
+  });
+}
+
+export async function fetchAdminCatalog() {
+  return request("/admin/catalog");
+}
+
+export async function saveAdminCatalog(payload) {
+  return request("/admin/catalog", {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function invalidatePublicCache(scope = "all") {
+  const params = new URLSearchParams({ scope });
+  return request(`/admin/cache/invalidate?${params.toString()}`, {
+    method: "POST"
+  });
 }
 
 export async function saveModerationRule(ruleId, payload) {

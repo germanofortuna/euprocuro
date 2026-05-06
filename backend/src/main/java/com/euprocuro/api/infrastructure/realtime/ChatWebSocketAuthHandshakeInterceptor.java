@@ -72,12 +72,7 @@ public class ChatWebSocketAuthHandshakeInterceptor implements HandshakeIntercept
             return Optional.of(header.substring(BEARER_PREFIX.length()).trim());
         }
 
-        String queryToken = resolveQueryParam(request, "token");
-        if (StringUtils.hasText(queryToken)) {
-            return Optional.of(queryToken);
-        }
-
-        return request.getHeaders().getOrEmpty(HttpHeaders.COOKIE)
+        Optional<String> cookieToken = request.getHeaders().getOrEmpty(HttpHeaders.COOKIE)
                 .stream()
                 .flatMap(headerValue -> Arrays.stream(headerValue.split(";")))
                 .map(String::trim)
@@ -86,6 +81,16 @@ public class ChatWebSocketAuthHandshakeInterceptor implements HandshakeIntercept
                 .map(parts -> parts[1])
                 .filter(StringUtils::hasText)
                 .findFirst();
+        if (cookieToken.isPresent()) {
+            return cookieToken;
+        }
+
+        String queryToken = resolveQueryParam(request, "token");
+        if (StringUtils.hasText(queryToken)) {
+            return Optional.of(queryToken);
+        }
+
+        return Optional.empty();
     }
 
     private String resolveQueryParam(ServerHttpRequest request, String name) {

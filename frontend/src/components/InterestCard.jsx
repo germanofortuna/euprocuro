@@ -1,7 +1,6 @@
 export default function InterestCard({ interest, selected, onClick }) {
   const isBoosted = Boolean(
-    interest.boostEnabled
-    && interest.boostedUntil
+    interest.boostedUntil
     && new Date(interest.boostedUntil).getTime() > Date.now()
   );
 

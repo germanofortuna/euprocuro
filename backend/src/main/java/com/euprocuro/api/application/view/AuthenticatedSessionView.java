@@ -13,4 +13,5 @@ public class AuthenticatedSessionView {
     String token;
     Instant expiresAt;
     UserProfile user;
+    boolean renewed;
 }

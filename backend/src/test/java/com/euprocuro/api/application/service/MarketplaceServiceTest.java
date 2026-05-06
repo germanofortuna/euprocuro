@@ -3,7 +3,10 @@ package com.euprocuro.api.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,8 +16,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import com.euprocuro.api.domain.gateway.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,7 +34,6 @@ import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestSearchCriteria;
 import com.euprocuro.api.domain.model.InterestStatus;
@@ -55,13 +59,26 @@ class MarketplaceServiceTest {
     private RealtimeMessageGateway realtimeMessageGateway;
     @Mock
     private BlockedTermValidationGateway blockedTermValidationGateway;
+    @Mock
+    private OperationalCatalogService operationalCatalogService;
+    @Mock
+    private InterestSearchGateway interestSearchGateway;
+    @Mock
+    private PublicCacheService publicCacheService;
 
     @InjectMocks
     private MarketplaceService marketplaceService;
 
+    @BeforeEach
+    void setUpCache() {
+        lenient().when(publicCacheService.getOrLoad(anyString(), anyString(), anyLong(), any()))
+                .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
+    }
+
     @Test
     void createInterestShouldPersistNormalizedInterest() {
         when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(operationalCatalogService.requireActiveCategory("SERVICOS")).thenReturn("SERVICOS");
         when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> {
             InterestPost interest = invocation.getArgument(0);
             interest.setId("interest-1");
@@ -72,15 +89,13 @@ class MarketplaceServiceTest {
                 .title("Violao")
                 .description("Busco violao usado")
                 .referenceImageUrl("  data:image/png;base64,abc  ")
-                .category(InterestCategory.SERVICOS)
+                .category("SERVICOS")
                 .budgetMin(new BigDecimal("100"))
                 .budgetMax(new BigDecimal("500"))
                 .city("Campinas")
                 .state("SP")
                 .neighborhood("Centro")
                 .desiredRadiusKm(15)
-                .acceptsNationwideOffers(true)
-                .boostEnabled(true)
                 .preferredCondition("Usado")
                 .preferredContactMode("Chat")
                 .tags(List.of("violao", "musica"))
@@ -102,7 +117,7 @@ class MarketplaceServiceTest {
 
         assertThatThrownBy(() -> marketplaceService.createInterest("buyer-1", CreateInterestCommand.builder()
                 .title("Violao")
-                .category(InterestCategory.SERVICOS)
+                .category("SERVICOS")
                 .budgetMin(new BigDecimal("600"))
                 .budgetMax(new BigDecimal("500"))
                 .build()))
@@ -114,21 +129,20 @@ class MarketplaceServiceTest {
     void updateInterestShouldPersistEditedInterestForOwner() {
         InterestPost existingInterest = baseInterest();
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(existingInterest));
+        when(operationalCatalogService.requireActiveCategory("SERVICOS")).thenReturn("SERVICOS");
         when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         InterestPost result = marketplaceService.updateInterest("buyer-1", "interest-1", UpdateInterestCommand.builder()
                 .title("Quero um violao eletrico")
                 .description("Procuro modelo conservado")
                 .referenceImageUrl(" imagem ")
-                .category(InterestCategory.SERVICOS)
+                .category("SERVICOS")
                 .budgetMin(new BigDecimal("200"))
                 .budgetMax(new BigDecimal("700"))
                 .city("Campinas")
                 .state("SP")
                 .neighborhood("Taquaral")
                 .desiredRadiusKm(40)
-                .acceptsNationwideOffers(true)
-                .boostEnabled(true)
                 .preferredCondition("Usado")
                 .preferredContactMode("Chat")
                 .tags(List.of("eletrico"))
@@ -136,7 +150,6 @@ class MarketplaceServiceTest {
 
         assertThat(result.getTitle()).isEqualTo("Quero um violao eletrico");
         assertThat(result.getReferenceImageUrl()).isEqualTo("imagem");
-        assertThat(result.isBoostEnabled()).isTrue();
         assertThat(result.getStatus()).isEqualTo(InterestStatus.PENDING);
         verify(eventPublisherGateway).publish(eq("interest.updated"), any(Map.class));
         verify(eventPublisherGateway).publish(eq("interest.moderation.requested"), any(Map.class));
@@ -181,7 +194,7 @@ class MarketplaceServiceTest {
 
         assertThatThrownBy(() -> marketplaceService.updateInterest("other-user", "interest-1", UpdateInterestCommand.builder()
                 .title("Novo")
-                .category(InterestCategory.SERVICOS)
+                .category("SERVICOS")
                 .build()))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("dono");
@@ -191,7 +204,6 @@ class MarketplaceServiceTest {
     void listInterestsShouldFilterAndSortBoostedFirst() {
         InterestPost boosted = baseInterest();
         boosted.setId("1");
-        boosted.setBoostEnabled(true);
         boosted.setBoostedUntil(Instant.now().plus(1, ChronoUnit.DAYS));
         boosted.setCreatedAt(Instant.now().minus(2, ChronoUnit.HOURS));
 
@@ -199,7 +211,6 @@ class MarketplaceServiceTest {
         newest.setId("2");
         newest.setTitle("Aula de violao");
         newest.setTags(List.of("aula"));
-        newest.setBoostEnabled(false);
         newest.setCreatedAt(Instant.now());
 
         InterestPost closed = baseInterest();
@@ -213,7 +224,7 @@ class MarketplaceServiceTest {
         when(interestGateway.findAll()).thenReturn(List.of(newest, closed, boosted, expired));
 
         List<InterestPost> results = marketplaceService.listInterests(InterestSearchFilter.builder()
-                .category(InterestCategory.SERVICOS)
+                .category("SERVICOS")
                 .city("Campinas")
                 .query("violao")
                 .maxBudget(new BigDecimal("500"))
@@ -386,6 +397,32 @@ class MarketplaceServiceTest {
     }
 
     @Test
+    void activateInterestShouldSendClosedInterestBackToModeration() {
+        InterestPost closed = baseInterest();
+        closed.setStatus(InterestStatus.CLOSED);
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(closed));
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        InterestPost result = marketplaceService.activateInterest("buyer-1", "interest-1");
+
+        assertThat(result.getStatus()).isEqualTo(InterestStatus.PENDING);
+        assertThat(result.getModeration()).isNull();
+        verify(eventPublisherGateway).publish(eq("interest.activated"), any(Map.class));
+        verify(eventPublisherGateway).publish(eq("interest.moderation.requested"), any(Map.class));
+    }
+
+    @Test
+    void activateInterestShouldRejectDifferentOwner() {
+        InterestPost closed = baseInterest();
+        closed.setStatus(InterestStatus.CLOSED);
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(closed));
+
+        assertThatThrownBy(() -> marketplaceService.activateInterest("other-user", "interest-1"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("dono do interesse");
+    }
+
+    @Test
     void deleteInterestShouldRemoveOwnedInterest() {
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
 
@@ -431,11 +468,11 @@ class MarketplaceServiceTest {
         expired.setId("expired");
         expired.setExpiresAt(Instant.now().minus(1, ChronoUnit.HOURS));
 
-        when(interestGateway.search(any(InterestSearchCriteria.class), eq(0), eq(50)))
+        when(interestSearchGateway.search(any(InterestSearchCriteria.class), eq(0), eq(50)))
                 .thenReturn(List.of(active, expired));
 
         List<InterestPost> result = marketplaceService.listInterests(InterestSearchFilter.builder()
-                .category(InterestCategory.SERVICOS)
+                .category("SERVICOS")
                 .city("Campinas")
                 .query("violao")
                 .maxBudget(new BigDecimal("500"))
@@ -473,7 +510,7 @@ class MarketplaceServiceTest {
                 .ownerName("Ana")
                 .title("Quero um violao")
                 .description("Procuro violao usado")
-                .category(InterestCategory.SERVICOS)
+                .category("SERVICOS")
                 .budgetMin(new BigDecimal("100"))
                 .budgetMax(new BigDecimal("500"))
                 .location(LocationInfo.builder()
@@ -484,8 +521,6 @@ class MarketplaceServiceTest {
                         .build())
                 .tags(List.of("violao"))
                 .desiredRadiusKm(20)
-                .acceptsNationwideOffers(true)
-                .boostEnabled(false)
                 .preferredCondition("Usado")
                 .preferredContactMode("Chat")
                 .status(InterestStatus.OPEN)

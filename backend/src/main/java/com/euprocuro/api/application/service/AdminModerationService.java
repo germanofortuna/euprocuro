@@ -50,6 +50,7 @@ public class AdminModerationService implements AdminModerationUseCase {
     private final ContentReportGateway contentReportGateway;
     private final EventPublisherGateway eventPublisherGateway;
     private final RealtimeMessageGateway realtimeMessageGateway;
+    private final PublicCacheService publicCacheService;
 
     @Override
     public AdminModerationView getModerationQueue(String currentUserId) {
@@ -116,6 +117,7 @@ public class AdminModerationService implements AdminModerationUseCase {
                 .updatedAt(Instant.now())
                 .moderation(mergeModeration(interest.getModeration(), status, admin.getId(), reason))
                 .build());
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.moderation.decided", Map.of(
                 "interestId", saved.getId(),
                 "ownerId", saved.getOwnerId(),

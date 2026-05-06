@@ -1,4 +1,6 @@
 application:
+  monetization:
+    provider: ${APP_MONETIZATION_PROVIDER:MERCADO_PAGO_CHECKOUT_PRO}
   auth:
     expose-reset-preview: false
     expose-session-token: false
@@ -7,3 +9,9 @@ application:
       same-site: Lax
   security:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:https://app.euprocuro.com}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

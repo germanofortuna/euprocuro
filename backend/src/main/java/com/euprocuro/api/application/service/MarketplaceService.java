@@ -27,6 +27,7 @@ import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
+import com.euprocuro.api.domain.gateway.InterestSearchGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
@@ -51,11 +52,16 @@ public class MarketplaceService implements MarketplaceUseCase {
     private final EmailGateway emailGateway;
     private final RealtimeMessageGateway realtimeMessageGateway;
     private final BlockedTermValidationGateway blockedTermValidationGateway;
+    private final OperationalCatalogService operationalCatalogService;
+    private final InterestSearchGateway interestSearchGateway;
+    private final PublicCacheService publicCacheService;
 
     @Value("${application.listings.expiration-days:30}")
     private long listingExpirationDays = 30;
     @Value("${application.listings.renewal-days:30}")
     private long listingRenewalDays = 30;
+    @Value("${application.cache.public.marketplace-ttl-seconds:60}")
+    private long marketplaceCacheTtlSeconds = 60;
 
     @Override
     public InterestPost createInterest(String currentUserId, CreateInterestCommand command) {
@@ -63,6 +69,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado."));
 
         validateBudgetRange(command.getBudgetMin(), command.getBudgetMax());
+        String category = operationalCatalogService.requireActiveCategory(command.getCategory());
         Instant now = Instant.now();
 
         InterestPost interestPost = InterestPost.builder()
@@ -71,21 +78,21 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .title(command.getTitle())
                 .description(command.getDescription())
                 .referenceImageUrl(normalizeReferenceImage(command.getReferenceImageUrl()))
-                .category(command.getCategory())
+                .category(category)
                 .budgetMin(command.getBudgetMin())
                 .budgetMax(command.getBudgetMax())
                 .location(LocationInfo.builder()
+                        .postalCode(normalizePostalCode(command.getPostalCode()))
                         .city(command.getCity())
                         .state(command.getState())
                         .neighborhood(command.getNeighborhood())
+                        .country(normalizeCountry(command.getCountry()))
                         .remote(false)
                         .build())
                 .tags(Optional.ofNullable(command.getTags()).orElse(List.of()))
                 .desiredRadiusKm(command.getDesiredRadiusKm())
-                .acceptsNationwideOffers(command.isAcceptsNationwideOffers())
                 .allowsWhatsappContact(command.isAllowsWhatsappContact())
                 .whatsappContact(command.isAllowsWhatsappContact() ? normalizeReferenceImage(command.getWhatsappContact()) : null)
-                .boostEnabled(command.isBoostEnabled())
                 .preferredCondition(command.getPreferredCondition())
                 .preferredContactMode(command.getPreferredContactMode())
                 .status(InterestStatus.PENDING)
@@ -101,10 +108,11 @@ public class MarketplaceService implements MarketplaceUseCase {
                 });
 
         InterestPost saved = interestGateway.save(interestPost);
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.created", Map.of(
                 "interestId", saved.getId(),
                 "ownerId", owner.getId(),
-                "category", saved.getCategory().name(),
+                "category", saved.getCategory(),
                 "budgetMax", saved.getBudgetMax()
         ));
         publishModerationRequest(saved);
@@ -124,10 +132,38 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         InterestPost saved = interestGateway.save(closedInterest);
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.closed", Map.of(
                 "interestId", saved.getId(),
                 "ownerId", saved.getOwnerId()
         ));
+        return saved;
+    }
+
+    @Override
+    public InterestPost activateInterest(String currentUserId, String interestId) {
+        InterestPost existingInterest = loadInterest(interestId);
+        if (!Objects.equals(existingInterest.getOwnerId(), currentUserId)) {
+            throw new ForbiddenException("Apenas o dono do interesse pode ativar esse anuncio.");
+        }
+
+        if (existingInterest.getStatus() != InterestStatus.CLOSED) {
+            throw new BusinessException("Apenas anuncios desativados podem ser ativados novamente.");
+        }
+
+        InterestPost activatedInterest = existingInterest.toBuilder()
+                .status(InterestStatus.PENDING)
+                .moderation(null)
+                .updatedAt(Instant.now())
+                .build();
+
+        InterestPost saved = interestGateway.save(activatedInterest);
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
+        eventPublisherGateway.publish("interest.activated", Map.of(
+                "interestId", saved.getId(),
+                "ownerId", saved.getOwnerId()
+        ));
+        publishModerationRequest(saved);
         return saved;
     }
 
@@ -139,6 +175,7 @@ public class MarketplaceService implements MarketplaceUseCase {
         }
 
         interestGateway.deleteById(interestId);
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.deleted", Map.of(
                 "interestId", interestId,
                 "ownerId", currentUserId
@@ -153,26 +190,27 @@ public class MarketplaceService implements MarketplaceUseCase {
         }
 
         validateBudgetRange(command.getBudgetMin(), command.getBudgetMax());
+        String category = operationalCatalogService.requireActiveCategory(command.getCategory());
 
         InterestPost updatedInterest = existingInterest.toBuilder()
                 .title(command.getTitle())
                 .description(command.getDescription())
                 .referenceImageUrl(normalizeReferenceImage(command.getReferenceImageUrl()))
-                .category(command.getCategory())
+                .category(category)
                 .budgetMin(command.getBudgetMin())
                 .budgetMax(command.getBudgetMax())
                 .location(LocationInfo.builder()
+                        .postalCode(normalizePostalCode(command.getPostalCode()))
                         .city(command.getCity())
                         .state(command.getState())
                         .neighborhood(command.getNeighborhood())
+                        .country(normalizeCountry(command.getCountry()))
                         .remote(false)
                         .build())
                 .tags(Optional.ofNullable(command.getTags()).orElse(List.of()))
                 .desiredRadiusKm(command.getDesiredRadiusKm())
-                .acceptsNationwideOffers(command.isAcceptsNationwideOffers())
                 .allowsWhatsappContact(command.isAllowsWhatsappContact())
                 .whatsappContact(command.isAllowsWhatsappContact() ? normalizeReferenceImage(command.getWhatsappContact()) : null)
-                .boostEnabled(command.isBoostEnabled())
                 .preferredCondition(command.getPreferredCondition())
                 .preferredContactMode(command.getPreferredContactMode())
                 .status(InterestStatus.PENDING)
@@ -187,10 +225,11 @@ public class MarketplaceService implements MarketplaceUseCase {
                 });
 
         InterestPost saved = interestGateway.save(updatedInterest);
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.updated", Map.of(
                 "interestId", saved.getId(),
                 "ownerId", saved.getOwnerId(),
-                "category", saved.getCategory().name(),
+                "category", saved.getCategory(),
                 "budgetMax", saved.getBudgetMax()
         ));
         publishModerationRequest(saved);
@@ -225,6 +264,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         InterestPost saved = interestGateway.save(renewedInterest);
+        publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.renewed", Map.of(
                 "interestId", saved.getId(),
                 "ownerId", saved.getOwnerId(),
@@ -238,7 +278,7 @@ public class MarketplaceService implements MarketplaceUseCase {
         return interestGateway.findAll()
                 .stream()
                 .filter(this::isNotExpired)
-                .filter(post -> filter.getCategory() == null || post.getCategory() == filter.getCategory())
+                .filter(post -> filter.getCategory() == null || Objects.equals(post.getCategory(), filter.getCategory()))
                 .filter(post -> filter.getCity() == null || filter.getCity().isBlank()
                         || equalsIgnoreCase(post.getLocation() == null ? null : post.getLocation().getCity(), filter.getCity()))
                 .filter(post -> filter.getMaxBudget() == null || post.getBudgetMax() == null
@@ -254,13 +294,30 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     @Override
     public List<InterestPost> listInterests(InterestSearchFilter filter, int offset, int limit) {
-        return interestGateway.search(InterestSearchCriteria.builder()
+        InterestSearchCriteria criteria = InterestSearchCriteria.builder()
                 .category(filter.getCategory())
                 .city(filter.getCity())
                 .maxBudget(filter.getMaxBudget())
                 .query(filter.getQuery())
                 .openOnly(filter.isOpenOnly())
-                .build(), Math.max(0, offset), Math.max(1, Math.min(limit, 50)))
+                .build();
+        int safeOffset = Math.max(0, offset);
+        int safeLimit = Math.max(1, Math.min(limit, 50));
+
+        if (!criteria.isOpenOnly()) {
+            return searchInterests(criteria, safeOffset, safeLimit);
+        }
+
+        return publicCacheService.getOrLoad(
+                PublicCacheService.MARKETPLACE,
+                interestSearchCacheKey(criteria, safeOffset, safeLimit),
+                marketplaceCacheTtlSeconds,
+                () -> searchInterests(criteria, safeOffset, safeLimit)
+        );
+    }
+
+    private List<InterestPost> searchInterests(InterestSearchCriteria criteria, int offset, int limit) {
+        return interestSearchGateway.search(criteria, offset, limit)
                 .stream()
                 .filter(this::isNotExpired)
                 .collect(Collectors.toList());
@@ -368,8 +425,7 @@ public class MarketplaceService implements MarketplaceUseCase {
     }
 
     private boolean isBoostActive(InterestPost post) {
-        return post.isBoostEnabled()
-                && post.getBoostedUntil() != null
+        return post.getBoostedUntil() != null
                 && post.getBoostedUntil().isAfter(Instant.now());
     }
 
@@ -423,11 +479,38 @@ public class MarketplaceService implements MarketplaceUseCase {
         return referenceImageUrl.trim();
     }
 
+    private String normalizePostalCode(String value) {
+        String digits = Optional.ofNullable(value).orElse("").replaceAll("\\D", "");
+        if (!StringUtils.hasText(digits)) {
+            return null;
+        }
+        if (digits.length() != 8) {
+            throw new BusinessException("Informe um CEP valido com 8 digitos.");
+        }
+        return digits.substring(0, 5) + "-" + digits.substring(5);
+    }
+
+    private String normalizeCountry(String value) {
+        return StringUtils.hasText(value) ? value.trim() : "Brasil";
+    }
+
     private boolean equalsIgnoreCase(String left, String right) {
         return left != null && left.equalsIgnoreCase(right);
     }
 
     private String safe(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private String interestSearchCacheKey(InterestSearchCriteria criteria, int offset, int limit) {
+        return String.join("|",
+                "category=" + safe(criteria.getCategory()),
+                "city=" + safe(criteria.getCity()),
+                "query=" + safe(criteria.getQuery()),
+                "maxBudget=" + Optional.ofNullable(criteria.getMaxBudget()).map(BigDecimal::toPlainString).orElse(""),
+                "openOnly=" + criteria.isOpenOnly(),
+                "offset=" + offset,
+                "limit=" + limit
+        );
     }
 }

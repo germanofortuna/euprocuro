@@ -1,0 +1,450 @@
+{
+  "termsVersion": "2026-05-05",
+  "slugs": {
+    "terms": "termos-de-uso",
+    "privacy": "politica-de-privacidade",
+    "prohibitedContent": "politica-de-conteudo-proibido",
+    "reports": "politica-de-denuncia-e-remocao"
+  },
+  "pages": {
+    "termos-de-uso": {
+      "title": "Termos de Uso",
+      "label": "Termos de Uso",
+      "updatedAt": "05/05/2026",
+      "effectiveAt": "05/05/2026",
+      "summary": "Regras gerais para uso do Eu Procuro, publicação de interesses, envio de propostas, moderação e responsabilidades dos usuários.",
+      "sections": [
+        {
+          "title": "1. Sobre o Eu Procuro",
+          "paragraphs": [
+            "O Eu Procuro é uma plataforma de marketplace reverso: usuários compradores publicam interesses de compra e usuários vendedores podem enviar propostas relacionadas a esses interesses.",
+            "A plataforma atua como ambiente de aproximação entre compradores e vendedores. O Eu Procuro não é parte das negociações realizadas entre usuários, não garante a qualidade, disponibilidade, entrega, procedência, regularidade ou adequação dos produtos e serviços ofertados, e não substitui a diligência que cada usuário deve adotar antes de fechar qualquer negócio."
+          ]
+        },
+        {
+          "title": "2. Aceite dos termos",
+          "paragraphs": [
+            "Ao criar uma conta, acessar ou usar a plataforma, o usuário declara que leu, compreendeu e aceitou estes Termos de Uso, a Política de Privacidade, a Política de Conteúdo Proibido e a Política de Denúncia e Remoção.",
+            "Se o usuário não concordar com qualquer regra, não deve criar conta nem utilizar a plataforma. O aceite poderá ser registrado com data, horário, versão dos termos e dados técnicos necessários para comprovação."
+          ]
+        },
+        {
+          "title": "3. Cadastro e conta",
+          "paragraphs": [
+            "O usuário deve fornecer informações verdadeiras, atualizadas e compatíveis com sua identidade ou atuação comercial. Contas com dados falsos, enganosos, de terceiros sem autorização ou usados para fraude poderão ser bloqueadas ou removidas.",
+            "O usuário é responsável por manter a confidencialidade de suas credenciais, por todas as atividades realizadas em sua conta e por avisar a plataforma caso identifique acesso indevido."
+          ],
+          "items": [
+            "A plataforma é destinada a pessoas capazes de contratar. Menores de idade somente podem utilizar o serviço com autorização e supervisão de responsável legal.",
+            "A criação de múltiplas contas para burlar moderação, avaliações, limites ou medidas de segurança é proibida.",
+            "Perfis de vendedores devem respeitar exigências legais, fiscais, profissionais e regulatórias aplicáveis à atividade anunciada."
+          ]
+        },
+        {
+          "title": "4. Publicação de interesses e propostas",
+          "paragraphs": [
+            "Ao publicar um interesse, o comprador deve descrever de forma clara o que procura, informar categoria, localidade, faixa de orçamento e demais dados relevantes para que os vendedores possam apresentar propostas adequadas.",
+            "Ao enviar uma proposta, o vendedor declara que possui legitimidade para oferecer o produto ou serviço, que as informações prestadas são verdadeiras e que cumprirá as condições combinadas diretamente com o comprador."
+          ],
+          "items": [
+            "É proibido publicar ou propor itens, serviços, dados, atividades ou ofertas vedadas pela Política de Conteúdo Proibido.",
+            "Fotos, textos, marcas, descrições e anexos usados na plataforma devem respeitar direitos de terceiros.",
+            "Preço, entrega, garantia, suporte, arrependimento, troca, reembolso e nota fiscal devem ser combinados e cumpridos pelos usuários responsáveis pela negociação, conforme a legislação aplicável."
+          ]
+        },
+        {
+          "title": "5. Responsabilidades dos usuários",
+          "paragraphs": [
+            "Cada usuário é responsável por suas publicações, propostas, mensagens, dados de contato e condutas dentro e fora da plataforma quando a interação tiver origem no Eu Procuro.",
+            "O usuário deve agir com boa-fé, transparência, urbanidade e respeito às leis brasileiras, incluindo regras de proteção ao consumidor, proteção de dados pessoais, propriedade intelectual, publicidade, concorrência e normas setoriais aplicáveis."
+          ],
+          "items": [
+            "Não usar a plataforma para fraude, golpe, lavagem de dinheiro, phishing, engenharia social, coleta abusiva de dados ou manipulação de avaliações.",
+            "Não assediar, ameaçar, discriminar, expor dados pessoais de terceiros ou pressionar outro usuário a negociar fora de condições claras e verificáveis.",
+            "Não tentar explorar falhas técnicas, interferir na segurança, automatizar acessos não autorizados ou contornar ferramentas de moderação."
+          ]
+        },
+        {
+          "title": "6. Moderação e segurança",
+          "paragraphs": [
+            "A plataforma poderá usar ferramentas automatizadas, incluindo serviços de inteligência artificial e revisão humana, para identificar conteúdos proibidos, abusos, riscos de fraude e violações destes termos.",
+            "A moderação pode gerar alertas, redução de alcance, bloqueio temporário, remoção de conteúdo, suspensão ou encerramento de contas. Em situações de risco, fraude, ordem legal ou violação grave, medidas podem ser adotadas sem aviso prévio."
+          ],
+          "items": [
+            "A aprovação automatizada de um conteúdo não significa endosso, garantia ou validação jurídica pela plataforma.",
+            "A plataforma pode preservar registros necessários para apuração, segurança, exercício regular de direitos, cumprimento legal ou cooperação com autoridades competentes.",
+            "Usuários podem contestar medidas de moderação pelos canais indicados na Política de Denúncia e Remoção."
+          ]
+        },
+        {
+          "title": "7. Conteúdo proibido",
+          "paragraphs": [
+            "Os usuários devem observar integralmente a Política de Conteúdo Proibido. Entre outros exemplos, são vedadas ofertas ilegais, fraudulentas, discriminatórias, perigosas, enganosas, invasivas à privacidade ou que envolvam bens e serviços sujeitos a autorização especial sem comprovação adequada.",
+            "A plataforma poderá remover conteúdos que, mesmo não listados expressamente, apresentem risco jurídico, reputacional, operacional ou de segurança para usuários, terceiros ou para o próprio serviço."
+          ]
+        },
+        {
+          "title": "8. Denúncias e remoções",
+          "paragraphs": [
+            "Qualquer pessoa pode reportar conteúdo, perfil, proposta ou conduta potencialmente irregular pelos canais descritos na Política de Denúncia e Remoção.",
+            "A plataforma analisará denúncias com base nas informações disponíveis, poderá solicitar dados adicionais e adotará medidas proporcionais ao risco identificado."
+          ]
+        },
+        {
+          "title": "9. Privacidade e dados pessoais",
+          "paragraphs": [
+            "O tratamento de dados pessoais na plataforma está descrito na Política de Privacidade. Ao usar o serviço, o usuário reconhece que determinados dados de perfil, interesses e propostas podem ser exibidos a outros usuários para viabilizar a operação do marketplace.",
+            "O usuário não deve inserir dados pessoais sensíveis, documentos, senhas, dados financeiros completos ou informações de terceiros que não sejam necessários para a negociação."
+          ]
+        },
+        {
+          "title": "10. Alterações, disponibilidade e encerramento",
+          "paragraphs": [
+            "A plataforma poderá alterar funcionalidades, regras, políticas, limites e estes Termos de Uso para refletir mudanças legais, operacionais, de segurança ou de produto. Quando a alteração for relevante, a plataforma buscará comunicar os usuários por meios razoáveis.",
+            "O serviço pode sofrer interrupções por manutenção, incidentes, mudanças técnicas ou fatores externos. A plataforma poderá encerrar contas inativas, fraudulentas ou incompatíveis com estes termos."
+          ]
+        },
+        {
+          "title": "11. Contato",
+          "paragraphs": [
+            "Dúvidas sobre estes Termos de Uso podem ser enviadas para contato@euprocuro.com. Solicitações sobre privacidade devem ser enviadas para privacidade@euprocuro.com. Denúncias de conteúdo ou conduta devem ser enviadas para denuncias@euprocuro.com."
+          ]
+        }
+      ]
+    },
+    "politica-de-privacidade": {
+      "title": "Política de Privacidade",
+      "label": "Privacidade",
+      "updatedAt": "05/05/2026",
+      "effectiveAt": "05/05/2026",
+      "summary": "Como o Eu Procuro coleta, usa, compartilha, protege e elimina dados pessoais no funcionamento do marketplace.",
+      "sections": [
+        {
+          "title": "1. Objetivo e controlador",
+          "paragraphs": [
+            "Esta Política de Privacidade explica, de forma transparente, como o Eu Procuro trata dados pessoais de usuários, visitantes, compradores, vendedores, denunciantes e demais pessoas que interagem com a plataforma.",
+            "Para fins da Lei Geral de Proteção de Dados Pessoais, o Eu Procuro atua como controlador dos dados tratados para operação da plataforma. O canal de contato sobre privacidade é privacidade@euprocuro.com."
+          ]
+        },
+        {
+          "title": "2. Dados que podemos coletar",
+          "paragraphs": [
+            "Coletamos dados fornecidos diretamente pelo usuário, dados gerados durante o uso da plataforma e dados necessários para segurança, moderação e cumprimento de obrigações legais."
+          ],
+          "items": [
+            "Dados cadastrais: nome, e-mail, cidade, estado, bio, data de aceite dos termos e versão aceita.",
+            "Dados de uso do marketplace: interesses publicados, categorias, orçamento, localização informada, tags, propostas, mensagens, destaques e dados de contato inseridos pelos usuários.",
+            "Dados técnicos e de segurança: endereço IP, identificadores de sessão, registros de acesso, navegador, dispositivo, data e hora de eventos, logs de erro e sinais de abuso.",
+            "Dados de moderação e denúncia: conteúdo reportado, motivo da denúncia, evidências enviadas, histórico de análise, medidas adotadas e comunicações com denunciantes ou usuários afetados.",
+            "Dados de provedores: informações recebidas de serviços de hospedagem, analytics, e-mail, suporte, antifraude, moderação automatizada, incluindo provedores de inteligência artificial, quando necessários para o funcionamento da plataforma."
+          ]
+        },
+        {
+          "title": "3. Finalidades do tratamento",
+          "paragraphs": [
+            "Tratamos dados pessoais para fornecer, manter, melhorar e proteger a plataforma, sempre observando necessidade, adequação e transparência."
+          ],
+          "items": [
+            "Criar e administrar contas de usuários.",
+            "Permitir a publicação de interesses, o envio de propostas e a comunicação entre compradores e vendedores.",
+            "Personalizar buscas, filtros, categorias, localização e recomendações operacionais.",
+            "Detectar, prevenir e investigar fraude, abuso, spam, conteúdo proibido, incidentes de segurança e violações dos termos.",
+            "Enviar comunicações operacionais, avisos de segurança, respostas de suporte e informações relevantes sobre a conta.",
+            "Cumprir obrigações legais, regulatórias, judiciais ou requisições de autoridades competentes.",
+            "Produzir estatísticas agregadas ou anonimizadas para melhoria do serviço e tomada de decisão."
+          ]
+        },
+        {
+          "title": "4. Bases legais",
+          "paragraphs": [
+            "O tratamento poderá se apoiar em diferentes bases legais previstas na LGPD, conforme a finalidade específica."
+          ],
+          "items": [
+            "Execução de contrato e procedimentos preliminares relacionados ao uso da plataforma.",
+            "Cumprimento de obrigação legal ou regulatória.",
+            "Exercício regular de direitos em processos administrativos, judiciais ou arbitrais.",
+            "Legítimo interesse para segurança, prevenção a fraudes, melhoria do serviço, suporte, moderação e proteção de usuários, sempre com avaliação de necessidade e impacto.",
+            "Consentimento, quando exigido, como para cookies não essenciais, comunicações opcionais ou tratamentos específicos que dependam de autorização."
+          ]
+        },
+        {
+          "title": "5. Compartilhamento de dados",
+          "paragraphs": [
+            "Podemos compartilhar dados pessoais quando isso for necessário para operar o marketplace, proteger usuários, cumprir a lei ou atender solicitações válidas."
+          ],
+          "items": [
+            "Com outros usuários, quando dados de perfil, interesses, propostas e contatos forem necessários para a negociação.",
+            "Com fornecedores de infraestrutura, hospedagem, banco de dados, e-mail, suporte, analytics, segurança, antifraude e moderação.",
+            "Com serviços de inteligência artificial ou moderação automatizada para classificar, detectar ou bloquear conteúdo proibido e abuso.",
+            "Com autoridades públicas, órgãos reguladores, Poder Judiciário ou terceiros legitimados, quando houver obrigação legal, ordem válida ou necessidade de exercício regular de direitos.",
+            "Em operações societárias, reorganização, aquisição ou transferência de ativos, sempre respeitando esta política e a legislação aplicável."
+          ]
+        },
+        {
+          "title": "6. Cookies e tecnologias semelhantes",
+          "paragraphs": [
+            "A plataforma poderá usar cookies e tecnologias semelhantes para manter sessão, preservar preferências, melhorar desempenho, medir uso, prevenir fraude e oferecer funcionalidades essenciais.",
+            "Cookies estritamente necessários podem ser usados sem consentimento adicional. Cookies analíticos, publicitários ou opcionais deverão observar consentimento ou outra base legal aplicável, com meios de gerenciamento quando implementados."
+          ]
+        },
+        {
+          "title": "7. Retenção e eliminação",
+          "paragraphs": [
+            "Os dados serão mantidos pelo tempo necessário para cumprir as finalidades informadas, atender obrigações legais, preservar segurança, prevenir fraude e viabilizar o exercício regular de direitos.",
+            "Quando os dados não forem mais necessários, poderão ser eliminados, anonimizados ou bloqueados, observadas hipóteses legais de conservação, registros de auditoria, prevenção a abuso e ordens de autoridades competentes."
+          ]
+        },
+        {
+          "title": "8. Segurança",
+          "paragraphs": [
+            "Adotamos medidas técnicas e organizacionais proporcionais ao estágio do produto e aos riscos envolvidos para proteger dados pessoais contra acessos não autorizados, perda, alteração, divulgação indevida ou uso incompatível.",
+            "Nenhum sistema é totalmente imune a incidentes. Caso ocorra incidente relevante de segurança, a plataforma avaliará impactos, adotará medidas de contenção e realizará comunicações exigidas pela legislação aplicável."
+          ]
+        },
+        {
+          "title": "9. Direitos dos titulares",
+          "paragraphs": [
+            "Nos termos da LGPD, titulares de dados pessoais podem solicitar confirmação de tratamento, acesso, correção, anonimização, bloqueio ou eliminação de dados desnecessários ou tratados em desconformidade, portabilidade quando aplicável, informação sobre compartilhamentos, revisão de decisões automatizadas, revogação de consentimento e oposição a tratamentos irregulares.",
+            "Para exercer direitos, envie solicitação para privacidade@euprocuro.com. Poderemos solicitar informações adicionais para confirmar identidade, proteger a conta e evitar acesso indevido a dados de terceiros."
+          ]
+        },
+        {
+          "title": "10. Dados de terceiros e dados sensíveis",
+          "paragraphs": [
+            "O usuário não deve publicar dados pessoais de terceiros sem base legal ou autorização adequada. Também deve evitar inserir documentos, dados financeiros completos, senhas, informações íntimas ou dados pessoais sensíveis em interesses, propostas, mensagens ou denúncias.",
+            "Conteúdos que exponham indevidamente dados pessoais poderão ser removidos e gerar medidas de conta."
+          ]
+        },
+        {
+          "title": "11. Crianças e adolescentes",
+          "paragraphs": [
+            "A plataforma não é direcionada a crianças. Usuários menores de idade somente podem usar o serviço com autorização e supervisão de responsável legal, e a plataforma poderá remover contas ou conteúdos quando identificar uso incompatível com essa regra."
+          ]
+        },
+        {
+          "title": "12. Transferência internacional",
+          "paragraphs": [
+            "Alguns fornecedores de tecnologia, hospedagem, segurança, analytics ou moderação podem tratar dados fora do Brasil. Quando isso ocorrer, adotaremos medidas razoáveis para exigir proteção compatível com a LGPD e com esta política."
+          ]
+        },
+        {
+          "title": "13. Alterações e contato",
+          "paragraphs": [
+            "Esta Política de Privacidade poderá ser atualizada para refletir mudanças legais, operacionais, tecnológicas ou de produto. Alterações relevantes poderão ser comunicadas por meios razoáveis.",
+            "Dúvidas e solicitações relacionadas a privacidade devem ser enviadas para privacidade@euprocuro.com."
+          ]
+        }
+      ]
+    },
+    "politica-de-conteudo-proibido": {
+      "title": "Política de Conteúdo Proibido",
+      "label": "Conteúdo Proibido",
+      "updatedAt": "05/05/2026",
+      "effectiveAt": "05/05/2026",
+      "summary": "O que não pode ser publicado, solicitado, ofertado ou negociado no Eu Procuro.",
+      "sections": [
+        {
+          "title": "1. Princípio geral",
+          "paragraphs": [
+            "O Eu Procuro existe para aproximar compradores e vendedores legítimos. Não permitimos conteúdos, interesses, propostas, perfis, mensagens ou condutas que sejam ilegais, enganosos, abusivos, discriminatórios, perigosos, invasivos à privacidade ou incompatíveis com a segurança da comunidade.",
+            "Esta política vale para todo conteúdo inserido na plataforma, incluindo textos, tags, preços, descrições, contatos, imagens, anexos, links, mensagens e dados enviados em denúncias."
+          ]
+        },
+        {
+          "title": "2. Itens e serviços ilegais ou regulados",
+          "paragraphs": [
+            "É proibido solicitar, ofertar ou facilitar a negociação de bens, serviços ou atividades vedados pela lei ou sujeitos a autorização especial sem comprovação adequada."
+          ],
+          "items": [
+            "Drogas ilícitas, substâncias controladas, produtos falsificados, contrabandeados, furtados, roubados ou de procedência irregular.",
+            "Armas, munições, explosivos, dispositivos de dano, instruções de fabricação ou serviços que facilitem violência.",
+            "Medicamentos, procedimentos de saúde, serviços profissionais regulados ou produtos que exijam habilitação, receita, registro, licença ou autorização sem comprovação compatível.",
+            "Documentos, credenciais, contas, acessos, dados pessoais, bases de dados, meios de pagamento, cartões, chaves, senhas ou qualquer item que facilite fraude.",
+            "Serviços financeiros, investimentos, crédito, consórcio, apostas, sorteios, pirâmides ou promessas de ganho que violem leis ou regras setoriais."
+          ]
+        },
+        {
+          "title": "3. Fraude, golpe e engano",
+          "paragraphs": [
+            "Não permitimos conteúdo destinado a enganar usuários, manipular decisões, obter vantagem indevida ou ocultar riscos relevantes."
+          ],
+          "items": [
+            "Falsidade sobre identidade, localização, posse, preço, disponibilidade, qualidade, garantia, entrega ou autorização para vender.",
+            "Phishing, links maliciosos, engenharia social, pedidos suspeitos de pagamento, golpes de intermediação ou tentativa de contornar mecanismos de segurança.",
+            "Avaliações falsas, manipulação de reputação, criação de escassez artificial ou uso de contas coordenadas para induzir confiança.",
+            "Anúncios ou propostas que prometam resultados impossíveis, ganhos garantidos ou condições incompatíveis com a realidade do mercado."
+          ]
+        },
+        {
+          "title": "4. Conteúdo ofensivo, discriminatório ou violento",
+          "paragraphs": [
+            "A plataforma não permite conteúdo que promova violência, humilhação, ameaça, exploração, ódio, assédio ou discriminação."
+          ],
+          "items": [
+            "Ataques ou exclusão com base em origem, raça, cor, etnia, nacionalidade, religião, deficiência, idade, gênero, orientação sexual, condição social ou outro atributo protegido.",
+            "Ameaças, intimidação, extorsão, chantagem, perseguição, exposição vexatória ou incentivo a dano contra pessoas ou grupos.",
+            "Conteúdo sexual explícito, exploração sexual, nudez não consentida, aliciamento, serviços sexuais ou qualquer conteúdo sexual envolvendo menores de idade.",
+            "Imagens ou descrições de violência extrema usadas para chocar, ameaçar ou promover dano."
+          ]
+        },
+        {
+          "title": "5. Privacidade e dados pessoais",
+          "paragraphs": [
+            "É proibido publicar, vender, solicitar ou compartilhar dados pessoais de terceiros sem autorização ou base legal adequada."
+          ],
+          "items": [
+            "Documentos, endereços, telefones, e-mails, dados financeiros, prontuários, dados biométricos, credenciais, localização em tempo real ou informações privadas de terceiros.",
+            "Bases de leads, listas de contatos, dados vazados, dados obtidos por raspagem abusiva ou qualquer informação usada para spam, fraude ou perseguição.",
+            "Conteúdo que exponha conversa privada, imagem íntima, segredo comercial ou informação confidencial sem autorização."
+          ]
+        },
+        {
+          "title": "6. Propriedade intelectual e autenticidade",
+          "paragraphs": [
+            "O usuário deve respeitar direitos autorais, marcas, patentes, desenhos industriais, software, fotos, textos, catálogos e demais materiais protegidos."
+          ],
+          "items": [
+            "Produtos falsificados, réplicas enganosas, desbloqueios ilegais, pirataria, chaves de licença irregulares ou serviços para burlar proteção tecnológica.",
+            "Uso de marcas, logos, imagens ou textos de terceiros de forma que confunda o usuário sobre origem, autorização ou vínculo comercial.",
+            "Ofertas de bens ou serviços sem autorização do titular quando essa autorização for exigida."
+          ]
+        },
+        {
+          "title": "7. Categorias sensíveis para marketplace",
+          "paragraphs": [
+            "Algumas categorias exigem cuidado adicional. Mesmo quando não forem proibidas, poderão ser limitadas, moderadas ou removidas se não houver informações suficientes de legalidade, segurança e responsabilidade."
+          ],
+          "items": [
+            "Veículos, imóveis e serviços profissionais devem trazer informações verídicas, compatíveis com registros, licenças, condições de posse, disponibilidade e regras setoriais.",
+            "Produtos usados devem ser descritos com condição real, defeitos conhecidos, acessórios incluídos e limitações relevantes.",
+            "Serviços locais devem respeitar normas municipais, estaduais, profissionais, trabalhistas, sanitárias e de segurança aplicáveis."
+          ]
+        },
+        {
+          "title": "8. Links, contatos e negociação fora da plataforma",
+          "paragraphs": [
+            "Links, telefones e contatos podem ser usados para viabilizar propostas legítimas, mas não podem servir para fraude, spam, evasão de moderação, cobrança enganosa ou envio de conteúdo proibido.",
+            "A plataforma poderá remover links suspeitos, mascarados, encurtados, maliciosos ou incompatíveis com a finalidade do marketplace."
+          ]
+        },
+        {
+          "title": "9. Medidas de moderação",
+          "paragraphs": [
+            "Conteúdos proibidos podem gerar remoção, bloqueio, redução de alcance, solicitação de ajuste, suspensão, encerramento de conta, preservação de registros e comunicação a autoridades quando cabível.",
+            "A tentativa de burlar esta política por variações de grafia, imagens, códigos, links externos, contas alternativas ou mensagens privadas também é proibida."
+          ]
+        },
+        {
+          "title": "10. Dúvidas e denúncias",
+          "paragraphs": [
+            "Se houver dúvida sobre a permissão de um item ou serviço, entre em contato por contato@euprocuro.com antes de publicar. Para denunciar violação, use denuncias@euprocuro.com ou os canais de denúncia disponíveis na plataforma."
+          ]
+        }
+      ]
+    },
+    "politica-de-denuncia-e-remocao": {
+      "title": "Política de Denúncia e Remoção",
+      "label": "Denúncia e Remoção",
+      "updatedAt": "05/05/2026",
+      "effectiveAt": "05/05/2026",
+      "summary": "Como denunciar conteúdo, proposta, perfil ou conduta irregular, e como a plataforma analisa e remove violações.",
+      "sections": [
+        {
+          "title": "1. Objetivo",
+          "paragraphs": [
+            "Esta política define como o Eu Procuro recebe, prioriza, analisa e trata denúncias relacionadas a conteúdo proibido, fraude, abuso, violação de privacidade, propriedade intelectual, risco à segurança ou descumprimento dos Termos de Uso.",
+            "A política também explica como um usuário afetado pode contestar uma remoção, bloqueio ou suspensão."
+          ]
+        },
+        {
+          "title": "2. Quem pode denunciar",
+          "paragraphs": [
+            "Qualquer usuário, visitante, titular de direito, representante legal, autoridade ou pessoa impactada pode enviar denúncia sobre conteúdo, perfil, proposta, mensagem ou conduta que considere irregular."
+          ]
+        },
+        {
+          "title": "3. Canais de denúncia",
+          "paragraphs": [
+            "Enquanto o botão de denúncia dentro do produto não estiver disponível, denúncias devem ser enviadas para denuncias@euprocuro.com. Solicitações de privacidade devem ser enviadas para privacidade@euprocuro.com.",
+            "Quando houver recurso de denúncia na interface, o usuário deverá preferencialmente usá-lo, pois o formulário poderá anexar identificadores do conteúdo denunciado e acelerar a análise."
+          ]
+        },
+        {
+          "title": "4. Informações recomendadas",
+          "paragraphs": [
+            "Para permitir análise eficiente, a denúncia deve trazer o máximo possível de informações objetivas."
+          ],
+          "items": [
+            "Link, título, ID, print ou descrição do conteúdo, perfil, proposta ou conversa denunciada.",
+            "Motivo da denúncia e política potencialmente violada.",
+            "Evidências relevantes, como mensagens, comprovantes, documentos ou contexto da negociação.",
+            "Dados de contato do denunciante, quando desejar receber retorno ou quando a análise exigir complementação.",
+            "No caso de propriedade intelectual, identificação do titular, obra ou marca protegida e comprovação de legitimidade para solicitar remoção."
+          ]
+        },
+        {
+          "title": "5. Priorização",
+          "paragraphs": [
+            "Denúncias são priorizadas conforme risco e urgência. Casos com ameaça à integridade física, fraude em andamento, exposição de dados pessoais, conteúdo sexual não consentido, exploração de menores, ordem de autoridade ou risco jurídico elevado podem receber medidas imediatas.",
+            "Casos menos urgentes serão analisados em fila, de acordo com volume, completude das informações e gravidade aparente."
+          ]
+        },
+        {
+          "title": "6. Análise e medidas possíveis",
+          "paragraphs": [
+            "A plataforma pode combinar análise automatizada, revisão humana, histórico da conta, evidências enviadas e contexto da publicação para decidir a medida adequada."
+          ],
+          "items": [
+            "Nenhuma violação identificada, com manutenção do conteúdo.",
+            "Solicitação de ajuste, complementação de informação ou comprovação de regularidade.",
+            "Remoção parcial ou total do conteúdo.",
+            "Bloqueio temporário de publicação, proposta, perfil ou conta.",
+            "Suspensão ou encerramento definitivo de conta em caso de violação grave ou reincidência.",
+            "Preservação de registros e comunicação a autoridades competentes quando houver obrigação legal, ordem válida ou risco relevante."
+          ]
+        },
+        {
+          "title": "7. Prazos orientativos",
+          "paragraphs": [
+            "A plataforma buscará acusar recebimento de denúncias recebidas por e-mail em prazo razoável, especialmente quando houver dados de contato válidos.",
+            "Casos urgentes poderão ser analisados prioritariamente. Casos comuns serão tratados conforme a fila operacional e a complexidade da apuração. Estes prazos são orientativos e podem variar conforme volume, necessidade de informações adicionais ou exigências legais."
+          ]
+        },
+        {
+          "title": "8. Notificação do usuário afetado",
+          "paragraphs": [
+            "Quando apropriado e seguro, o usuário cujo conteúdo foi removido ou cuja conta sofreu restrição poderá receber comunicação com indicação geral do motivo e caminho para contestação.",
+            "A plataforma poderá deixar de notificar previamente quando isso puder comprometer investigação, segurança, cumprimento legal, proteção de vítimas, prevenção a fraude ou preservação de evidências."
+          ]
+        },
+        {
+          "title": "9. Contestação",
+          "paragraphs": [
+            "O usuário que discordar de uma remoção, bloqueio ou suspensão pode enviar contestação para denuncias@euprocuro.com, informando o e-mail da conta, conteúdo afetado, motivo da discordância e evidências de regularidade.",
+            "A contestação será reavaliada por critérios de proporcionalidade, contexto, risco e políticas aplicáveis. A reversão não é garantida e poderá depender de ajustes no conteúdo ou documentação adicional."
+          ]
+        },
+        {
+          "title": "10. Denúncias abusivas",
+          "paragraphs": [
+            "Denúncias falsas, coordenadas, repetitivas, discriminatórias, feitas de má-fé ou destinadas a prejudicar concorrentes e usuários legítimos podem gerar restrições ao denunciante.",
+            "O uso do canal de denúncia não autoriza exposição pública, assédio ou contato abusivo com usuários envolvidos."
+          ]
+        },
+        {
+          "title": "11. Autoridades e medidas externas",
+          "paragraphs": [
+            "A plataforma pode cooperar com autoridades competentes quando houver obrigação legal, ordem válida ou risco relevante. Em situações de emergência ou crime em andamento, o denunciante também deve acionar diretamente as autoridades competentes.",
+            "A remoção de conteúdo na plataforma não substitui medidas judiciais, administrativas ou policiais que possam ser necessárias."
+          ]
+        },
+        {
+          "title": "12. O que não está coberto agora",
+          "paragraphs": [
+            "Esta política não cria, neste momento, fluxo de reembolso, garantia comercial, mediação obrigatória de disputa de compra e venda ou ouvidoria formal. Esses temas poderão ser tratados em políticas próprias no futuro."
+          ]
+        }
+      ]
+    }
+  }
+}

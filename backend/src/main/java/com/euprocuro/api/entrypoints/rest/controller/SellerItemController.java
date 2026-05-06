@@ -79,6 +79,13 @@ public class SellerItemController {
         );
     }
 
+    @PatchMapping("/{itemId}/activate")
+    public SellerItemResponse activateItem(@PathVariable String itemId, HttpServletRequest request) {
+        return RestMapper.toResponse(
+                sellerItemUseCase.activateItem(CurrentUserContext.userId(request), itemId)
+        );
+    }
+
     @PostMapping("/{itemId}/interests/{interestId}/offer")
     @ResponseStatus(HttpStatus.CREATED)
     public OfferResponse shareItemAsOffer(

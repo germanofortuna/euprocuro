@@ -8,7 +8,6 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 
-import com.euprocuro.api.domain.model.InterestCategory;
 
 import lombok.Data;
 
@@ -22,15 +21,18 @@ public class UpdateSellerItemRequest {
     @Size(max = 120)
     private String description;
 
+    @Size(max = 1500000)
     private String referenceImageUrl;
 
     @NotNull
-    private InterestCategory category;
+    private String category;
 
     private BigDecimal desiredPrice;
 
+    private String postalCode;
     private String city;
     private String state;
     private String neighborhood;
+    private String country;
     private List<String> tags = new ArrayList<>();
 }

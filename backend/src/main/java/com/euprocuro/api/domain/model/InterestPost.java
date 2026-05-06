@@ -20,16 +20,14 @@ public class InterestPost {
     private String title;
     private String description;
     private String referenceImageUrl;
-    private InterestCategory category;
+    private String category;
     private BigDecimal budgetMin;
     private BigDecimal budgetMax;
     private LocationInfo location;
     private List<String> tags;
     private Integer desiredRadiusKm;
-    private boolean acceptsNationwideOffers;
     private boolean allowsWhatsappContact;
     private String whatsappContact;
-    private boolean boostEnabled;
     private Instant boostedUntil;
     private String preferredCondition;
     private String preferredContactMode;

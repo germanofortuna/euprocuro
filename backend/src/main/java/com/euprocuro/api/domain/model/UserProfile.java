@@ -18,8 +18,11 @@ public class UserProfile {
     private String documentNumber;
     private String documentType;
     private String passwordHash;
+    private String postalCode;
     private String city;
     private String state;
+    private String neighborhood;
+    private String country;
     private boolean emailVerified;
     private double buyerRating;
     private double sellerRating;
@@ -28,4 +31,7 @@ public class UserProfile {
     private String subscriptionPlan;
     private Instant subscriptionActiveUntil;
     private String ipAddress;
+    private boolean termsAccepted;
+    private Instant termsAcceptedAt;
+    private String termsVersion;
 }

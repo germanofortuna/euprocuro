@@ -32,7 +32,6 @@ import com.euprocuro.api.domain.gateway.ModerationRuleGateway;
 import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
 import com.euprocuro.api.domain.model.ContentReport;
 import com.euprocuro.api.domain.model.ContentReportStatus;
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.LocationInfo;
@@ -54,6 +53,8 @@ class ModerationServiceTest {
     private AiModerationGateway aiModerationGateway;
     @Mock
     private RealtimeMessageGateway realtimeMessageGateway;
+    @Mock
+    private PublicCacheService publicCacheService;
 
     @InjectMocks
     private ModerationService moderationService;
@@ -250,7 +251,7 @@ class ModerationServiceTest {
                 .ownerName("Ana")
                 .title("Procuro produto duvidoso")
                 .description("Procuro item usado em bom estado")
-                .category(InterestCategory.OUTROS)
+                .category("OUTROS")
                 .budgetMin(BigDecimal.ZERO)
                 .budgetMax(new BigDecimal("500"))
                 .location(LocationInfo.builder()

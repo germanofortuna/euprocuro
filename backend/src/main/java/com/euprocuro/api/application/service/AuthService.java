@@ -7,6 +7,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -52,6 +53,7 @@ public class AuthService implements AuthUseCase {
             "temp-mail.org",
             "yopmail.com"
     );
+    private static final String CURRENT_TERMS_VERSION = "2026-05-05";
 
     private final UserGateway userGateway;
     private final AuthSessionGateway authSessionGateway;
@@ -64,6 +66,9 @@ public class AuthService implements AuthUseCase {
     @Value("${application.auth.session-hours:168}")
     private long sessionHours;
 
+    @Value("${application.auth.session-renewal-threshold-hours:24}")
+    private long sessionRenewalThresholdHours;
+
     @Value("${application.auth.password-reset-hours:2}")
     private long passwordResetHours;
 
@@ -73,7 +78,7 @@ public class AuthService implements AuthUseCase {
     @Value("${application.auth.reset-base-url:http://localhost:5173}")
     private String resetBaseUrl;
 
-    @Value("${application.auth.expose-reset-preview:true}")
+    @Value("${application.auth.expose-reset-preview:false}")
     private boolean exposeResetPreview;
 
     @Value("${application.hml.access.enabled:false}")
@@ -105,30 +110,35 @@ public class AuthService implements AuthUseCase {
             throw new BusinessException("Ja existe usuario com este CPF/CNPJ.");
         });
 
+        if (!command.isTermsAccepted()) {
+            throw new BusinessException("E necessario aceitar os termos de uso para criar a conta.");
+        }
+
         UserProfile user = userGateway.save(UserProfile.builder()
                 .name(normalizedName)
                 .email(normalizedEmail)
                 .documentNumber(normalizedDocument)
                 .documentType(documentType)
                 .passwordHash(passwordEncoder.encode(command.getPassword()))
+                .postalCode(normalizePostalCode(command.getPostalCode()))
                 .city(normalizeText(command.getCity()))
                 .state(normalizeState(command.getState()))
-                .emailVerified(false)
+                .neighborhood(normalizeText(command.getNeighborhood()))
+                .country(normalizeCountry(command.getCountry()))
+                .emailVerified(!emailVerificationRequired)
                 .buyerRating(4.8)
                 .sellerRating(4.8)
                 .sellerCredits(3)
                 .purchasedCreditsTotal(0)
                 .ipAddress(command.getIpAddress())
+                .termsAccepted(true)
+                .termsAcceptedAt(Instant.now())
+                .termsVersion(StringUtils.hasText(command.getTermsVersion())
+                        ? command.getTermsVersion()
+                        : CURRENT_TERMS_VERSION)
                 .build());
 
-        EmailVerificationToken verificationToken = emailVerificationTokenGateway.save(EmailVerificationToken.builder()
-                .token(UUID.randomUUID().toString().replace("-", ""))
-                .userId(user.getId())
-                .createdAt(Instant.now())
-                .expiresAt(Instant.now().plus(emailVerificationHours, ChronoUnit.HOURS))
-                .build());
-        String verificationLink = buildEmailVerificationLink(verificationToken.getToken());
-        boolean verificationSent = emailGateway.sendEmailVerificationEmail(user, verificationLink);
+        boolean verificationSent = emailVerificationRequired && sendRequiredEmailVerification(user);
 
         eventPublisherGateway.publish("user.registered", Map.of(
                 "userId", user.getId(),
@@ -136,13 +146,54 @@ public class AuthService implements AuthUseCase {
                 "verificationSentByEmail", verificationSent
         ));
 
-        String message = emailVerificationRequired ? (verificationSent ? "Conta criada. Enviamos um link para confirmar seu e-mail antes do login."
-                : "Conta criada, mas nao conseguimos enviar o e-mail de confirmacao. Verifique a configuracao SMTP.") : "Conta criada";
+        String message = emailVerificationRequired
+                ? "Conta criada. Enviamos um link para confirmar seu e-mail antes do login."
+                : "Conta criada";
 
         return RegistrationView.builder()
                 .verificationSentByEmail(verificationSent)
                 .message(message)
                 .build();
+    }
+
+    private boolean sendRequiredEmailVerification(UserProfile user) {
+        EmailVerificationToken verificationToken = null;
+
+        try {
+            verificationToken = emailVerificationTokenGateway.save(buildEmailVerificationToken(user));
+            String verificationLink = buildEmailVerificationLink(verificationToken.getToken());
+            boolean verificationSent = emailGateway.sendEmailVerificationEmail(user, verificationLink);
+
+            if (verificationSent) {
+                return true;
+            }
+        } catch (RuntimeException exception) {
+            rollbackPendingRegistration(user, verificationToken);
+            throw new BusinessException("Nao foi possivel enviar o e-mail de confirmacao. Tente novamente mais tarde.");
+        }
+
+        rollbackPendingRegistration(user, verificationToken);
+        throw new BusinessException("Nao foi possivel enviar o e-mail de confirmacao. Tente novamente mais tarde.");
+    }
+
+    private EmailVerificationToken buildEmailVerificationToken(UserProfile user) {
+        Instant now = Instant.now();
+        return EmailVerificationToken.builder()
+                .token(UUID.randomUUID().toString().replace("-", ""))
+                .userId(user.getId())
+                .createdAt(now)
+                .expiresAt(now.plus(emailVerificationHours, ChronoUnit.HOURS))
+                .build();
+    }
+
+    private void rollbackPendingRegistration(UserProfile user, EmailVerificationToken verificationToken) {
+        if (verificationToken != null && StringUtils.hasText(verificationToken.getToken())) {
+            emailVerificationTokenGateway.deleteByToken(verificationToken.getToken());
+        }
+
+        if (user != null && StringUtils.hasText(user.getId())) {
+            userGateway.deleteById(user.getId());
+        }
     }
 
     @Override
@@ -322,9 +373,22 @@ public class AuthService implements AuthUseCase {
 
     @Override
     public UserProfile requireAuthenticatedUser(String token) {
+        return requireAuthenticatedSession(token).getUser();
+    }
+
+    @Override
+    public AuthenticatedSessionView requireAuthenticatedSession(String token) {
         AuthSession session = getValidSession(token);
-        return userGateway.findById(session.getUserId())
+        AuthSession validSession = renewSessionIfNeeded(session);
+        UserProfile user = userGateway.findById(validSession.getUserId())
                 .orElseThrow(() -> new UnauthorizedException("Sessao invalida."));
+
+        return AuthenticatedSessionView.builder()
+                .token(validSession.getToken())
+                .expiresAt(validSession.getExpiresAt())
+                .user(user)
+                .renewed(!Objects.equals(session.getExpiresAt(), validSession.getExpiresAt()))
+                .build();
     }
 
     private AuthSession createSession(UserProfile user) {
@@ -350,6 +414,22 @@ public class AuthService implements AuthUseCase {
         }
 
         return session;
+    }
+
+    private AuthSession renewSessionIfNeeded(AuthSession session) {
+        if (sessionRenewalThresholdHours <= 0) {
+            return session;
+        }
+
+        Instant now = Instant.now();
+        Instant renewalBoundary = now.plus(sessionRenewalThresholdHours, ChronoUnit.HOURS);
+        if (session.getExpiresAt().isAfter(renewalBoundary)) {
+            return session;
+        }
+
+        return authSessionGateway.save(session.toBuilder()
+                .expiresAt(now.plus(sessionHours, ChronoUnit.HOURS))
+                .build());
     }
 
     private void validateName(String name) {
@@ -420,6 +500,22 @@ public class AuthService implements AuthUseCase {
             throw new BusinessException("Informe a UF com 2 letras.");
         }
         return state;
+    }
+
+    private String normalizePostalCode(String value) {
+        String digits = Optional.ofNullable(value).orElse("").replaceAll("\\D", "");
+        if (!StringUtils.hasText(digits)) {
+            return null;
+        }
+        if (digits.length() != 8) {
+            throw new BusinessException("Informe um CEP valido com 8 digitos.");
+        }
+        return digits.substring(0, 5) + "-" + digits.substring(5);
+    }
+
+    private String normalizeCountry(String value) {
+        String country = normalizeText(value);
+        return StringUtils.hasText(country) ? country : "Brasil";
     }
 
     private String normalizeDocument(String value) {

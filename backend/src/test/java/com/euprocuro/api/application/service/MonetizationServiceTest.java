@@ -3,7 +3,9 @@ package com.euprocuro.api.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -12,14 +14,15 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -36,14 +39,14 @@ import com.euprocuro.api.domain.gateway.PaymentCheckoutGateway;
 import com.euprocuro.api.domain.gateway.PaymentOrderGateway;
 import com.euprocuro.api.domain.gateway.PaymentStatusGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
-import com.euprocuro.api.domain.model.InterestCategory;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.PaymentOrder;
 import com.euprocuro.api.domain.model.PaymentOrderStatus;
 import com.euprocuro.api.domain.model.PaymentProviderStatus;
+import com.euprocuro.api.domain.model.MonetizationProductType;
 import com.euprocuro.api.domain.model.UserProfile;
-import com.euprocuro.api.shared.config.MonetizationCatalogProperties;
+import com.euprocuro.api.application.view.MonetizationProductView;
 
 @ExtendWith(MockitoExtension.class)
 class MonetizationServiceTest {
@@ -56,17 +59,70 @@ class MonetizationServiceTest {
     private EventPublisherGateway eventPublisherGateway;
     @Mock
     private EmailGateway emailGateway;
-    @Spy
-    private MonetizationCatalog monetizationCatalog = new MonetizationCatalog(new MonetizationCatalogProperties());
+    @Mock
+    private MonetizationCatalog monetizationCatalog;
     @Mock
     private PaymentOrderGateway paymentOrderGateway;
     @Mock
     private PaymentCheckoutGateway paymentCheckoutGateway;
     @Mock
     private PaymentStatusGateway paymentStatusGateway;
+    @Mock
+    private PublicCacheService publicCacheService;
 
     @InjectMocks
     private MonetizationService monetizationService;
+
+    @BeforeEach
+    void setUpCatalog() {
+        List<MonetizationProductView> products = defaultProducts();
+        lenient().when(monetizationCatalog.products()).thenReturn(products);
+        lenient().when(monetizationCatalog.findByCode(anyString())).thenReturn(Optional.empty());
+        for (MonetizationProductView product : products) {
+            lenient().when(monetizationCatalog.findByCode(product.getCode())).thenReturn(Optional.of(product));
+        }
+    }
+
+    private List<MonetizationProductView> defaultProducts() {
+        return List.of(
+                MonetizationProductView.builder()
+                        .code("CREDITS_10")
+                        .name("10 propostas")
+                        .description("Pacote para vendedores enviarem propostas avulsas.")
+                        .type(MonetizationProductType.CREDIT_PACK)
+                        .price(new BigDecimal("9.90"))
+                        .credits(10)
+                        .enabled(true)
+                        .build(),
+                MonetizationProductView.builder()
+                        .code("CREDITS_30")
+                        .name("30 propostas")
+                        .description("Mais volume para vendedores frequentes.")
+                        .type(MonetizationProductType.CREDIT_PACK)
+                        .price(new BigDecimal("24.90"))
+                        .credits(30)
+                        .enabled(true)
+                        .build(),
+                MonetizationProductView.builder()
+                        .code("SELLER_PRO")
+                        .name("Plano vendedor Pro")
+                        .description("Propostas ilimitadas por 30 dias neste MVP.")
+                        .type(MonetizationProductType.SUBSCRIPTION)
+                        .price(new BigDecimal("49.90"))
+                        .durationDays(30)
+                        .enabled(true)
+                        .build(),
+                MonetizationProductView.builder()
+                        .code("BOOST_3_DAYS")
+                        .name("Boost 3 dias")
+                        .description("Impulsiona o interesse na busca e na home.")
+                        .type(MonetizationProductType.BOOST)
+                        .price(new BigDecimal("9.90"))
+                        .durationDays(3)
+                        .enabled(true)
+                        .build()
+        );
+    }
 
     @Test
     void getAccountShouldReturnCreditsPlanAndProducts() {
@@ -503,14 +559,21 @@ class MonetizationServiceTest {
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
         when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+        when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        InterestPost result = monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+        CheckoutView result = monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
                 .boostCode("BOOST_3_DAYS")
                 .paymentMethod("PIX")
                 .build());
 
-        assertThat(result.isBoostEnabled()).isTrue();
-        assertThat(result.getBoostedUntil()).isAfter(Instant.now());
+        assertThat(result.getStatus()).isEqualTo("APPROVED");
+        assertThat(result.getProductCode()).isEqualTo("BOOST_3_DAYS");
+        verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
+                "BOOST_3_DAYS".equals(order.getProductCode()) && "interest-1".equals(order.getBoostInterestId())
+        ));
+        verify(interestGateway).save(org.mockito.ArgumentMatchers.argThat(savedInterest ->
+                savedInterest.getBoostedUntil().isAfter(Instant.now())
+        ));
         verify(emailGateway).sendBoostActivatedEmail(any(UserProfile.class), eq("Quero um carro"), any(String.class));
         verify(eventPublisherGateway).publish(eq("interest.boosted"), any(Map.class));
     }
@@ -518,20 +581,90 @@ class MonetizationServiceTest {
     @Test
     void boostInterestShouldExtendExistingBoostWindow() {
         InterestPost interest = baseInterest().toBuilder()
-                .boostEnabled(true)
                 .boostedUntil(Instant.now().plus(2, ChronoUnit.DAYS))
                 .build();
         Instant previousBoostedUntil = interest.getBoostedUntil();
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
         when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+        when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        InterestPost result = monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+        monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
                 .boostCode("BOOST_3_DAYS")
                 .paymentMethod("PIX")
                 .build());
 
-        assertThat(result.getBoostedUntil()).isAfter(previousBoostedUntil.plus(2, ChronoUnit.DAYS));
+        verify(interestGateway).save(org.mockito.ArgumentMatchers.argThat(savedInterest ->
+                savedInterest.getBoostedUntil().isAfter(previousBoostedUntil.plus(2, ChronoUnit.DAYS))
+        ));
+    }
+
+    @Test
+    void boostInterestShouldCreateCheckoutAndWaitForPaymentWhenProviderIsExternal() {
+        ReflectionTestUtils.setField(monetizationService, "checkoutProvider", "MERCADO_PAGO_CHECKOUT_PRO");
+        InterestPost interest = baseInterest();
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+        when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentCheckoutGateway.createCheckout(any(UserProfile.class), any(MonetizationProductView.class), any(PaymentOrder.class)))
+                .thenAnswer(invocation -> {
+                    PaymentOrder order = invocation.getArgument(2);
+                    return CheckoutView.builder()
+                            .provider("MERCADO_PAGO_CHECKOUT_PRO")
+                            .paymentMethod(order.getPaymentMethod())
+                            .productCode(order.getProductCode())
+                            .paymentOrderId(order.getId())
+                            .providerPreferenceId("pref-1")
+                            .checkoutUrl("https://mercadopago.example/checkout")
+                            .status("PENDING")
+                            .message("Checkout criado.")
+                            .build();
+                });
+
+        CheckoutView result = monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+                .boostCode("BOOST_3_DAYS")
+                .paymentMethod("PIX")
+                .build());
+
+        assertThat(result.getCheckoutUrl()).contains("mercadopago");
+        verify(interestGateway, never()).save(any(InterestPost.class));
+        verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
+                "interest-1".equals(order.getBoostInterestId()) && order.getStatus() == PaymentOrderStatus.CREATED
+        ));
+    }
+
+    @Test
+    void confirmPaymentShouldActivateBoostAfterApprovedPayment() {
+        PaymentOrder paymentOrder = PaymentOrder.builder()
+                .id("order-boost")
+                .userId("user-1")
+                .productCode("BOOST_3_DAYS")
+                .boostInterestId("interest-1")
+                .paymentMethod("PIX")
+                .provider("MERCADO_PAGO_CHECKOUT_PRO")
+                .status(PaymentOrderStatus.PENDING)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+        when(paymentStatusGateway.findPayment("123")).thenReturn(PaymentProviderStatus.builder()
+                .paymentId("123")
+                .status("approved")
+                .externalReference("order-boost")
+                .paymentMethod("pix")
+                .build());
+        when(paymentOrderGateway.findById("order-boost")).thenReturn(Optional.of(paymentOrder));
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+
+        monetizationService.confirmPayment("123");
+
+        verify(interestGateway).save(org.mockito.ArgumentMatchers.argThat(savedInterest ->
+                savedInterest.getBoostedUntil().isAfter(Instant.now())
+        ));
+        verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
+                order.getStatus() == PaymentOrderStatus.APPROVED && "123".equals(order.getProviderPaymentId())
+        ));
     }
 
     @Test
@@ -573,7 +706,7 @@ class MonetizationServiceTest {
                 .ownerId("user-1")
                 .ownerName("Ana")
                 .title("Quero um carro")
-                .category(InterestCategory.AUTOMOVEIS)
+                .category("AUTOMOVEIS")
                 .status(InterestStatus.OPEN)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
