@@ -76,6 +76,7 @@ class MarketplaceServiceTest {
     void setUpCache() {
         lenient().when(publicCacheService.getOrLoad(anyString(), anyString(), anyLong(), any()))
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
+        lenient().when(blockedTermValidationGateway.validateBlockedTerms(any(InterestPost.class))).thenReturn(Optional.empty());
     }
 
     @Test
@@ -247,6 +248,109 @@ class MarketplaceServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("expirado");
         verify(interestGateway).deleteById("interest-1");
+    }
+
+    @Test
+    void getInterestShouldReturnPubliclyVisibleInterest() {
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+
+        InterestPost result = marketplaceService.getInterest("interest-1");
+
+        assertThat(result.getId()).isEqualTo("interest-1");
+        assertThat(result.getStatus()).isEqualTo(InterestStatus.OPEN);
+    }
+
+    @Test
+    void getInterestShouldRejectNonPublicInterest() {
+        InterestPost pending = baseInterest();
+        pending.setStatus(InterestStatus.PENDING);
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(pending));
+
+        assertThatThrownBy(() -> marketplaceService.getInterest("interest-1"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Interesse nao encontrado");
+    }
+
+    @Test
+    void listInterestsShouldMatchQueryByDescriptionOwnerNameAndCity() {
+        InterestPost byDescription = baseInterest();
+        byDescription.setId("description");
+        byDescription.setTitle("Titulo sem termo");
+        byDescription.setDescription("Procuro teclado mecanico");
+        byDescription.setOwnerName("Ana");
+        byDescription.setLocation(LocationInfo.builder().city("Campinas").state("SP").build());
+
+        InterestPost byOwner = baseInterest();
+        byOwner.setId("owner");
+        byOwner.setTitle("Titulo generico");
+        byOwner.setDescription("Descricao generica");
+        byOwner.setOwnerName("Carlos Mecanico");
+        byOwner.setLocation(LocationInfo.builder().city("Valinhos").state("SP").build());
+
+        InterestPost byCity = baseInterest();
+        byCity.setId("city");
+        byCity.setTitle("Outro titulo");
+        byCity.setDescription("Outra descricao");
+        byCity.setOwnerName("Maria");
+        byCity.setLocation(LocationInfo.builder().city("Mecanico").state("SP").build());
+
+        InterestPost noMatch = baseInterest();
+        noMatch.setId("no-match");
+        noMatch.setTitle("Violao");
+        noMatch.setDescription("Instrumento musical");
+        noMatch.setOwnerName("Joao");
+        noMatch.setLocation(null);
+        noMatch.setTags(null);
+
+        when(interestGateway.findAll()).thenReturn(List.of(byDescription, byOwner, byCity, noMatch));
+
+        List<InterestPost> results = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .query("mecanico")
+                .openOnly(true)
+                .build());
+
+        assertThat(results).extracting(InterestPost::getId)
+                .containsExactlyInAnyOrder("city", "owner", "description");
+    }
+
+    @Test
+    void createInterestShouldNormalizePostalCodeWithDigitsOnly() {
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(operationalCatalogService.requireActiveCategory("SERVICOS")).thenReturn("SERVICOS");
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> {
+            InterestPost interest = invocation.getArgument(0);
+            interest.setId("interest-cep");
+            return interest;
+        });
+
+        InterestPost result = marketplaceService.createInterest("buyer-1", CreateInterestCommand.builder()
+                .title("Violao")
+                .description("Busco violao usado")
+                .category("SERVICOS")
+                .budgetMax(new BigDecimal("500"))
+                .postalCode("13010-111")
+                .city("Campinas")
+                .state("SP")
+                .build());
+
+        assertThat(result.getLocation().getPostalCode()).isEqualTo("13010-111");
+    }
+
+    @Test
+    void createInterestShouldRejectInvalidPostalCode() {
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(operationalCatalogService.requireActiveCategory("SERVICOS")).thenReturn("SERVICOS");
+
+        assertThatThrownBy(() -> marketplaceService.createInterest("buyer-1", CreateInterestCommand.builder()
+                .title("Violao")
+                .description("Busco violao usado")
+                .category("SERVICOS")
+                .postalCode("123")
+                .city("Campinas")
+                .state("SP")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("CEP valido");
     }
 
     @Test

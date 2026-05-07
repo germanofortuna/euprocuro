@@ -497,6 +497,17 @@ function XIcon() {
   );
 }
 
+function FacebookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M14.2 8.4h2.3V5.1c-.4-.1-1.7-.2-3.2-.2-3.2 0-5.3 1.9-5.3 5.5v3.1H4.5v3.7H8v6.7h4.2v-6.7h3.5l.6-3.7h-4.1v-2.7c0-1.1.3-2.4 2-2.4Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 function LinkIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -727,13 +738,19 @@ export default function App() {
   );
   const sentOffers = useMemo(() => (dashboard?.offersSent ?? []).slice().sort(byNewest), [dashboard?.offersSent]);
   const receivedOffers = useMemo(() => (dashboard?.offersReceived ?? []).slice().sort(byNewest), [dashboard?.offersReceived]);
+  const creditPurchasesEnabled = Boolean(monetizationAccount?.creditPurchasesEnabled);
+  const boostPurchasesEnabled = Boolean(monetizationAccount?.boostPurchasesEnabled);
   const creditProducts = useMemo(
-    () => (monetizationAccount?.products ?? []).filter((product) => product.type === "CREDIT_PACK"),
-    [monetizationAccount?.products]
+    () => creditPurchasesEnabled
+      ? (monetizationAccount?.products ?? []).filter((product) => product.type === "CREDIT_PACK")
+      : [],
+    [creditPurchasesEnabled, monetizationAccount?.products]
   );
   const subscriptionProducts = useMemo(
-    () => (monetizationAccount?.products ?? []).filter((product) => product.type === "SUBSCRIPTION"),
-    [monetizationAccount?.products]
+    () => creditPurchasesEnabled
+      ? (monetizationAccount?.products ?? []).filter((product) => product.type === "SUBSCRIPTION")
+      : [],
+    [creditPurchasesEnabled, monetizationAccount?.products]
   );
   const purchaseProducts = useMemo(
     () => [...creditProducts, ...subscriptionProducts],
@@ -744,8 +761,10 @@ export default function App() {
     [purchaseProducts, selectedPurchaseProductCode]
   );
   const boostProducts = useMemo(
-    () => (monetizationAccount?.products ?? []).filter((product) => product.type === "BOOST"),
-    [monetizationAccount?.products]
+    () => boostPurchasesEnabled
+      ? (monetizationAccount?.products ?? []).filter((product) => product.type === "BOOST")
+      : [],
+    [boostPurchasesEnabled, monetizationAccount?.products]
   );
   const visibleHomeInterests = useMemo(
     () => {
@@ -976,6 +995,12 @@ export default function App() {
     return url.toString();
   }
 
+  function buildFacebookShareUrl(interest) {
+    const url = new URL("https://www.facebook.com/sharer/sharer.php");
+    url.searchParams.set("u", buildInterestShareUrl(interest));
+    return url.toString();
+  }
+
   async function copyInterestLinkToClipboard(interest) {
     const url = buildInterestShareUrl(interest);
 
@@ -1029,6 +1054,15 @@ export default function App() {
             aria-label={t("share.x")}
           >
             <XIcon />
+          </a>
+          <a
+            className="share-button share-button--facebook"
+            href={buildFacebookShareUrl(interest)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={t("share.facebook")}
+          >
+            <FacebookIcon />
           </a>
           <button
             type="button"
@@ -1587,7 +1621,7 @@ export default function App() {
 
     paymentReturnHandledRef.current = true;
     setIsPaymentReturnLoading(true);
-    navigateTo(loggedSections.CREDITS);
+    navigateTo(creditPurchasesEnabled ? loggedSections.CREDITS : loggedSections.EXPLORE);
     setPaymentStatus((current) => ({
       ...(current ?? {}),
       step: paymentResult === "failure" ? "FAILED" : "PAYMENT",
@@ -2321,6 +2355,10 @@ export default function App() {
   }
 
   async function handlePurchaseProduct(productCode, paymentMethod = "MERCADO_PAGO") {
+    if (!creditPurchasesEnabled) {
+      openFeedback("error", "Compra indisponível", "A compra de créditos e planos está desabilitada no momento.");
+      return;
+    }
     if (!session) {
       openAuthModal("login");
       return;
@@ -2510,6 +2548,10 @@ export default function App() {
   }
 
   async function handleBoostInterest(boostCode, interestId = selectedInterest?.id, paymentMethod = "MERCADO_PAGO") {
+    if (!boostPurchasesEnabled) {
+      openFeedback("error", "Boost indisponível", "A compra de boosts está desabilitada no momento.");
+      return;
+    }
     if (!interestId) {
       return;
     }
@@ -2555,9 +2597,13 @@ export default function App() {
       openFeedback(
         "error",
         "Créditos insuficientes",
-        "Você precisa de 1 crédito para renovar o anúncio. Abra a página de créditos para comprar."
+        creditPurchasesEnabled
+          ? "Você precisa de 1 crédito para renovar o anúncio. Abra a página de créditos para comprar."
+          : "Você precisa de 1 crédito para renovar o anúncio."
       );
-      navigateTo(loggedSections.CREDITS);
+      if (creditPurchasesEnabled) {
+        navigateTo(loggedSections.CREDITS);
+      }
       return;
     }
 
@@ -3423,6 +3469,24 @@ export default function App() {
   }
 
   function renderCreditsPage() {
+    if (!creditPurchasesEnabled) {
+      return (
+        <section className="panel panel--spaced credits-page">
+          <div className="panel__header">
+            <div>
+              <span className="eyebrow">Página</span>
+              <h2>Monetização indisponível</h2>
+            </div>
+            <button type="button" className="ghost-button" onClick={() => navigateTo(loggedSections.EXPLORE)}>
+              Voltar para home
+            </button>
+          </div>
+          {renderPaymentTracker()}
+          {renderPaymentHistory()}
+        </section>
+      );
+    }
+
     const sellerCredits = monetizationAccount?.sellerCredits ?? 0;
     const purchasedCreditsTotal = monetizationAccount?.purchasedCreditsTotal ?? 0;
     const hasPurchasedCredits = purchasedCreditsTotal > 0;
@@ -4157,13 +4221,15 @@ export default function App() {
           >
             {t("dashboard.nav.sellerItems")}
           </button>
-          <button
-            type="button"
-            className={loggedSection === loggedSections.CREDITS ? "active" : ""}
-            onClick={() => navigateTo(loggedSections.CREDITS)}
-          >
-            {t("dashboard.nav.credits")}
-          </button>
+          {creditPurchasesEnabled ? (
+            <button
+              type="button"
+              className={loggedSection === loggedSections.CREDITS ? "active" : ""}
+              onClick={() => navigateTo(loggedSections.CREDITS)}
+            >
+              {t("dashboard.nav.credits")}
+            </button>
+          ) : null}
           {isAdmin ? (
             <button
               type="button"
@@ -4298,7 +4364,7 @@ export default function App() {
                       Excluir anúncio
                     </button>
                   </div>
-                  {["APPROVED", "OPEN"].includes(selectedInterest?.status) && (
+                  {boostPurchasesEnabled && boostProducts.length > 0 && ["APPROVED", "OPEN"].includes(selectedInterest?.status) && (
                       <>
                         <div className="boost-box">
                           <div>
@@ -4719,11 +4785,12 @@ export default function App() {
           hasNotifications={hasUnreadMessages}
           sellerCredits={monetizationAccount?.sellerCredits}
           subscriptionActive={monetizationAccount?.subscriptionActive}
+          creditPurchasesEnabled={creditPurchasesEnabled}
           isLoggedIn={Boolean(session)}
           notificationButtonRef={notificationButtonRef}
           onLoginClick={() => openAuthModal("login")}
           onRegisterClick={() => openAuthModal("register")}
-          onCreditsClick={() => navigateTo(loggedSections.CREDITS)}
+          onCreditsClick={() => creditPurchasesEnabled && navigateTo(loggedSections.CREDITS)}
           onNotificationClick={openNotificationModal}
           onLogout={handleLogout}
           onNavigate={(section) => {

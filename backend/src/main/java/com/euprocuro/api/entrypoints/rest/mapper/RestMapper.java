@@ -14,6 +14,7 @@ import com.euprocuro.api.application.command.CatalogProductCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.ModerationDecisionCommand;
+import com.euprocuro.api.application.command.MonetizationSettingsCommand;
 import com.euprocuro.api.application.command.PurchaseProductCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ReportInterestCommand;
@@ -169,6 +170,12 @@ public final class RestMapper {
 
     public static SaveOperationalCatalogCommand toCommand(SaveOperationalCatalogRequest request) {
         return SaveOperationalCatalogCommand.builder()
+                .monetizationSettings(MonetizationSettingsCommand.builder()
+                        .creditPurchasesEnabled(request.getMonetizationSettings() != null
+                                && request.getMonetizationSettings().isCreditPurchasesEnabled())
+                        .boostPurchasesEnabled(request.getMonetizationSettings() != null
+                                && request.getMonetizationSettings().isBoostPurchasesEnabled())
+                        .build())
                 .categories(Optional.ofNullable(request.getCategories()).orElse(List.of())
                         .stream()
                         .map(category -> CatalogCategoryCommand.builder()
@@ -372,6 +379,8 @@ public final class RestMapper {
                 .subscriptionPlan(view.getSubscriptionPlan())
                 .subscriptionActiveUntil(view.getSubscriptionActiveUntil())
                 .subscriptionActive(view.isSubscriptionActive())
+                .creditPurchasesEnabled(view.isCreditPurchasesEnabled())
+                .boostPurchasesEnabled(view.isBoostPurchasesEnabled())
                 .products(view.getProducts().stream().map(RestMapper::toResponse).collect(Collectors.toList()))
                 .paymentHistory(Optional.ofNullable(view.getPaymentHistory()).orElse(List.of())
                         .stream()
@@ -435,6 +444,7 @@ public final class RestMapper {
 
     public static AdminOperationalCatalogResponse toResponse(AdminOperationalCatalogView view) {
         return AdminOperationalCatalogResponse.builder()
+                .monetizationSettings(toResponse(view.getMonetizationSettings()))
                 .categories(Optional.ofNullable(view.getCategories()).orElse(List.of())
                         .stream()
                         .map(RestMapper::toResponse)
@@ -444,6 +454,16 @@ public final class RestMapper {
                         .map(RestMapper::toResponse)
                         .collect(Collectors.toList()))
                 .updatedAt(view.getUpdatedAt())
+                .build();
+    }
+
+    public static MonetizationSettingsResponse toResponse(com.euprocuro.api.application.view.MonetizationSettingsView view) {
+        if (view == null) {
+            return MonetizationSettingsResponse.builder().build();
+        }
+        return MonetizationSettingsResponse.builder()
+                .creditPurchasesEnabled(view.isCreditPurchasesEnabled())
+                .boostPurchasesEnabled(view.isBoostPurchasesEnabled())
                 .build();
     }
 

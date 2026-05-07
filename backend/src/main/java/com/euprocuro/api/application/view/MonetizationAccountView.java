@@ -14,6 +14,8 @@ public class MonetizationAccountView {
     String subscriptionPlan;
     Instant subscriptionActiveUntil;
     boolean subscriptionActive;
+    boolean creditPurchasesEnabled;
+    boolean boostPurchasesEnabled;
     List<MonetizationProductView> products;
     List<PaymentOrderView> paymentHistory;
 }

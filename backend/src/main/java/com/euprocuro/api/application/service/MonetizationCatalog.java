@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 import com.euprocuro.api.application.view.MonetizationProductView;
+import com.euprocuro.api.application.view.MonetizationSettingsView;
 
 import lombok.RequiredArgsConstructor;
 
@@ -17,6 +18,18 @@ class MonetizationCatalog {
 
     List<MonetizationProductView> products() {
         return operationalCatalogService.listActiveProducts();
+    }
+
+    MonetizationSettingsView settings() {
+        return operationalCatalogService.getMonetizationSettings();
+    }
+
+    boolean creditPurchasesEnabled() {
+        return settings().isCreditPurchasesEnabled();
+    }
+
+    boolean boostPurchasesEnabled() {
+        return settings().isBoostPurchasesEnabled();
     }
 
     Optional<MonetizationProductView> findByCode(String code) {

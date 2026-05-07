@@ -40,6 +40,7 @@ export default function Header({
   hasNotifications,
   sellerCredits,
   subscriptionActive,
+  creditPurchasesEnabled = false,
   notificationButtonRef,
   onNavigate,
   onCreditsClick,
@@ -80,15 +81,17 @@ export default function Header({
             </button>
           </nav>
 
-          <button
-            type="button"
-            className={`credits-badge ${hasNoCredits ? "credits-badge--empty" : ""}`}
-            onClick={onCreditsClick}
-            title={t("header.credits.title")}
-          >
-            <strong>{subscriptionActive ? t("header.credits.pro") : (sellerCredits ?? 0)}</strong>
-            <span>{subscriptionActive ? t("header.credits.planActive") : t("header.credits.credits")}</span>
-          </button>
+          {creditPurchasesEnabled ? (
+            <button
+              type="button"
+              className={`credits-badge ${hasNoCredits ? "credits-badge--empty" : ""}`}
+              onClick={onCreditsClick}
+              title={t("header.credits.title")}
+            >
+              <strong>{subscriptionActive ? t("header.credits.pro") : (sellerCredits ?? 0)}</strong>
+              <span>{subscriptionActive ? t("header.credits.planActive") : t("header.credits.credits")}</span>
+            </button>
+          ) : null}
 
           <button
             ref={notificationButtonRef}

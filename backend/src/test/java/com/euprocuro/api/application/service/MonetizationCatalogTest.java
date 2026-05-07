@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import com.euprocuro.api.application.view.MonetizationProductView;
+import com.euprocuro.api.application.view.MonetizationSettingsView;
 import com.euprocuro.api.domain.model.MonetizationProductType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,9 +31,15 @@ class MonetizationCatalogTest {
                 .enabled(true)
                 .build();
         when(operationalCatalogService.listActiveProducts()).thenReturn(List.of(product));
+        when(operationalCatalogService.getMonetizationSettings()).thenReturn(MonetizationSettingsView.builder()
+                .creditPurchasesEnabled(true)
+                .boostPurchasesEnabled(false)
+                .build());
 
         assertThat(catalog.products()).containsExactly(product);
         assertThat(catalog.findByCode("boost_3_days")).contains(product);
         assertThat(catalog.findByCode("missing")).isEmpty();
+        assertThat(catalog.creditPurchasesEnabled()).isTrue();
+        assertThat(catalog.boostPurchasesEnabled()).isFalse();
     }
 }

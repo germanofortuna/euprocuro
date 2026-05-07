@@ -25,6 +25,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.euprocuro.api.application.command.CatalogCategoryCommand;
 import com.euprocuro.api.application.command.CatalogProductCommand;
+import com.euprocuro.api.application.command.MonetizationSettingsCommand;
 import com.euprocuro.api.application.command.SaveOperationalCatalogCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.domain.gateway.ContentEntryGateway;
@@ -63,16 +64,17 @@ class OperationalCatalogServiceIntegrationStyleTest {
     }
 
     @Test
-    void listActiveCategoriesAndProductsShouldSeedDefaultsAndReadPublishedJson() {
+    void listActiveCategoriesAndProductsShouldSeedDefaultsWithMonetizationDisabled() {
         var categories = service.listActiveCategories();
         var products = service.listActiveProducts();
 
         assertThat(categories).extracting("code")
                 .containsExactly("AUTOMOVEIS", "IMOVEIS", "SERVICOS", "ELETRONICOS", "INSTRUMENTOS", "OUTROS");
-        assertThat(products).extracting("code")
-                .contains("CREDITS_10", "CREDITS_30", "SELLER_PRO", "BOOST_3_DAYS", "BOOST_7_DAYS");
-        assertThat(contentEntryGateway.findAll()).hasSize(2);
-        assertThat(contentRevisionGateway.revisions).hasSize(2);
+        assertThat(products).isEmpty();
+        assertThat(service.getMonetizationSettings().isCreditPurchasesEnabled()).isFalse();
+        assertThat(service.getMonetizationSettings().isBoostPurchasesEnabled()).isFalse();
+        assertThat(contentEntryGateway.findAll()).hasSize(3);
+        assertThat(contentRevisionGateway.revisions).hasSize(3);
     }
 
     @Test
@@ -90,6 +92,10 @@ class OperationalCatalogServiceIntegrationStyleTest {
                 .thenReturn(UserProfile.builder().id("admin-1").email("admin@test.com").build());
 
         SaveOperationalCatalogCommand command = SaveOperationalCatalogCommand.builder()
+                .monetizationSettings(MonetizationSettingsCommand.builder()
+                        .creditPurchasesEnabled(true)
+                        .boostPurchasesEnabled(false)
+                        .build())
                 .categories(List.of(
                         CatalogCategoryCommand.builder()
                                 .code(" auto ")

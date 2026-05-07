@@ -1601,7 +1601,8 @@ textarea:focus {
 }
 
 .share-button--whatsapp,
-.share-button--x {
+.share-button--x,
+.share-button--facebook {
   width: 36px;
   padding: 0;
 }
@@ -1620,6 +1621,11 @@ textarea:focus {
 .share-button--x {
   color: #0f172a;
   border-color: rgba(15, 23, 42, 0.18);
+}
+
+.share-button--facebook {
+  color: #1877f2;
+  border-color: rgba(24, 119, 242, 0.25);
 }
 
 .share-button--link {
@@ -2489,6 +2495,23 @@ textarea:focus {
   border: 1px solid rgba(30, 111, 242, 0.12);
   border-radius: 16px;
   background: rgba(246, 250, 255, 0.72);
+}
+
+.catalog-admin__settings {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.checkbox-row--panel {
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid rgba(30, 111, 242, 0.16);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 800;
 }
 
 .catalog-admin__section-header {

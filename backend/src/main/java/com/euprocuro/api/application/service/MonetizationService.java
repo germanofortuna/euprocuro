@@ -71,6 +71,8 @@ public class MonetizationService implements MonetizationUseCase {
                 .subscriptionPlan(user.getSubscriptionPlan())
                 .subscriptionActiveUntil(user.getSubscriptionActiveUntil())
                 .subscriptionActive(hasActiveSubscription(user))
+                .creditPurchasesEnabled(monetizationCatalog.creditPurchasesEnabled())
+                .boostPurchasesEnabled(monetizationCatalog.boostPurchasesEnabled())
                 .products(listProducts())
                 .paymentHistory(paymentHistory(userId))
                 .build();
@@ -83,6 +85,9 @@ public class MonetizationService implements MonetizationUseCase {
 
         if (product.getType() == MonetizationProductType.BOOST) {
             throw new BusinessException("Boost deve ser ativado diretamente no interesse.");
+        }
+        if (!monetizationCatalog.creditPurchasesEnabled()) {
+            throw new BusinessException("Compra de creditos e planos esta temporariamente desabilitada.");
         }
 
         if (isCheckoutProviderWithPendingOrder()) {
@@ -141,6 +146,8 @@ public class MonetizationService implements MonetizationUseCase {
                 .subscriptionPlan(updatedUser.getSubscriptionPlan())
                 .subscriptionActiveUntil(updatedUser.getSubscriptionActiveUntil())
                 .subscriptionActive(false)
+                .creditPurchasesEnabled(monetizationCatalog.creditPurchasesEnabled())
+                .boostPurchasesEnabled(monetizationCatalog.boostPurchasesEnabled())
                 .products(listProducts())
                 .paymentHistory(paymentHistory(userId))
                 .build();
@@ -209,6 +216,9 @@ public class MonetizationService implements MonetizationUseCase {
         MonetizationProductView product = requireProduct(command.getBoostCode());
         if (product.getType() != MonetizationProductType.BOOST) {
             throw new BusinessException("Produto informado nao e um boost.");
+        }
+        if (!monetizationCatalog.boostPurchasesEnabled()) {
+            throw new BusinessException("Compra de boosts esta temporariamente desabilitada.");
         }
 
         UserProfile owner = requireUser(userId);
@@ -376,8 +386,14 @@ public class MonetizationService implements MonetizationUseCase {
 
         MonetizationProductView product = requireProduct(paymentOrder.getProductCode());
         if (product.getType() == MonetizationProductType.BOOST) {
+            if (!monetizationCatalog.boostPurchasesEnabled()) {
+                throw new BusinessException("Compra de boosts esta temporariamente desabilitada.");
+            }
             activateBoost(paymentOrder.getUserId(), paymentOrder.getBoostInterestId(), product, normalizedPaymentMethod, paymentOrder.getId());
         } else {
+            if (!monetizationCatalog.creditPurchasesEnabled()) {
+                throw new BusinessException("Compra de creditos e planos esta temporariamente desabilitada.");
+            }
             UserProfile user = requireUser(paymentOrder.getUserId());
             UserProfile updatedUser = userGateway.save(applyProductToUser(user, product));
             emailGateway.sendPurchaseConfirmationEmail(updatedUser, product.getName(), normalizedPaymentMethod);

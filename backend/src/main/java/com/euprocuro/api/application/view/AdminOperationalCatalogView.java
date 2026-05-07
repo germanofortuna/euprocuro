@@ -9,6 +9,7 @@ import lombok.Value;
 @Value
 @Builder
 public class AdminOperationalCatalogView {
+    MonetizationSettingsView monetizationSettings;
     List<CatalogCategoryView> categories;
     List<MonetizationProductView> products;
     Instant updatedAt;

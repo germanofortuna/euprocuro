@@ -276,7 +276,7 @@ A aba `Moderacao` tambem concentra o CRM interno da plataforma. O acesso e sempr
 O CRM possui duas frentes:
 
 - **Conteudo**: textos da interface, mensagens, CTAs, erros e documentos legais. Rascunhos, historico e autoria ficam restritos ao admin; o site publico consome apenas entradas `PUBLISHED` por `GET /api/content/public`.
-- **Catalogo operacional**: categorias de anuncios, produtos de monetizacao, precos, planos, boosts e promocoes. O site recebe apenas categorias ativas e produtos habilitados; campos internos de admin nao sao expostos ao front publico.
+- **Catalogo operacional**: categorias de anuncios, disponibilidade da monetizacao, produtos, precos, planos, boosts e promocoes. O site recebe apenas categorias ativas e modalidades de monetizacao habilitadas; campos internos de admin nao sao expostos ao front publico.
 
 Fluxo de conteudo:
 
@@ -288,9 +288,15 @@ Fluxo de conteudo:
 Fluxo de catalogo operacional:
 
 1. O admin altera categorias ou produtos em `CRM operacional`.
-2. Ao salvar, o backend valida codigos, duplicidades, preco promocional e pelo menos uma categoria ativa.
+2. Ao salvar, o backend valida codigos, duplicidades, preco promocional, disponibilidade da monetizacao e pelo menos uma categoria ativa.
 3. Categorias ativas sao refletidas em `GET /api/categories`.
-4. Produtos habilitados sao refletidos em `GET /api/monetization/products` e na conta de monetizacao.
+4. Produtos habilitados sao refletidos em `GET /api/monetization/products` e na conta de monetizacao somente quando a modalidade correspondente tambem estiver habilitada.
+
+Disponibilidade da monetizacao:
+
+- `creditPurchasesEnabled=false` oculta o saldo/botao de creditos no topo, remove a aba `Comprar creditos`, nao entrega pacotes de credito/plano na conta de monetizacao e bloqueia `POST /api/monetization/purchase`.
+- `boostPurchasesEnabled=false` nao entrega produtos `BOOST`, oculta a area de impulsionamento do interesse e bloqueia `POST /api/monetization/interests/{interestId}/boost`.
+- O padrao semeado pelo backend e subir tudo desativado. Para liberar primeiro apenas boosts, habilite somente `Permitir compra de boosts` no CRM operacional e mantenha creditos/planos desligados.
 
 Promocoes:
 
@@ -428,7 +434,7 @@ O MVP ja possui produtos de monetizacao configuraveis por ambiente:
 - plano vendedor Pro com propostas liberadas enquanto estiver ativo
 - boost de 3 ou 7 dias para destacar interesses na busca e na home
 
-Por padrao geral, o pagamento usa o provedor `LOCAL_MOCK`: a API simula aprovacao imediata para permitir testar produto, tela e regras de negocio sem dinheiro real.
+Por padrao geral, a disponibilidade comercial sobe desligada pelo CRM operacional, mesmo que o provedor de pagamento esteja configurado. O pagamento usa o provedor `LOCAL_MOCK`: a API simula aprovacao imediata para permitir testar produto, tela e regras de negocio sem dinheiro real quando uma modalidade for habilitada.
 
 No profile `local`, o provedor padrao e `LOCAL_CHECKOUT_MOCK`. Ele cria um pedido pendente, redireciona para um checkout fake local e aprova o pedido automaticamente antes de voltar ao frontend. Assim da para testar o fluxo ponta-a-ponta sem ngrok e sem webhook real:
 
