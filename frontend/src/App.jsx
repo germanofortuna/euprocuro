@@ -177,7 +177,7 @@ const MAX_REFERENCE_IMAGE_SIZE = 1200;
 const REFERENCE_IMAGE_QUALITY = 0.78;
 const HOME_PAGE_SIZE = 10;
 const TITLE_MAX_LENGTH = 80;
-const DESCRIPTION_MAX_LENGTH = 120;
+const DESCRIPTION_MAX_LENGTH = 250;
 const LISTING_EXPIRATION_DAYS = Number(import.meta.env.VITE_LISTING_EXPIRATION_DAYS ?? 30);
 const FALLBACK_CATEGORIES = [
   { value: "AUTOMOVEIS", labelKey: "categories.automoveis" },
@@ -449,6 +449,12 @@ function buildInterestPayload(interestForm) {
       .map((tag) => tag.trim())
       .filter(Boolean)
   };
+}
+
+function hasInvalidBudgetRange(interestForm) {
+  const min = Number(interestForm.budgetMin || 0);
+  const max = Number(interestForm.budgetMax || 0);
+  return Number.isFinite(min) && Number.isFinite(max) && min > max;
 }
 
 function buildSellerItemPayload(itemForm) {
@@ -1157,6 +1163,9 @@ export default function App() {
     setLoggedSection(section);
     setActiveLegalPageSlug("");
     sharedInterestIdRef.current = "";
+    if (section !== loggedSections.NEW_INTEREST && !editingInterestId) {
+      setIsInterestModalVisible(false);
+    }
 
     if (options.updateUrl !== false) {
       window.history[options.replace ? "replaceState" : "pushState"]({}, "", currentSectionPath(section));
@@ -1524,6 +1533,8 @@ export default function App() {
         setEditingInterestId(null);
         setInterestForm(initialInterestForm);
         setIsInterestModalVisible(true);
+      } else if (!editingInterestId) {
+        setIsInterestModalVisible(false);
       }
       sharedInterestIdRef.current = createInitialSharedInterestId();
       if (sharedInterestIdRef.current) {
@@ -2151,11 +2162,10 @@ export default function App() {
     }
 
     if (hasLink(interestForm.description)) {
-      openFeedback(
-        "error",
-        t("interest.feedback.linkNotAllowed.title"),
-        t("interest.feedback.linkNotAllowed.message")
-      );
+      return;
+    }
+
+    if (hasInvalidBudgetRange(interestForm)) {
       return;
     }
 
@@ -4197,6 +4207,9 @@ export default function App() {
   }
 
   function renderLoggedArea() {
+    const isCreateInterestPage = isInterestModalVisible
+      && loggedSection === loggedSections.NEW_INTEREST
+      && !editingInterestId;
     const statCards = [
       {
         key: loggedSections.MY_INTERESTS,
@@ -4539,28 +4552,38 @@ export default function App() {
         {loggedSection === loggedSections.ADMIN && isAdmin ? renderAdminModerationPage() : null}
 
         {isInterestModalVisible ? (
-          <div className="modal-overlay" role="presentation" onClick={cancelInterestEditing}>
+          <div
+            className={isCreateInterestPage ? "interest-form-page-shell" : "modal-overlay"}
+            role="presentation"
+            onClick={isCreateInterestPage ? undefined : cancelInterestEditing}
+          >
             <section
               ref={newInterestSectionRef}
-              className="form-modal panel panel--form"
-              role="dialog"
-              aria-modal="true"
+              className={isCreateInterestPage ? "panel panel--form interest-form-page" : "form-modal panel panel--form"}
+              role={isCreateInterestPage ? undefined : "dialog"}
+              aria-modal={isCreateInterestPage ? undefined : "true"}
               aria-labelledby="interest-form-title"
-              onClick={(event) => event.stopPropagation()}
+              onClick={isCreateInterestPage ? undefined : (event) => event.stopPropagation()}
             >
             <div className="feedback-modal__header">
               <div>
                 <span className="eyebrow">{t("interest.form.eyebrow")}</span>
                 <h2 id="interest-form-title">{editingInterestId ? t("interest.form.editTitle") : t("interest.form.createTitle")}</h2>
               </div>
-              <button
-                type="button"
-                className="modal-close-button"
-                onClick={cancelInterestEditing}
-                aria-label={t("common.actions.closeModal")}
-              >
-                X
-              </button>
+              {isCreateInterestPage ? (
+                <button type="button" className="ghost-button" onClick={() => navigateTo(loggedSections.EXPLORE)}>
+                  {t("common.actions.backHome")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="modal-close-button"
+                  onClick={cancelInterestEditing}
+                  aria-label={t("common.actions.closeModal")}
+                >
+                  X
+                </button>
+              )}
             </div>
 
             <form className="stacked-form" onSubmit={handleInterestSubmit}>
@@ -4661,6 +4684,9 @@ export default function App() {
                   }
                 />
               </div>
+              {hasInvalidBudgetRange(interestForm) ? (
+                <p className="form-note form-note--compact">{t("interest.feedback.invalidBudget.message")}</p>
+              ) : null}
 
               <div className="three-columns">
                 <input

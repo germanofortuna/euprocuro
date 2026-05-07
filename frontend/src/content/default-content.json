@@ -105,6 +105,8 @@
     "moderation.feedback.rejected.message": "Seu anúncio foi recusado. Você pode editar e enviar novamente para análise.",
     "interest.feedback.linkNotAllowed.title": "Link não permitido",
     "interest.feedback.linkNotAllowed.message": "Remova links da descrição do anúncio antes de enviar para moderação.",
+    "interest.feedback.invalidBudget.title": "Orçamento inválido",
+    "interest.feedback.invalidBudget.message": "O orçamento mínimo não pode ser maior que o orçamento máximo.",
     "interest.feedback.updateReceived.title": "Alteração recebida",
     "interest.feedback.createReceived.title": "Interesse recebido",
     "interest.feedback.updateReceived.message": "Vamos validar a alteração agora. Se houver recusa, você receberá um aviso para editar novamente.",

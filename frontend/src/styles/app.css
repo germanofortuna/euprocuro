@@ -2602,6 +2602,17 @@ textarea:focus {
   backdrop-filter: none;
 }
 
+.interest-form-page-shell {
+  margin-top: 22px;
+}
+
+.interest-form-page {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+}
+
 .auth-modal,
 .conversation-modal,
 .form-modal,
