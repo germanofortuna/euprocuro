@@ -667,6 +667,7 @@ export default function App() {
   const publicRequestSeq = useRef(0);
   const detailRequestSeq = useRef(0);
   const realtimeHandlerRef = useRef(null);
+  const publicInterestDetailRef = useRef(null);
   const myInterestsSectionRef = useRef(null);
   const sentOffersSectionRef = useRef(null);
   const receivedOffersSectionRef = useRef(null);
@@ -1000,6 +1001,19 @@ export default function App() {
     }
   }
 
+  function scrollPublicInterestDetailIntoViewOnMobile() {
+    if (!window.matchMedia("(max-width: 1080px)").matches) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      publicInterestDetailRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    });
+  }
+
   function selectPublicInterest(interest, options = {}) {
     setSelectedInterest(interest);
     setLoggedSection(loggedSections.EXPLORE);
@@ -1008,6 +1022,7 @@ export default function App() {
       replace: Boolean(options.replace),
       preserveScroll: true
     }).catch(() => {});
+    scrollPublicInterestDetailIntoViewOnMobile();
   }
 
   function buildInterestShareUrl(interest) {
@@ -2983,7 +2998,7 @@ export default function App() {
             )}
           </article>
 
-          <aside className="panel panel--sticky">
+          <aside ref={publicInterestDetailRef} className="panel panel--sticky">
             <div className="panel__header">
               <div className="panel-title-stack">
                 <span className="eyebrow detail-owner-line">
