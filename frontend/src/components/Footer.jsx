@@ -18,7 +18,7 @@ export default function Footer() {
 
       <nav className="site-footer__links" aria-label={t("footer.legal.aria")}>
         {legalNavigation.map((item) => (
-          <a key={item.slug} href={`#${item.slug}`}>
+          <a key={item.slug} href={`/legal/${item.slug}`}>
             {item.label}
           </a>
         ))}

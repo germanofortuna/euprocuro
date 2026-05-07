@@ -157,6 +157,21 @@ const loggedSections = {
   NEW_INTEREST: "NEW_INTEREST"
 };
 
+const sectionRoutes = {
+  [loggedSections.EXPLORE]: "/",
+  [loggedSections.NEW_INTEREST]: "/cadastrar-interesse",
+  [loggedSections.MY_INTERESTS]: "/meus-interesses",
+  [loggedSections.SENT_OFFERS]: "/ofertas-enviadas",
+  [loggedSections.RECEIVED_OFFERS]: "/ofertas-recebidas",
+  [loggedSections.SELLER_ITEMS]: "/meus-itens",
+  [loggedSections.CREDITS]: "/comprar-creditos",
+  [loggedSections.ADMIN]: "/admin"
+};
+
+const routeSections = Object.fromEntries(
+  Object.entries(sectionRoutes).map(([section, route]) => [route, section])
+);
+
 const MESSAGE_SEEN_STORAGE_KEY = "eu-procuro-message-seen";
 const MAX_REFERENCE_IMAGE_SIZE = 1200;
 const REFERENCE_IMAGE_QUALITY = 0.78;
@@ -330,13 +345,28 @@ function createResetStateFromLocation() {
 }
 
 function createInitialSharedInterestId() {
+  const interestIdFromPath = window.location.pathname.match(/^\/interesses\/([^/]+)\/?$/)?.[1];
+  if (interestIdFromPath) {
+    return decodeURIComponent(interestIdFromPath);
+  }
+
   const params = new URLSearchParams(window.location.search);
   return params.get("interest") ?? "";
 }
 
 function getActiveLegalPageSlug() {
+  const slugFromPath = window.location.pathname.match(/^\/legal\/([^/]+)\/?$/)?.[1];
+  if (slugFromPath && legalPages[slugFromPath]) {
+    return slugFromPath;
+  }
+
   const slug = window.location.hash.replace("#", "");
   return legalPages[slug] ? slug : "";
+}
+
+function getSectionFromPath() {
+  const normalizedPath = window.location.pathname.replace(/\/+$/, "") || "/";
+  return routeSections[normalizedPath] ?? loggedSections.EXPLORE;
 }
 
 function fileToDataUrl(file) {
@@ -684,7 +714,7 @@ export default function App() {
   const [homeMatchFilter, setHomeMatchFilter] = useState(null);
   const [homeOffset, setHomeOffset] = useState(0);
   const [hasMoreInterests, setHasMoreInterests] = useState(false);
-  const [loggedSection, setLoggedSection] = useState(loggedSections.EXPLORE);
+  const [loggedSection, setLoggedSection] = useState(getSectionFromPath);
   const [passwordRecoveryPreview, setPasswordRecoveryPreview] = useState(null);
   const [isLoadingPublic, setIsLoadingPublic] = useState(true);
   const [isLoadingMorePublic, setIsLoadingMorePublic] = useState(false);
@@ -895,20 +925,20 @@ export default function App() {
     setMessageSyncKey((current) => current + 1);
   }
 
+  function replaceCurrentUrl(pathname, search = "") {
+    window.history.replaceState({}, "", `${pathname}${search}`);
+  }
+
+  function currentSectionPath(section = loggedSection) {
+    return sectionRoutes[section] ?? sectionRoutes[loggedSections.EXPLORE];
+  }
+
   function updateInterestUrl(interestId, replace = false) {
-    const url = new URL(window.location.href);
-
-    if (interestId) {
-      url.searchParams.delete("mode");
-      url.searchParams.delete("token");
-      url.searchParams.set("interest", interestId);
-    } else {
-      url.searchParams.delete("interest");
-    }
-
     sharedInterestIdRef.current = interestId ?? "";
-    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
-    window.history[replace ? "replaceState" : "pushState"]({}, "", nextUrl);
+    const nextPath = interestId
+      ? `/interesses/${encodeURIComponent(interestId)}`
+      : currentSectionPath();
+    window.history[replace ? "replaceState" : "pushState"]({}, "", nextPath);
   }
 
   async function loadInterestDetail(interestId, options = {}) {
@@ -975,9 +1005,7 @@ export default function App() {
   }
 
   function buildInterestShareUrl(interest) {
-    const url = new URL(`${window.location.origin}${window.location.pathname}`);
-    url.searchParams.set("interest", interest.id);
-    return url.toString();
+    return `${window.location.origin}/interesses/${encodeURIComponent(interest.id)}`;
   }
 
   function buildInterestShareText(interest) {
@@ -998,6 +1026,7 @@ export default function App() {
   function buildFacebookShareUrl(interest) {
     const url = new URL("https://www.facebook.com/sharer/sharer.php");
     url.searchParams.set("u", buildInterestShareUrl(interest));
+    url.searchParams.set("quote", t("share.xMessage", { title: interest.title }));
     return url.toString();
   }
 
@@ -1124,8 +1153,14 @@ export default function App() {
     navigateTo(loggedSections.EXPLORE);
   }
 
-  function navigateTo(section) {
+  function navigateTo(section, options = {}) {
     setLoggedSection(section);
+    setActiveLegalPageSlug("");
+    sharedInterestIdRef.current = "";
+
+    if (options.updateUrl !== false) {
+      window.history[options.replace ? "replaceState" : "pushState"]({}, "", currentSectionPath(section));
+    }
 
     if (section === loggedSections.EXPLORE) {
       setSelectedInterest((current) =>
@@ -1184,6 +1219,7 @@ export default function App() {
   }
 
   function openNewInterestForm() {
+    navigateTo(loggedSections.NEW_INTEREST);
     setEditingInterestId(null);
     setInterestForm(initialInterestForm);
     setIsInterestModalVisible(true);
@@ -1479,13 +1515,46 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    function handleHashChange() {
-      setActiveLegalPageSlug(getActiveLegalPageSlug());
+    function syncRouteFromLocation() {
+      const legalSlug = getActiveLegalPageSlug();
+      const nextSection = getSectionFromPath();
+      setActiveLegalPageSlug(legalSlug);
+      setLoggedSection(nextSection);
+      if (nextSection === loggedSections.NEW_INTEREST) {
+        setEditingInterestId(null);
+        setInterestForm(initialInterestForm);
+        setIsInterestModalVisible(true);
+      }
+      sharedInterestIdRef.current = createInitialSharedInterestId();
+      if (sharedInterestIdRef.current) {
+        loadInterestDetail(sharedInterestIdRef.current, { replace: true }).catch(() => {});
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
+    function handleHashChange() {
+      const legalSlug = getActiveLegalPageSlug();
+      if (legalSlug) {
+        replaceCurrentUrl(`/legal/${legalSlug}`);
+      }
+      syncRouteFromLocation();
+    }
+
     window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", syncRouteFromLocation);
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("popstate", syncRouteFromLocation);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeLegalPageSlug && window.location.pathname !== `/legal/${activeLegalPageSlug}`) {
+      replaceCurrentUrl(`/legal/${activeLegalPageSlug}`);
+    }
+    if (getSectionFromPath() === loggedSections.NEW_INTEREST) {
+      setIsInterestModalVisible(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -1653,23 +1722,7 @@ export default function App() {
         openFeedback("error", "Pagamento pendente", requestError.message || "Ainda não foi possível confirmar o pagamento.");
       })
       .finally(() => {
-        [
-          "payment",
-          "payment_id",
-          "collection_id",
-          "collection_status",
-          "status",
-          "external_reference",
-          "payment_type",
-          "merchant_order_id",
-          "preference_id",
-          "site_id",
-          "processing_mode",
-          "merchant_account_id"
-        ].forEach((param) => {
-          url.searchParams.delete(param);
-        });
-        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+        replaceCurrentUrl(currentSectionPath(creditPurchasesEnabled ? loggedSections.CREDITS : loggedSections.EXPLORE));
         setIsPaymentReturnLoading(false);
       });
   }, [session?.token]);
@@ -2064,6 +2117,10 @@ export default function App() {
       setAdminModeration(null);
       setIsAdmin(false);
       setLoggedSection(loggedSections.EXPLORE);
+      setSelectedInterest(null);
+      setActiveLegalPageSlug("");
+      sharedInterestIdRef.current = "";
+      replaceCurrentUrl(sectionRoutes[loggedSections.EXPLORE]);
       setOffers([]);
       setConversationModal((current) => ({ ...current, visible: false, data: null, draftMessage: "" }));
       openFeedback("success", "Sessão encerrada", "Você saiu da área logada.");
@@ -4763,7 +4820,8 @@ export default function App() {
             isLoggedIn={false}
             hideActions
             onNavigate={() => {
-              window.location.hash = "";
+              setActiveLegalPageSlug("");
+              replaceCurrentUrl(sectionRoutes[loggedSections.EXPLORE]);
             }}
           />
           <LegalPage slug={activeLegalPageSlug} />
