@@ -1,4 +1,4 @@
-export default function InterestCard({ interest, selected, onClick }) {
+﻿export default function InterestCard({ interest, selected, onClick }) {
   const isBoosted = Boolean(
     interest.boostedUntil
     && new Date(interest.boostedUntil).getTime() > Date.now()
@@ -25,11 +25,12 @@ export default function InterestCard({ interest, selected, onClick }) {
       )}
 
       <div className="interest-card__summary-copy">
+        <span>Procura publicada</span>
         <strong>
           {interest.title}
           {isBoosted ? (
-            <span className="boost-rocket" aria-label="Interesse impulsionado" title="Interesse impulsionado">
-              🚀
+            <span className="boost-rocket" aria-label="Procura impulsionada" title="Procura impulsionada">
+              ðŸš€
             </span>
           ) : null}
         </strong>
@@ -37,3 +38,4 @@ export default function InterestCard({ interest, selected, onClick }) {
     </button>
   );
 }
+

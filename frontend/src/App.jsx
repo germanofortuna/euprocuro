@@ -561,7 +561,7 @@ function isBoostActive(interest) {
 }
 
 function BoostRocket() {
-  return <span className="boost-rocket" aria-label="Interesse impulsionado" title="Interesse impulsionado">🚀</span>;
+  return <span className="boost-rocket" aria-label="Procura impulsionada" title="Procura impulsionada">🚀</span>;
 }
 
 function WhatsAppIcon() {
@@ -775,13 +775,20 @@ export default function App() {
   const [isSubmittingOmbudsman, setIsSubmittingOmbudsman] = useState(false);
   const [adminModeration, setAdminModeration] = useState(null);
   const [adminOmbudsmanRequests, setAdminOmbudsmanRequests] = useState([]);
-  const [ombudsmanAdminFilter, setOmbudsmanAdminFilter] = useState("");
   const [ombudsmanResponses, setOmbudsmanResponses] = useState({});
   const [isOmbudsmanAdminLoading, setIsOmbudsmanAdminLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [moderationRuleForm, setModerationRuleForm] = useState(initialModerationRuleForm);
   const [isSubmittingModerationRule, setIsSubmittingModerationRule] = useState(false);
   const [isModerationActionLoading, setIsModerationActionLoading] = useState(false);
+  const [collapsedAdminSections, setCollapsedAdminSections] = useState({
+    moderationQueue: true,
+    moderationRules: true,
+    reports: true,
+    ombudsman: true,
+    contentCrm: true,
+    catalogCrm: true
+  });
   const [expandedInterests, setExpandedInterests] = useState({});
   const [expandedOffers, setExpandedOffers] = useState({});
   const [filters, setFilters] = useState({
@@ -1090,7 +1097,7 @@ export default function App() {
     } catch (requestError) {
       if (requestId === detailRequestSeq.current) {
         setSelectedInterest(null);
-        openFeedback("error", "Falha ao abrir anúncio", requestError.message || "Tente novamente.");
+        openFeedback("error", "Falha ao abrir procura", requestError.message || "Tente novamente.");
       }
     } finally {
       if (requestId === detailRequestSeq.current) {
@@ -1916,7 +1923,7 @@ export default function App() {
       .then(setOffers)
       .catch((requestError) => {
         setOffers([]);
-        openFeedback("error", "Não foi possível carregar ofertas", requestError.message || "Tente novamente.");
+        openFeedback("error", "Não foi possível carregar propostas", requestError.message || "Tente novamente.");
       });
   }, [session, selectedInterest?.id, isSelectedInterestMine]);
 
@@ -2002,7 +2009,7 @@ export default function App() {
       const description = [
         selectedInterest.description,
         location ? `Localidade: ${location}.` : "",
-        "Veja este interesse no Eu Procuro."
+        "Veja esta procura no Eu Procuro."
       ].filter(Boolean).join(" ");
       applyPageMeta({
         title: `${selectedInterest.title} | Eu Procuro`,
@@ -2015,32 +2022,32 @@ export default function App() {
     const routeMeta = {
       [loggedSections.EXPLORE]: {
         title: "Eu Procuro - Marketplace reverso",
-        description: "Publique o que você procura e receba ofertas de vendedores interessados.",
+        description: "Publique o que você procura e receba propostas de quem pode atender.",
         robots: "index,follow"
       },
       [loggedSections.NEW_INTEREST]: {
-        title: "Cadastrar interesse | Eu Procuro",
-        description: "Publique um interesse para receber ofertas de vendedores na plataforma Eu Procuro.",
+        title: "Publicar procura | Eu Procuro",
+        description: "Publique uma procura para receber propostas na plataforma Eu Procuro.",
         robots: "noindex,nofollow"
       },
       [loggedSections.MY_INTERESTS]: {
-        title: "Meus interesses | Eu Procuro",
-        description: "Área privada de interesses cadastrados no Eu Procuro.",
+        title: "Minhas procuras | Eu Procuro",
+        description: "Área privada de procuras publicadas no Eu Procuro.",
         robots: "noindex,nofollow"
       },
       [loggedSections.SENT_OFFERS]: {
-        title: "Ofertas enviadas | Eu Procuro",
-        description: "Área privada de ofertas enviadas no Eu Procuro.",
+        title: "Propostas enviadas | Eu Procuro",
+        description: "Área privada de propostas enviadas no Eu Procuro.",
         robots: "noindex,nofollow"
       },
       [loggedSections.RECEIVED_OFFERS]: {
-        title: "Ofertas recebidas | Eu Procuro",
-        description: "Área privada de ofertas recebidas no Eu Procuro.",
+        title: "Propostas recebidas | Eu Procuro",
+        description: "Área privada de propostas recebidas no Eu Procuro.",
         robots: "noindex,nofollow"
       },
       [loggedSections.SELLER_ITEMS]: {
-        title: "Meus itens | Eu Procuro",
-        description: "Área privada de itens cadastrados no Eu Procuro.",
+        title: "Tenho para negociar | Eu Procuro",
+        description: "Área privada de itens disponíveis para negociação no Eu Procuro.",
         robots: "noindex,nofollow"
       },
       [loggedSections.CREDITS]: {
@@ -2085,7 +2092,7 @@ export default function App() {
           type: "new-offer",
           offerId: offer.id,
           section: loggedSections.RECEIVED_OFFERS,
-          title: offer.interestTitle ?? "Nova oferta recebida",
+          title: offer.interestTitle ?? "Nova proposta recebida",
           message: `${offer.sellerName ?? "Um vendedor"} enviou uma proposta: ${offer.message ?? "sem descrição."}`,
           createdAt: offer.createdAt
         };
@@ -2181,10 +2188,10 @@ export default function App() {
           type: "interest-moderation",
           interestId: interest.id,
           section: loggedSections.MY_INTERESTS,
-          title: rejected ? "Anúncio rejeitado" : "Anúncio em análise",
+          title: rejected ? "Procura rejeitada" : "Procura em análise",
           message: rejected
-            ? "Seu anúncio foi rejeitado. Você pode editar e enviar novamente para análise ou excluir."
-            : (interest.moderation?.reason ?? "Seu anúncio está aguardando revisão."),
+            ? "Sua procura foi rejeitada. Você pode editar e enviar novamente para análise ou excluir."
+            : (interest.moderation?.reason ?? "Sua procura está aguardando revisão."),
           createdAt: interest.updatedAt ?? new Date().toISOString()
         };
       })
@@ -2205,7 +2212,7 @@ export default function App() {
             reportId: report.id,
             section: loggedSections.ADMIN,
             title: "Nova denúncia recebida",
-            message: report.reason ?? "Um usuário denunciou um anúncio para revisão.",
+            message: report.reason ?? "Um usuário denunciou uma procura para revisão.",
             createdAt: report.createdAt
           };
         })
@@ -2230,7 +2237,7 @@ export default function App() {
     if (isAdmin && loggedSection === loggedSections.ADMIN) {
       refreshAdminOmbudsmanData().catch(() => {});
     }
-  }, [isAdmin, loggedSection, ombudsmanAdminFilter]);
+  }, [isAdmin, loggedSection]);
 
   useEffect(() => {
     if (!session) {
@@ -2464,7 +2471,7 @@ export default function App() {
       setOfferForm(initialOfferForm);
       await refreshPrivateData();
       navigateTo(loggedSections.SENT_OFFERS);
-      openFeedback("success", "Oferta enviada", "Sua oferta foi enviada para o anunciante.");
+      openFeedback("success", "Proposta enviada", "Sua proposta foi enviada para quem publicou a procura.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível enviar", requestError.message || "Tente novamente.");
     } finally {
@@ -2481,7 +2488,7 @@ export default function App() {
       await closeInterest(interestId);
       await Promise.all([refreshPrivateData(), refreshPublicData()]);
       setSelectedInterest(null);
-      openFeedback("success", "Anúncio desativado", "Seu anúncio não aparecerá mais para outros usuários.");
+      openFeedback("success", "Procura desativada", "Sua procura não aparecerá mais para outros usuários.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível desativar", requestError.message || "Tente novamente.");
     }
@@ -2495,14 +2502,14 @@ export default function App() {
     try {
       await activateInterest(interestId);
       await Promise.all([refreshPrivateData(), refreshPublicData()]);
-      openFeedback("success", "Anúncio enviado para análise", "Seu interesse foi reativado e será validado antes de voltar à vitrine.");
+      openFeedback("success", "Procura enviada para análise", "Sua procura foi reativada e será validada antes de voltar à vitrine.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível ativar", requestError.message || "Tente novamente.");
     }
   }
 
   async function handleDeleteInterest(interestId) {
-    if (!interestId || !window.confirm("Deseja excluir este anúncio definitivamente?")) {
+    if (!interestId || !window.confirm("Deseja excluir esta procura definitivamente?")) {
       return;
     }
 
@@ -2510,7 +2517,7 @@ export default function App() {
       await deleteInterest(interestId);
       await Promise.all([refreshPrivateData(), refreshPublicData()]);
       setSelectedInterest(null);
-      openFeedback("success", "Anúncio excluído", "O anúncio foi removido da plataforma.");
+      openFeedback("success", "Procura excluída", "A procura foi removida da plataforma.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível excluir", requestError.message || "Tente novamente.");
     }
@@ -2588,7 +2595,7 @@ export default function App() {
     }
   }
 
-  async function refreshAdminOmbudsmanData(status = ombudsmanAdminFilter) {
+  async function refreshAdminOmbudsmanData(status = "") {
     setIsOmbudsmanAdminLoading(true);
     try {
       const data = await fetchAdminOmbudsman(status);
@@ -2604,6 +2611,7 @@ export default function App() {
     try {
       const updated = await updateAdminOmbudsmanStatus(requestId, status);
       setAdminOmbudsmanRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      openFeedback("success", "Status atualizado", `A manifestação ${updated.protocol} foi atualizada.`);
     } catch (requestError) {
       openFeedback("error", "Falha ao atualizar status", requestError.message || "Tente novamente.");
     }
@@ -2814,7 +2822,7 @@ export default function App() {
         editingSellerItemId ? "Item atualizado" : "Item cadastrado",
         editingSellerItemId
           ? "Seu item foi atualizado com sucesso."
-          : "Agora vamos monitorar interesses compatíveis com ele."
+          : "Agora vamos monitorar procuras compatíveis com ele."
       );
     } catch (requestError) {
       openFeedback(
@@ -2835,7 +2843,7 @@ export default function App() {
     try {
       await deactivateSellerItem(itemId);
       await refreshPrivateData();
-      openFeedback("success", "Item desativado", "Você pode cadastrar outro item quando quiser.");
+      openFeedback("success", "Item pausado", "Você pode reativar este item quando quiser.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível desativar", requestError.message || "Tente novamente.");
     }
@@ -2849,7 +2857,7 @@ export default function App() {
     try {
       await activateSellerItem(itemId);
       await refreshPrivateData();
-      openFeedback("success", "Item ativado", "Seu item voltou a participar dos cruzamentos com interesses.");
+      openFeedback("success", "Item ativado", "Seu item voltou a participar dos cruzamentos com procuras.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível ativar", requestError.message || "Tente novamente.");
     }
@@ -2876,7 +2884,7 @@ export default function App() {
       await refreshPrivateData();
       setSellerItemShareForm(initialSellerItemShareForm);
       navigateTo(loggedSections.SENT_OFFERS);
-      openFeedback("success", "Item compartilhado", "Sua oferta foi enviada usando o item cadastrado.");
+      openFeedback("success", "Proposta enviada", "Sua proposta foi enviada usando o item cadastrado.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível compartilhar", requestError.message || "Tente novamente.");
     } finally {
@@ -2935,8 +2943,8 @@ export default function App() {
         "error",
         "Créditos insuficientes",
         creditPurchasesEnabled
-          ? "Você precisa de 1 crédito para renovar o anúncio. Abra a página de créditos para comprar."
-          : "Você precisa de 1 crédito para renovar o anúncio."
+          ? "Você precisa de 1 crédito para renovar a procura. Abra a página de créditos para comprar."
+          : "Você precisa de 1 crédito para renovar a procura."
       );
       if (creditPurchasesEnabled) {
         navigateTo(loggedSections.CREDITS);
@@ -2947,7 +2955,7 @@ export default function App() {
     try {
       await renewInterest(interestId);
       await Promise.all([refreshPrivateData(), refreshPublicData(), loadInterestDetail(interestId, { updateUrl: false })]);
-      openFeedback("success", "Anúncio renovado", `Seu anúncio ganhou mais ${LISTING_EXPIRATION_DAYS} dias.`);
+      openFeedback("success", "Procura renovada", `Sua procura ganhou mais ${LISTING_EXPIRATION_DAYS} dias.`);
     } catch (requestError) {
       openFeedback("error", "Não foi possível renovar", requestError.message || "Tente novamente.");
     }
@@ -3141,10 +3149,16 @@ export default function App() {
               <div className="hero-card">
                 <strong>{t("home.hero.card1.title")}</strong>
                 <p>{t("home.hero.card1.description")}</p>
+                <button type="button" className="primary-button primary-button--compact" onClick={() => openAuthModal("register")}>
+                  {t("home.hero.card1.cta")}
+                </button>
               </div>
               <div className="hero-card">
                 <strong>{t("home.hero.card2.title")}</strong>
                 <p>{t("home.hero.card2.description")}</p>
+                <button type="button" className="ghost-button" onClick={() => openAuthModal("register")}>
+                  {t("home.hero.card2.cta")}
+                </button>
               </div>
             </div>
           </section>
@@ -3638,8 +3652,8 @@ export default function App() {
     return (
       <div className="sent-offer-summary">
         <div className="form-heading">
-          <span className="eyebrow">Oferta enviada</span>
-          <h3>Você já respondeu este interesse</h3>
+          <span className="eyebrow">Proposta enviada</span>
+          <h3>Você já respondeu esta procura</h3>
         </div>
 
         {offer.offerImageUrl ? (
@@ -3654,7 +3668,7 @@ export default function App() {
 
         <div className="sent-offer-summary__grid">
           <div>
-            <span>Valor ofertado</span>
+            <span>Valor da proposta</span>
             <strong>{currency(offer.offeredPrice, t)}</strong>
           </div>
           <div>
@@ -3694,7 +3708,7 @@ export default function App() {
             className="ghost-button"
             onClick={() => navigateTo(loggedSections.SENT_OFFERS)}
           >
-            Ver ofertas enviadas
+            Ver propostas enviadas
           </button>
         </div>
       </div>
@@ -3880,7 +3894,7 @@ export default function App() {
                   const isSelected = selectedPurchaseProduct?.code === product.code;
                   const description = product.type === "SUBSCRIPTION"
                     ? `Plano ativo por ${product.durationDays} dias para vendedores frequentes.`
-                    : `${product.credits} propostas para responder interesses de compradores.`;
+                    : `${product.credits} propostas para responder procuras de compradores.`;
 
                   return (
                     <button
@@ -4076,7 +4090,7 @@ export default function App() {
           <div className="panel__header">
             <div>
               <span className="eyebrow">{t("interest.form.eyebrow")}</span>
-              <h2>{t("dashboard.nav.sellerItems")}</h2>
+              <h2>Itens que posso negociar</h2>
             </div>
           </div>
 
@@ -4102,8 +4116,8 @@ export default function App() {
         <aside className="panel panel--sticky">
           <div className="panel__header">
             <div>
-              <span className="eyebrow">Meus Itens</span>
-              <h2>{selectedItem?.title ?? "Cadastre um item"}</h2>
+              <span className="eyebrow">Tenho para negociar</span>
+              <h2>{selectedItem?.title ?? "Cadastre um item disponível"}</h2>
             </div>
           </div>
           <label className="seller-items-toggle">
@@ -4135,7 +4149,7 @@ export default function App() {
                     )}
                     <span className="seller-item-tab__title">
                       <strong>{group.item.title}</strong>
-                      {!group.item.active ? <em>Desativado</em> : null}
+                      {!group.item.active ? <em>Pausado</em> : null}
                     </span>
                     <small
                       className="seller-match-count"
@@ -4145,7 +4159,7 @@ export default function App() {
                       }}
                     >
                       <strong>{group.matchCount}</strong>
-                      <span>possíveis<br />interessados</span>
+                      <span>pessoas procurando<br />algo parecido</span>
                     </small>
                   </button>
                 ))}
@@ -4155,7 +4169,7 @@ export default function App() {
                 <div className="seller-item-summary">
                   <div className="seller-item-summary__content">
                     <strong>{currency(selectedItem.desiredPrice, t)}</strong>
-                    {!selectedItem.active ? <span className="seller-item-status-badge">Desativado</span> : null}
+                    {!selectedItem.active ? <span className="seller-item-status-badge">Pausado</span> : null}
                     {selectedItem.description ? (
                       <p title={selectedItem.description}>{selectedItem.description}</p>
                     ) : null}
@@ -4181,7 +4195,7 @@ export default function App() {
                         className="ghost-button ghost-button--small"
                         onClick={() => handleDeactivateSellerItem(selectedItem.id)}
                       >
-                        Desativar item
+                        Pausar item
                       </button>
                     ) : (
                       <button
@@ -4250,7 +4264,7 @@ export default function App() {
                         type="button"
                         className="primary-button primary-button--compact"
                         disabled={shareDisabled || sharingSellerItemInterestId === interest.id}
-                        title={!canSendOffer ? noCreditsTooltip : !sellerItemShareForm.sellerPhone.trim() ? "Informe um telefone para enviar a oferta." : undefined}
+                        title={!canSendOffer ? noCreditsTooltip : !sellerItemShareForm.sellerPhone.trim() ? "Informe um telefone para enviar a proposta." : undefined}
                         onClick={() => handleShareSellerItem(selectedItem.id, interest)}
                       >
                         {sharingSellerItemInterestId === interest.id ? "Enviando..." : "Compartilhar item"}
@@ -4260,15 +4274,15 @@ export default function App() {
                 </div>
               ) : (
                 <EmptyState
-                  title="Nenhum interesse compatível ainda"
-                  description="Quando alguém procurar algo parecido com este item, ele aparecerá aqui."
+                  title="Nenhuma procura compatível ainda"
+                  description="Quando alguém procurar algo parecido com este item, a procura aparecerá aqui."
                 />
               )}
             </>
           ) : (
             <EmptyState
-              title="Nenhum item cadastrado"
-              description="Cadastre um item ou serviço para descobrir usuários interessados em algo parecido."
+              title="Nenhum item disponível cadastrado"
+              description="Cadastre um item ou serviço para descobrir pessoas procurando algo parecido."
             />
           )}
         </aside>
@@ -4304,10 +4318,45 @@ export default function App() {
     );
   }
 
+  function toggleAdminSection(sectionKey) {
+    setCollapsedAdminSections((current) => ({
+      ...current,
+      [sectionKey]: !current[sectionKey]
+    }));
+  }
+
+  function renderAdminSection({ sectionKey, eyebrow, title, count = 0, priority = false, children }) {
+    const isCollapsed = Boolean(collapsedAdminSections[sectionKey]);
+
+    return (
+      <article className={`admin-card admin-collapsible ${priority ? "admin-card--priority" : ""} ${isCollapsed ? "admin-collapsible--collapsed" : ""}`}>
+        <button
+          type="button"
+          className="admin-collapsible__header"
+          onClick={() => toggleAdminSection(sectionKey)}
+          aria-expanded={!isCollapsed}
+        >
+          <span className="admin-collapsible__title">
+            <span className="eyebrow">{eyebrow}</span>
+            <strong>{title}</strong>
+          </span>
+          <span className="admin-collapsible__meta">
+            {isCollapsed && count > 0 ? <span className="admin-section-badge">{count}</span> : null}
+            <span aria-hidden="true">{isCollapsed ? "+" : "−"}</span>
+          </span>
+        </button>
+        {isCollapsed ? null : <div className="admin-collapsible__body">{children}</div>}
+      </article>
+    );
+  }
+
   function renderAdminModerationPage() {
     const pendingInterests = adminModeration?.pendingInterests ?? [];
     const rules = adminModeration?.rules ?? [];
     const openReports = adminModeration?.openReports ?? [];
+    const newOmbudsmanCount = adminOmbudsmanRequests.filter((requestItem) =>
+      requestItem.status === "OPEN" && !requestItem.adminResponse
+    ).length;
 
     return (
       <section className="admin-moderation panel panel--spaced">
@@ -4327,11 +4376,13 @@ export default function App() {
           </button>
         </div>
 
-        <article className="admin-card admin-card--priority">
-          <div className="form-heading">
-            <span className="eyebrow">{t("admin.moderation.queue")}</span>
-            <h3>{t("admin.moderation.queueCount", { count: pendingInterests.length })}</h3>
-          </div>
+        {renderAdminSection({
+          sectionKey: "moderationQueue",
+          eyebrow: t("admin.moderation.queue"),
+          title: t("admin.moderation.queueCount", { count: pendingInterests.length }),
+          count: pendingInterests.length,
+          priority: true,
+          children: (
           <div className="admin-list">
             {pendingInterests.length ? pendingInterests.map((interest) => (
               <article key={interest.id} className="admin-list-item admin-list-item--stacked">
@@ -4372,14 +4423,16 @@ export default function App() {
               <EmptyState title={t("admin.moderation.empty.title")} description={t("admin.moderation.empty.description")} />
             )}
           </div>
-        </article>
+          )
+        })}
 
         <div className="admin-grid">
-          <article className="admin-card">
-            <div className="form-heading">
-              <span className="eyebrow">{t("admin.moderation.rules")}</span>
-              <h3>{moderationRuleForm.id ? t("admin.moderation.editRule") : t("admin.moderation.newRule")}</h3>
-            </div>
+          {renderAdminSection({
+            sectionKey: "moderationRules",
+            eyebrow: t("admin.moderation.rules"),
+            title: moderationRuleForm.id ? t("admin.moderation.editRule") : t("admin.moderation.newRule"),
+            children: (
+              <>
             <form className="stacked-form" onSubmit={handleModerationRuleSubmit}>
               <input
                 placeholder={t("admin.moderation.rule.placeholder")}
@@ -4448,13 +4501,16 @@ export default function App() {
                 <EmptyState title={t("admin.moderation.rule.empty.title")} description={t("admin.moderation.rule.empty.description")} />
               )}
             </div>
-          </article>
+              </>
+            )
+          })}
 
-          <article className="admin-card">
-            <div className="form-heading">
-              <span className="eyebrow">{t("admin.moderation.reports")}</span>
-              <h3>{t("admin.moderation.reportsCount", { count: openReports.length })}</h3>
-            </div>
+          {renderAdminSection({
+            sectionKey: "reports",
+            eyebrow: t("admin.moderation.reports"),
+            title: t("admin.moderation.reportsCount", { count: openReports.length }),
+            count: openReports.length,
+            children: (
             <div className="admin-list">
               {openReports.length ? openReports.map((report) => (
                 <article key={report.id} className="admin-list-item">
@@ -4468,11 +4524,28 @@ export default function App() {
                 <EmptyState title={t("admin.moderation.reports.empty.title")} description={t("admin.moderation.reports.empty.description")} />
               )}
             </div>
-          </article>
+            )
+          })}
         </div>
-        {renderAdminOmbudsmanPanel()}
-        <ContentAdminPanel onFeedback={openFeedback} />
-        <OperationalCatalogAdminPanel onFeedback={openFeedback} />
+        {renderAdminSection({
+          sectionKey: "ombudsman",
+          eyebrow: "Ouvidoria",
+          title: "Manifestações recebidas",
+          count: newOmbudsmanCount,
+          children: renderAdminOmbudsmanPanel()
+        })}
+        {renderAdminSection({
+          sectionKey: "contentCrm",
+          eyebrow: "Conteúdo",
+          title: "CRM de conteúdo",
+          children: <ContentAdminPanel onFeedback={openFeedback} />
+        })}
+        {renderAdminSection({
+          sectionKey: "catalogCrm",
+          eyebrow: "Catálogo",
+          title: "CRM operacional",
+          children: <OperationalCatalogAdminPanel onFeedback={openFeedback} />
+        })}
       </section>
     );
   }
@@ -4572,82 +4645,113 @@ export default function App() {
   }
 
   function renderAdminOmbudsmanPanel() {
-    return (
-      <article className="admin-card admin-card--ombudsman">
-        <div className="content-admin__header">
-          <div>
-            <span className="eyebrow">Ouvidoria</span>
-            <h3>Manifestações recebidas</h3>
-            <p>Acompanhe protocolos, responda usuários e atualize o status.</p>
-          </div>
-          <div className="inline-actions">
+    const newRequests = adminOmbudsmanRequests.filter((requestItem) =>
+      requestItem.status === "OPEN" && !requestItem.adminResponse
+    );
+    const inProgressRequests = adminOmbudsmanRequests.filter((requestItem) =>
+      requestItem.status !== "CLOSED" && (requestItem.status === "IN_REVIEW" || requestItem.status === "ANSWERED" || requestItem.adminResponse)
+    );
+    const closedRequests = adminOmbudsmanRequests.filter((requestItem) => requestItem.status === "CLOSED");
+
+    const renderOmbudsmanRequest = (requestItem) => (
+      <article key={requestItem.id} className="admin-list-item admin-list-item--stacked ombudsman-admin-item">
+        <div>
+          <strong>{requestItem.protocol} · {requestItem.subject}</strong>
+          <span>{requestItem.type} · {requestItem.status} · {formatTimestamp(requestItem.createdAt, t)}</span>
+          <p>{requestItem.message}</p>
+          <small>{requestItem.name} · {requestItem.email}</small>
+          {requestItem.relatedEntityId ? (
+            <small>Referência: {requestItem.relatedEntityType || "item"} · {requestItem.relatedEntityId}</small>
+          ) : null}
+          {requestItem.adminResponse ? (
+            <div className="admin-response-box">
+              <strong>Resposta enviada</strong>
+              <p>{requestItem.adminResponse}</p>
+            </div>
+          ) : null}
+        </div>
+        <div className="ombudsman-admin-actions">
+          <label className="compact-field-label">
+            <span>Status</span>
             <select
-              value={ombudsmanAdminFilter}
-              onChange={(event) => setOmbudsmanAdminFilter(event.target.value)}
+              value={requestItem.status}
+              onChange={(event) => handleOmbudsmanStatusChange(requestItem.id, event.target.value)}
             >
-              <option value="">Todos</option>
-              <option value="OPEN">Abertas</option>
-              <option value="IN_REVIEW">Em análise</option>
-              <option value="ANSWERED">Respondidas</option>
-              <option value="CLOSED">Encerradas</option>
+              <option value="OPEN">Aberta</option>
+              <option value="IN_REVIEW">Em atendimento</option>
+              <option value="ANSWERED">Respondida</option>
+              <option value="CLOSED">Fechada</option>
             </select>
+          </label>
+          <textarea
+            placeholder="Resposta da Ouvidoria"
+            value={ombudsmanResponses[requestItem.id] ?? ""}
+            onChange={(event) => setOmbudsmanResponses((current) => ({
+              ...current,
+              [requestItem.id]: event.target.value
+            }))}
+            rows={4}
+          />
+          <button
+            type="button"
+            className="primary-button primary-button--compact"
+            onClick={() => handleOmbudsmanResponseSubmit(requestItem)}
+          >
+            Responder
+          </button>
+        </div>
+      </article>
+    );
+
+    const renderOmbudsmanGroup = (title, description, requests, emptyDescription) => (
+      <section className="ombudsman-admin-group">
+        <div className="ombudsman-admin-group__header">
+          <div>
+            <strong>{title}</strong>
+            <p>{description}</p>
+          </div>
+          <span className="admin-section-badge">{requests.length}</span>
+        </div>
+        <div className="admin-list admin-list--ombudsman">
+          {requests.length ? requests.map(renderOmbudsmanRequest) : (
+            <EmptyState title="Nada por aqui" description={emptyDescription} />
+          )}
+        </div>
+      </section>
+    );
+
+    return (
+      <div className="admin-card--ombudsman">
+        <div className="admin-section-toolbar">
+          <p>Acompanhe protocolos, responda usuários e atualize o status.</p>
+          <div className="inline-actions">
             <button type="button" className="ghost-button ghost-button--small" onClick={() => refreshAdminOmbudsmanData()}>
               {isOmbudsmanAdminLoading ? "Atualizando..." : "Atualizar"}
             </button>
           </div>
         </div>
 
-        <div className="admin-list admin-list--ombudsman">
-          {adminOmbudsmanRequests.length ? adminOmbudsmanRequests.map((requestItem) => (
-            <article key={requestItem.id} className="admin-list-item admin-list-item--stacked ombudsman-admin-item">
-              <div>
-                <strong>{requestItem.protocol} · {requestItem.subject}</strong>
-                <span>{requestItem.type} · {requestItem.status} · {formatTimestamp(requestItem.createdAt, t)}</span>
-                <p>{requestItem.message}</p>
-                <small>{requestItem.name} · {requestItem.email}</small>
-                {requestItem.relatedEntityId ? (
-                  <small>Referência: {requestItem.relatedEntityType || "item"} · {requestItem.relatedEntityId}</small>
-                ) : null}
-                {requestItem.adminResponse ? (
-                  <div className="admin-response-box">
-                    <strong>Resposta enviada</strong>
-                    <p>{requestItem.adminResponse}</p>
-                  </div>
-                ) : null}
-              </div>
-              <div className="ombudsman-admin-actions">
-                <select
-                  value={requestItem.status}
-                  onChange={(event) => handleOmbudsmanStatusChange(requestItem.id, event.target.value)}
-                >
-                  <option value="OPEN">Aberta</option>
-                  <option value="IN_REVIEW">Em análise</option>
-                  <option value="ANSWERED">Respondida</option>
-                  <option value="CLOSED">Encerrada</option>
-                </select>
-                <textarea
-                  placeholder="Resposta da Ouvidoria"
-                  value={ombudsmanResponses[requestItem.id] ?? ""}
-                  onChange={(event) => setOmbudsmanResponses((current) => ({
-                    ...current,
-                    [requestItem.id]: event.target.value
-                  }))}
-                  rows={4}
-                />
-                <button
-                  type="button"
-                  className="primary-button primary-button--compact"
-                  onClick={() => handleOmbudsmanResponseSubmit(requestItem)}
-                >
-                  Responder
-                </button>
-              </div>
-            </article>
-          )) : (
-            <EmptyState title="Nenhuma manifestação" description="Novas manifestações da Ouvidoria aparecerão aqui." />
+        <div className="ombudsman-admin-groups">
+          {renderOmbudsmanGroup(
+            "Novas",
+            "Manifestações abertas que ainda não receberam resposta.",
+            newRequests,
+            "Novas manifestações da Ouvidoria aparecerão aqui."
+          )}
+          {renderOmbudsmanGroup(
+            "Em atendimento",
+            "Manifestações em análise ou já respondidas, mas ainda não fechadas.",
+            inProgressRequests,
+            "Manifestações em análise ou respondidas aparecerão aqui."
+          )}
+          {renderOmbudsmanGroup(
+            "Fechadas",
+            "Protocolos encerrados.",
+            closedRequests,
+            "Manifestações fechadas aparecerão aqui."
           )}
         </div>
-      </article>
+      </div>
     );
   }
 
@@ -4764,7 +4868,7 @@ export default function App() {
               <div className="panel__header">
                 <div>
                   <span className="eyebrow">Página</span>
-                  <h2>{showInactiveInterests ? "Meus interesses" : "Interesses ativos"}</h2>
+                  <h2>{showInactiveInterests ? "Minhas procuras" : "Procuras ativas"}</h2>
                 </div>
               </div>
               <label className="seller-items-toggle">
@@ -4773,15 +4877,15 @@ export default function App() {
                   checked={showInactiveInterests}
                   onChange={(event) => setShowInactiveInterests(event.target.checked)}
                 />
-                <span>Mostrar interesses desativados</span>
+                <span>Mostrar procuras desativadas</span>
               </label>
 
               {myInterests.length ? (
                 <div className="accordion-list">{myInterests.map(renderInterestListItem)}</div>
               ) : (
                 <EmptyState
-                  title="Nenhum interesse ativo"
-                  description="Cadastre um novo interesse para começar a receber ofertas."
+                  title="Nenhuma procura ativa"
+                  description="Publique uma nova procura para começar a receber propostas."
                 />
               )}
             </article>
@@ -4790,7 +4894,7 @@ export default function App() {
               <div className="panel__header">
                 <div>
                   <span className="eyebrow">Respostas</span>
-                  <h2>{selectedInterest?.title ?? "Escolha um interesse"}</h2>
+                  <h2>{selectedInterest?.title ?? "Escolha uma procura"}</h2>
                 </div>
               </div>
 
@@ -4811,10 +4915,10 @@ export default function App() {
                       <strong>{moderationStatusLabel(selectedInterest.status, t)}</strong>
                       <p>
                         {selectedInterest.status === "REJECTED"
-                          ? "Seu anúncio foi rejeitado. Edite para enviar novamente para análise ou exclua se preferir."
+                          ? "Sua procura foi rejeitada. Edite para enviar novamente para análise ou exclua se preferir."
                           : selectedInterest.status === "CLOSED"
-                            ? "Este anúncio está desativado e não aparece para outros usuários."
-                          : (selectedInterest.moderation?.reason ?? "Seu anúncio ainda não está disponível publicamente.")}
+                            ? "Esta procura está desativada e não aparece para outros usuários."
+                          : (selectedInterest.moderation?.reason ?? "Sua procura ainda não está disponível publicamente.")}
                       </p>
                     </div>
                   ) : null}
@@ -4828,7 +4932,7 @@ export default function App() {
                         type="button"
                         className="renewal-button"
                         onClick={() => handleRenewInterest(selectedInterest.id)}
-                        title="Usa 1 crédito para adicionar mais 30 dias ao anúncio"
+                        title="Usa 1 crédito para adicionar mais 30 dias à procura"
                       >
                         <span className="renewal-button__icon" aria-hidden="true">↻</span>
                         <span>Renovar por 1 crédito</span>
@@ -4844,7 +4948,7 @@ export default function App() {
                       className="ghost-button action-button--compact"
                       onClick={() => startEditingInterest(selectedInterest)}
                     >
-                      Editar anúncio
+                      Editar procura
                     </button>
                     {selectedInterest.status === "CLOSED" ? (
                       <button
@@ -4852,7 +4956,7 @@ export default function App() {
                         className="primary-button action-button--compact"
                         onClick={() => handleActivateInterest(selectedInterest.id)}
                       >
-                        Ativar anúncio
+                        Ativar procura
                       </button>
                     ) : (
                       <button
@@ -4860,7 +4964,7 @@ export default function App() {
                         className="ghost-button action-button--compact"
                         onClick={() => handleCloseInterest(selectedInterest.id)}
                       >
-                        Desativar anúncio
+                        Desativar procura
                       </button>
                     )}
                     <button
@@ -4868,14 +4972,14 @@ export default function App() {
                       className="danger-button action-button--compact"
                       onClick={() => handleDeleteInterest(selectedInterest.id)}
                     >
-                      Excluir anúncio
+                      Excluir procura
                     </button>
                   </div>
                   {boostPurchasesEnabled && boostProducts.length > 0 && ["APPROVED", "OPEN"].includes(selectedInterest?.status) && (
                       <>
                         <div className="boost-box">
                           <div>
-                            <strong>Impulsionar interesse</strong>
+                            <strong>Impulsionar procura</strong>
                             <p>
                               {selectedInterest.boostedUntil
                                   ? t("boost.activeUntil", { date: formatTimestamp(selectedInterest.boostedUntil, t) })
@@ -4910,14 +5014,14 @@ export default function App() {
 
                         <div className="offers">
                           <div className="offers__header">
-                            <span className="eyebrow">Ofertas recebidas</span>
+                            <span className="eyebrow">Propostas recebidas</span>
                             <strong>{offers.length}</strong>
                           </div>
 
                           {offers.length === 0 ? (
                               <EmptyState
-                                  title="Ainda sem ofertas"
-                                  description="Quando alguém responder ao seu interesse, as mensagens aparecerão aqui."
+                                  title="Ainda sem propostas"
+                                  description="Quando alguém responder à sua procura, as mensagens aparecerão aqui."
                               />
                           ) : (
                               <div className="accordion-list">
@@ -4932,8 +5036,8 @@ export default function App() {
                 </>
               ) : (
                 <EmptyState
-                  title="Selecione um interesse seu"
-                  description="Clique em um interesse ativo para acompanhar as respostas."
+                  title="Selecione uma procura sua"
+                  description="Clique em uma procura ativa para acompanhar as propostas."
                 />
               )}
             </aside>
@@ -4945,7 +5049,7 @@ export default function App() {
             <div className="panel__header">
               <div>
                 <span className="eyebrow">Página</span>
-                <h2>Ofertas enviadas</h2>
+                <h2>Propostas enviadas</h2>
               </div>
             </div>
 
@@ -4955,8 +5059,8 @@ export default function App() {
               </div>
             ) : (
               <EmptyState
-                title="Nenhuma oferta enviada"
-                description="As ofertas que você enviar para outros interesses aparecerão aqui."
+                title="Nenhuma proposta enviada"
+                description="As propostas que você enviar para procuras de outras pessoas aparecerão aqui."
               />
             )}
           </section>
@@ -4967,7 +5071,7 @@ export default function App() {
             <div className="panel__header">
               <div>
                 <span className="eyebrow">Página</span>
-                <h2>Ofertas recebidas</h2>
+                <h2>Propostas recebidas</h2>
               </div>
             </div>
 
@@ -4977,8 +5081,8 @@ export default function App() {
               </div>
             ) : (
               <EmptyState
-                title="Nenhuma oferta recebida"
-                description="As respostas aos seus interesses ficarão listadas aqui."
+                title="Nenhuma proposta recebida"
+                description="As respostas às suas procuras ficarão listadas aqui."
               />
             )}
           </section>
@@ -5024,6 +5128,13 @@ export default function App() {
             </div>
 
             <form className="stacked-form" onSubmit={handleInterestSubmit}>
+              {!editingInterestId ? (
+                <>
+                  <p className="form-intro">{t("interest.form.guidance")}</p>
+                  <div className="intent-notice">{t("interest.form.intentNotice")}</div>
+                </>
+              ) : null}
+
               <div className="expiry-note">
                 {t("interest.form.expiryNote", { count: LISTING_EXPIRATION_DAYS })}
               </div>
@@ -5061,7 +5172,10 @@ export default function App() {
                 maxLength={DESCRIPTION_MAX_LENGTH}
                 required
               />
-              <FieldCounter value={interestForm.description} max={DESCRIPTION_MAX_LENGTH} />
+              <div className="field-footer">
+                <p className="field-helper">{t("interest.form.description.helper")}</p>
+                <FieldCounter value={interestForm.description} max={DESCRIPTION_MAX_LENGTH} />
+              </div>
               {hasLink(interestForm.description) ? (
                 <p className="form-note form-note--compact">{t("interest.form.linksNotAllowed")}</p>
               ) : null}
@@ -5088,6 +5202,7 @@ export default function App() {
                 />
               </div>
 
+              <div className="field-group-label">Quanto pretende investir?</div>
               <div className="three-columns">
                 <input
                   type="number"
@@ -5425,7 +5540,7 @@ export default function App() {
             <div className="feedback-modal__header">
               <div>
                 <span className="eyebrow">Denúncia</span>
-                <h2 id="report-modal-title">Denunciar interesse</h2>
+                <h2 id="report-modal-title">Denunciar procura</h2>
               </div>
               <button type="button" className="modal-close-button" onClick={closeReportModal} aria-label="Fechar modal">
                 X
