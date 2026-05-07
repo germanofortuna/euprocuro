@@ -1,4 +1,4 @@
-import logo from "../assets/eu-procuro-logo.png";
+import logoDark from "../assets/eu-procuro-logo-dark.svg";
 import { useContentText } from "../content/ContentContext";
 
 const loggedSections = {
@@ -63,10 +63,7 @@ export default function Header({
         className="topbar__brand topbar__brand-button"
         onClick={() => onNavigate(loggedSections.EXPLORE)}
       >
-        <img src={logo} alt={t("header.logo.alt")} />
-        <div className="topbar__brand-copy">
-          <span className="eyebrow">{t("header.brand.eyebrow")}</span>
-        </div>
+        <img className="brand-logo" src={logoDark} alt={t("header.logo.alt")} />
       </button>
 
       {hideActions ? null : authenticated ? (
@@ -77,6 +74,7 @@ export default function Header({
               className={currentSection === loggedSections.NEW_INTEREST ? "active" : ""}
               onClick={() => onNavigate(loggedSections.NEW_INTEREST)}
             >
+              <span className="nav-icon" aria-hidden="true">+</span>
               {t("header.nav.publish")}
             </button>
           </nav>

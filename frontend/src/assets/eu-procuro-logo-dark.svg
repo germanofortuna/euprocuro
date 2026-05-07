@@ -1,0 +1,61 @@
+<svg width="420" height="108" viewBox="0 0 420 108" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Eu Procuro</title>
+  <desc id="desc">Logo Eu Procuro com uma lupa sobre um anuncio em jornal.</desc>
+  <defs>
+    <linearGradient id="lensStroke" x1="34" y1="16" x2="124" y2="100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#35D3FF"/>
+      <stop offset="1" stop-color="#5B8CFF"/>
+    </linearGradient>
+    <linearGradient id="handleStroke" x1="20" y1="94" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#35D3FF"/>
+      <stop offset="1" stop-color="#0B4FBB"/>
+    </linearGradient>
+    <radialGradient id="lensFill" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(73 50) rotate(52) scale(58)">
+      <stop stop-color="#F1F7FF" stop-opacity="0.98"/>
+      <stop offset="0.48" stop-color="#DDEAF7" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#9CB2CC" stop-opacity="0.72"/>
+    </radialGradient>
+    <filter id="glow" x="-20" y="-20" width="170" height="148" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="8" flood-color="#35D3FF" flood-opacity="0.16"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.32"/>
+    </filter>
+    <clipPath id="lensClip">
+      <circle cx="74" cy="52" r="42"/>
+    </clipPath>
+  </defs>
+
+  <g filter="url(#glow)">
+    <path d="M18 92L45 71" stroke="url(#handleStroke)" stroke-width="15" stroke-linecap="round"/>
+    <circle cx="74" cy="52" r="48" fill="#07101A"/>
+    <circle cx="74" cy="52" r="42" fill="url(#lensFill)"/>
+
+    <g clip-path="url(#lensClip)" opacity="0.8">
+      <rect x="31" y="10" width="86" height="86" fill="#EFF5FB"/>
+      <rect x="38" y="18" width="29" height="4" rx="2" fill="#A6B5C7"/>
+      <rect x="73" y="18" width="27" height="4" rx="2" fill="#A6B5C7"/>
+      <rect x="38" y="27" width="29" height="2" rx="1" fill="#C7D2E0"/>
+      <rect x="38" y="33" width="29" height="2" rx="1" fill="#C7D2E0"/>
+      <rect x="38" y="39" width="29" height="2" rx="1" fill="#C7D2E0"/>
+      <rect x="73" y="27" width="27" height="2" rx="1" fill="#C7D2E0"/>
+      <rect x="73" y="33" width="27" height="2" rx="1" fill="#C7D2E0"/>
+      <rect x="73" y="39" width="27" height="2" rx="1" fill="#C7D2E0"/>
+      <rect x="38" y="73" width="29" height="2" rx="1" fill="#C7D2E0"/>
+      <rect x="38" y="79" width="29" height="2" rx="1" fill="#C7D2E0"/>
+      <rect x="73" y="73" width="27" height="2" rx="1" fill="#C7D2E0"/>
+      <rect x="73" y="79" width="27" height="2" rx="1" fill="#C7D2E0"/>
+      <path d="M90 43L100 31L110 43H90Z" fill="#B9C6D6"/>
+      <path d="M82 43L91 34L101 43H82Z" fill="#CFD8E5"/>
+    </g>
+
+    <text x="51" y="52" font-family="Sora, Arial, sans-serif" font-size="29" font-weight="900" fill="#073E9C" letter-spacing="-1.5">eu</text>
+    <text x="51" y="70" font-family="Sora, Arial, sans-serif" font-size="15" font-weight="800" fill="#073E9C">procuro</text>
+    <circle cx="74" cy="52" r="42" stroke="#E7F2FF" stroke-opacity="0.82" stroke-width="3"/>
+    <circle cx="74" cy="52" r="49" stroke="url(#lensStroke)" stroke-width="8"/>
+  </g>
+
+  <g>
+    <text x="142" y="55" font-family="Sora, Arial, sans-serif" font-size="34" font-weight="900" fill="#35D3FF" letter-spacing="0.5">EU</text>
+    <text x="199" y="55" font-family="Sora, Arial, sans-serif" font-size="34" font-weight="300" fill="#EDF6FF" letter-spacing="0.5">PROCURO</text>
+    <text x="144" y="82" font-family="Sora, Arial, sans-serif" font-size="13" font-weight="800" fill="#5B8CFF" letter-spacing="3">MARKETPLACE REVERSO</text>
+  </g>
+</svg>

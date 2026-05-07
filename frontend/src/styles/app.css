@@ -1,17 +1,17 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   font-family: "Sora", sans-serif;
-  --bg: #eef5ff;
-  --surface: rgba(255, 255, 255, 0.94);
-  --surface-soft: rgba(237, 245, 255, 0.94);
-  --ink: #10213d;
-  --muted: #5a6d89;
-  --line: rgba(13, 78, 181, 0.12);
-  --accent: #1e6ff2;
-  --accent-strong: #0b4fbb;
-  --success: #11633c;
-  --error: #b3261e;
-  --shadow: 0 16px 42px rgba(15, 41, 84, 0.1);
+  --bg: #05070b;
+  --surface: rgba(13, 18, 28, 0.94);
+  --surface-soft: rgba(21, 31, 46, 0.92);
+  --ink: #edf6ff;
+  --muted: #8fa4be;
+  --line: rgba(103, 232, 249, 0.16);
+  --accent: #35d3ff;
+  --accent-strong: #5b8cff;
+  --success: #7cffb2;
+  --error: #ff7a90;
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
 }
 
 * {
@@ -28,9 +28,10 @@ body {
   margin: 0;
   color: var(--ink);
   background:
-    radial-gradient(circle at top left, rgba(56, 144, 255, 0.12), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(11, 79, 187, 0.14), transparent 25%),
-    linear-gradient(180deg, #f9fbff 0%, #edf4ff 100%);
+    radial-gradient(circle at top left, rgba(53, 211, 255, 0.18), transparent 30%),
+    radial-gradient(circle at 82% 18%, rgba(91, 140, 255, 0.16), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(64, 93, 230, 0.18), transparent 28%),
+    linear-gradient(180deg, #030406 0%, #07101a 48%, #05070b 100%);
 }
 
 button,
@@ -65,10 +66,10 @@ img {
   position: fixed;
   inset: 0;
   background:
-    linear-gradient(rgba(11, 79, 187, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(11, 79, 187, 0.04) 1px, transparent 1px);
+    linear-gradient(rgba(103, 232, 249, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(103, 232, 249, 0.055) 1px, transparent 1px);
   background-size: 40px 40px;
-  opacity: 0.72;
+  opacity: 0.55;
   pointer-events: none;
 }
 
@@ -189,14 +190,23 @@ img {
 
 .topbar__brand-copy {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   min-height: 100%;
 }
 
-.topbar__brand img,
+.brand-logo,
 .brand-inline img {
   width: 180px;
   height: auto;
+}
+
+.brand-logo {
+  width: clamp(180px, 20vw, 260px);
+  max-height: 62px;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 26px rgba(0, 0, 0, 0.28));
 }
 
 .topbar__brand h2,
@@ -234,11 +244,24 @@ img {
 .topbar__nav button,
 .section-nav button,
 .auth-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: none;
   border-radius: 14px;
   background: rgba(224, 237, 255, 0.92);
   color: var(--muted);
   padding: 0 12px;
+}
+
+.nav-icon {
+  width: 1.15em;
+  min-width: 1.15em;
+  display: inline-grid;
+  place-items: center;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .auth-tabs button {
@@ -283,13 +306,13 @@ img {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(227, 248, 237, 0.95);
-  color: #127a45;
+  background: rgba(31, 44, 68, 0.92);
+  color: #bcd4ff;
 }
 
 .section-nav button.admin-nav-button.active {
-  background: linear-gradient(135deg, #1fb36b, #087a45);
-  color: white;
+  background: linear-gradient(135deg, #35d3ff, #5b8cff);
+  color: #031018;
 }
 
 .admin-nav-badge {
@@ -1940,7 +1963,7 @@ textarea:focus {
 
 .moderation-callout--warning {
   border-color: rgba(245, 158, 11, 0.24);
-  background: rgba(255, 248, 225, 0.85);
+  background: rgb(107 93 46 / 85%);
   margin-bottom: 10px;
 }
 
@@ -2002,7 +2025,7 @@ textarea:focus {
   width: 100%;
   border: 1px solid rgba(11, 79, 187, 0.1);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.94);
+  background: #252424;
   color: var(--ink);
   padding: 10px;
   text-align: left;
@@ -2033,7 +2056,7 @@ textarea:focus {
   padding: 18px;
   border: 1px solid rgba(30, 111, 242, 0.14);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.78);
+  background: linear-gradient(145deg, rgb(28 38 59 / 96%), rgba(8, 13, 22, 0.96)), var(--surface);
 }
 
 .admin-card--priority {
@@ -2199,7 +2222,7 @@ textarea:focus {
   margin: 16px 0;
   padding: 14px;
   border-radius: 18px;
-  background: rgba(237, 245, 255, 0.94);
+  background: #252424;
 }
 
 .seller-item-summary__content {
@@ -2362,8 +2385,8 @@ textarea:focus {
   padding: 12px 14px;
   border: 1px solid rgba(30, 111, 242, 0.16);
   border-radius: 12px;
-  background: rgba(237, 245, 255, 0.9);
-  color: var(--muted);
+  background: rgb(227 179 68 / 90%);
+  color: white;
   line-height: 1.45;
 }
 
@@ -2394,13 +2417,13 @@ textarea:focus {
 }
 
 .content-entry-button {
-  width: 100%;
+  width: 95%;
   display: grid;
   gap: 4px;
   padding: 12px;
   border: 1px solid rgba(11, 79, 187, 0.12);
   border-radius: 12px;
-  background: white;
+  background: #5b5555;
   color: var(--text);
   text-align: left;
   cursor: pointer;
@@ -2409,7 +2432,7 @@ textarea:focus {
 .content-entry-button:hover,
 .content-entry-button.active {
   border-color: rgba(30, 111, 242, 0.42);
-  background: rgba(237, 245, 255, 0.86);
+  background: rgb(16 97 199 / 86%);
 }
 
 .content-entry-button span,
@@ -2494,7 +2517,7 @@ textarea:focus {
   padding: 14px;
   border: 1px solid rgba(30, 111, 242, 0.12);
   border-radius: 16px;
-  background: rgba(246, 250, 255, 0.72);
+  background: rgb(6 16 28 / 72%);
 }
 
 .catalog-admin__settings {
@@ -2539,7 +2562,7 @@ textarea:focus {
   padding: 12px;
   border: 1px solid rgba(11, 79, 187, 0.1);
   border-radius: 14px;
-  background: white;
+  background: #252424;
 }
 
 .catalog-row > * {
@@ -2607,8 +2630,7 @@ textarea:focus {
 }
 
 .interest-form-page {
-  width: min(980px, 100%);
-  margin: 0 auto;
+  width: min(1240px, 100%);
   display: grid;
   gap: 18px;
 }
@@ -2622,12 +2644,49 @@ textarea:focus {
   overflow: auto;
   padding: 22px;
   border-radius: 24px;
+  border: 1px solid #4fa2ff5e;
   background: white;
   box-shadow: 0 18px 42px rgba(10, 31, 66, 0.18);
   display: grid;
   gap: 18px;
   contain: layout paint;
   overscroll-behavior: contain;
+}
+
+.form-modal,
+.auth-modal,
+.legal-modal,
+.conversation-modal,
+.notification-modal {
+  scrollbar-width: thin;              /* Firefox */
+  scrollbar-color: #35d3ff #0b1220;   /* thumb track */
+}
+
+.form-modal::-webkit-scrollbar,
+.auth-modal::-webkit-scrollbar,
+.legal-modal::-webkit-scrollbar,
+.conversation-modal::-webkit-scrollbar,
+.notification-modal::-webkit-scrollbar {
+  width: 10px;
+}
+
+.form-modal::-webkit-scrollbar-track,
+.auth-modal::-webkit-scrollbar-track,
+.legal-modal::-webkit-scrollbar-track,
+.conversation-modal::-webkit-scrollbar-track,
+.notification-modal::-webkit-scrollbar-track {
+  background: #0b1220;
+  border-radius: 999px;
+}
+
+.form-modal::-webkit-scrollbar-thumb,
+.auth-modal::-webkit-scrollbar-thumb,
+.legal-modal::-webkit-scrollbar-thumb,
+.conversation-modal::-webkit-scrollbar-thumb,
+.notification-modal::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #35d3ff, #5b8cff);
+  border-radius: 999px;
+  border: 2px solid #0b1220;
 }
 
 .notification-modal {
@@ -2765,7 +2824,7 @@ textarea:focus {
   overflow: auto;
   padding: 8px;
   border-radius: 22px;
-  background: rgba(239, 246, 255, 0.95);
+  background: rgb(48 48 49 / 95%);
   border: 1px solid var(--line);
   contain: layout paint;
   overscroll-behavior: contain;
@@ -2776,8 +2835,8 @@ textarea:focus {
   gap: 8px;
   max-width: min(100%, 480px);
   padding: 14px 16px;
-  border-radius: 18px 18px 18px 6px;
-  background: white;
+  border-radius: 18px 18px 18px 16px;
+  background: #5696ff80;
   border: 1px solid rgba(11, 79, 187, 0.1);
   content-visibility: auto;
   contain-intrinsic-size: 92px;
@@ -2861,7 +2920,7 @@ textarea:focus {
   padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: white;
+  background: #252424;
   color: var(--muted);
 }
 
@@ -2989,6 +3048,230 @@ textarea:focus {
   justify-content: flex-end;
 }
 
+.topbar,
+.hero,
+.panel,
+.site-footer,
+.legal-hero,
+.legal-nav,
+.legal-document,
+.auth-modal,
+.conversation-modal,
+.form-modal,
+.feedback-modal,
+.notification-modal,
+.legal-modal {
+  background:
+    linear-gradient(145deg, rgba(17, 24, 38, 0.96), rgba(8, 13, 22, 0.96)),
+    var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.hero {
+  background:
+    linear-gradient(135deg, rgba(22, 34, 52, 0.96), rgba(8, 13, 22, 0.94)),
+    var(--surface);
+}
+
+.site-footer__links a,
+.topbar__nav button,
+.section-nav button,
+.auth-tabs button,
+.profile-badge,
+.loading-card,
+.empty-state,
+.interest-card,
+.accordion-card,
+.offer-card,
+.hero-card,
+.stat-card,
+.cta-card,
+.sent-offer-summary,
+.preview-card,
+.detail-block,
+.share-card,
+.media-field,
+.offers,
+.payment-history__item,
+.product-chip,
+.catalog-admin__item,
+.admin-list-item,
+.checkbox-row--panel,
+.context-filter-card,
+.icon-button {
+  background: rgba(15, 23, 36, 0.88);
+  border-color: rgba(103, 232, 249, 0.14);
+  color: var(--ink);
+}
+
+.interest-card.selected,
+.accordion-card.selected,
+.product-chip.selected,
+.admin-list-item.selected {
+  border-color: rgba(53, 211, 255, 0.44);
+  background: rgba(16, 32, 55, 0.94);
+}
+
+input,
+select,
+textarea {
+  background: rgba(3, 7, 12, 0.78);
+  border-color: rgba(103, 232, 249, 0.18);
+  color: var(--ink);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #71869f;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(53, 211, 255, 0.7);
+  box-shadow: 0 0 0 4px rgba(53, 211, 255, 0.12);
+}
+
+.ghost-button,
+.text-button,
+.share-button,
+.modal-close-button,
+.notification-button {
+  background: rgba(7, 12, 20, 0.84);
+  border-color: rgba(103, 232, 249, 0.18);
+  color: var(--accent);
+}
+
+.primary-button,
+.topbar__nav button.active,
+.section-nav button.active,
+.auth-tabs button.active {
+  background: linear-gradient(135deg, #35d3ff, #5b8cff);
+  color: #031018;
+}
+
+.danger-button,
+.report-button {
+  background: rgba(255, 122, 144, 0.12);
+  border-color: rgba(255, 122, 144, 0.32);
+  color: #ff9cac;
+}
+
+.credits-badge {
+  background: rgba(20, 43, 78, 0.72);
+  border-color: rgba(53, 211, 255, 0.28);
+  color: #cde9ff;
+}
+
+.credits-badge strong {
+  color: #78d9ff;
+}
+
+.credits-badge--empty {
+  background: rgba(87, 24, 38, 0.62);
+  border-color: rgba(255, 122, 144, 0.32);
+  color: #ffc0ca;
+}
+
+.credits-badge--empty strong,
+.form-note,
+.form-inline-error {
+  color: var(--error);
+}
+
+.eyebrow,
+.site-footer__links a {
+  color: var(--accent-strong);
+}
+
+.detail-description,
+.hero__copy p,
+.panel__header-note,
+.empty-state p,
+.offer-card p,
+.site-footer__brand span,
+.field-with-help small,
+.checkbox-row--with-help small {
+  color: var(--muted);
+}
+
+.interest-card__image--placeholder,
+.boost-rocket {
+  background: rgba(53, 211, 255, 0.13);
+  color: var(--accent-strong);
+}
+
+.stat-card:not(.accent) {
+  background: rgba(15, 23, 36, 0.92);
+  border-color: rgba(103, 232, 249, 0.16);
+}
+
+.stat-card:not(.accent) strong {
+  color: #eaf7ff;
+}
+
+.stat-card:not(.accent) span {
+  color: #a9bdd5;
+}
+
+.stat-card.accent {
+  background: linear-gradient(135deg, #35d3ff, #5b8cff);
+  color: #031018;
+}
+
+.stat-card.accent span {
+  color: rgba(3, 16, 24, 0.72);
+}
+
+.boost-box,
+.detail-description,
+.share-card,
+.purchase-option--selected,
+.product-chip--boost,
+.product-chip--large {
+  background: rgba(15, 23, 36, 0.92);
+  border-color: rgba(103, 232, 249, 0.16);
+}
+
+.product-chip__actions .payment-button,
+.mercado-pago-button,
+.payment-button__icon {
+  background: rgba(7, 12, 20, 0.88);
+  border-color: rgba(103, 232, 249, 0.18);
+  color: var(--ink);
+}
+
+.product-chip__actions .primary-button.payment-button {
+  border-color: rgba(53, 211, 255, 0.32);
+}
+
+.payment-button__svg--card {
+  stroke: #d9e8ff;
+}
+
+.share-button--x {
+  color: #eaf7ff;
+}
+
+.expiry-note,
+.expiry-pill {
+  background: rgba(47, 72, 111, 0.82);
+  border-color: rgba(155, 190, 255, 0.24);
+  color: #d9e8ff;
+}
+
+.expiry-pill--warning {
+  background: rgba(121, 83, 19, 0.28);
+  border-color: rgba(245, 158, 11, 0.32);
+  color: #ffd88a;
+}
+
+.renewal-button,
+.report-reason-button {
+  background: rgba(15, 23, 36, 0.9);
+  color: var(--accent);
+}
+
 @media (max-width: 1080px) {
   .hero,
   .workspace-grid,
@@ -3079,6 +3362,10 @@ textarea:focus {
 
   .payment-status-pill {
     justify-self: start;
+  }
+
+  .brand-logo {
+    width: min(100%, 240px);
   }
 
   .seller-item-tabs img,

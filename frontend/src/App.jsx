@@ -46,7 +46,6 @@ import {
   verifyEmail
 } from "./api";
 import { trackEvent, trackPageView } from "./analytics";
-import logo from "./assets/eu-procuro-logo.png";
 import mercadoPagoLogo from "./assets/mercado-pago.svg";
 import AuthModal from "./components/AuthModal";
 import ContentAdminPanel from "./components/ContentAdminPanel";
@@ -368,6 +367,35 @@ function getActiveLegalPageSlug() {
 function getSectionFromPath() {
   const normalizedPath = window.location.pathname.replace(/\/+$/, "") || "/";
   return routeSections[normalizedPath] ?? loggedSections.EXPLORE;
+}
+
+function updateMetaTag(selector, attribute, value) {
+  const element = document.head.querySelector(selector);
+  if (element) {
+    element.setAttribute(attribute, value);
+  }
+}
+
+function upsertCanonical(url) {
+  let canonical = document.head.querySelector("link[rel='canonical']");
+  if (!canonical) {
+    canonical = document.createElement("link");
+    canonical.rel = "canonical";
+    document.head.appendChild(canonical);
+  }
+  canonical.href = url;
+}
+
+function applyPageMeta({ title, description, url, robots = "index,follow" }) {
+  document.title = title;
+  updateMetaTag("meta[name='description']", "content", description);
+  updateMetaTag("meta[name='robots']", "content", robots);
+  updateMetaTag("meta[property='og:title']", "content", title);
+  updateMetaTag("meta[property='og:description']", "content", description);
+  updateMetaTag("meta[property='og:url']", "content", url);
+  updateMetaTag("meta[name='twitter:title']", "content", title);
+  updateMetaTag("meta[name='twitter:description']", "content", description);
+  upsertCanonical(url);
 }
 
 function fileToDataUrl(file) {
@@ -1186,6 +1214,8 @@ export default function App() {
   }
 
   function navigateTo(section, options = {}) {
+    const shouldScrollToSection = options.scrollIntoView !== false;
+
     setLoggedSection(section);
     setActiveLegalPageSlug("");
     sharedInterestIdRef.current = "";
@@ -1209,7 +1239,7 @@ export default function App() {
       setSelectedInterest((current) => myInterests.find((interest) => interest.id === current?.id) ?? myInterests[0] ?? null);
     }
 
-    if (section === loggedSections.NEW_INTEREST) {
+    if (shouldScrollToSection && section === loggedSections.NEW_INTEREST) {
       window.requestAnimationFrame(() => {
         newInterestSectionRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -1218,7 +1248,7 @@ export default function App() {
       });
     }
 
-    if (section === loggedSections.MY_INTERESTS) {
+    if (shouldScrollToSection && section === loggedSections.MY_INTERESTS) {
       window.requestAnimationFrame(() => {
         myInterestsSectionRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -1227,7 +1257,7 @@ export default function App() {
       });
     }
 
-    if (section === loggedSections.SENT_OFFERS) {
+    if (shouldScrollToSection && section === loggedSections.SENT_OFFERS) {
       window.requestAnimationFrame(() => {
         sentOffersSectionRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -1236,7 +1266,7 @@ export default function App() {
       });
     }
 
-    if (section === loggedSections.RECEIVED_OFFERS) {
+    if (shouldScrollToSection && section === loggedSections.RECEIVED_OFFERS) {
       window.requestAnimationFrame(() => {
         receivedOffersSectionRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -1245,7 +1275,7 @@ export default function App() {
       });
     }
 
-    if (section === loggedSections.SELLER_ITEMS) {
+    if (shouldScrollToSection && section === loggedSections.SELLER_ITEMS) {
       window.requestAnimationFrame(() => {
         sellerItemsSectionRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -1255,8 +1285,14 @@ export default function App() {
     }
   }
 
+  function navigateFromDashboardControl(section) {
+    navigateTo(section, {
+      scrollIntoView: !window.matchMedia("(min-width: 1081px)").matches
+    });
+  }
+
   function openNewInterestForm() {
-    navigateTo(loggedSections.NEW_INTEREST);
+    navigateFromDashboardControl(loggedSections.NEW_INTEREST);
     setEditingInterestId(null);
     setInterestForm(initialInterestForm);
     setIsInterestModalVisible(true);
@@ -1863,6 +1899,86 @@ export default function App() {
       return null;
     });
   }, [loggedSection, visibleHomeInterests]);
+
+  useEffect(() => {
+    const origin = window.location.origin;
+
+    if (activeLegalPageSlug) {
+      const page = legalPages[activeLegalPageSlug];
+      applyPageMeta({
+        title: page?.title ? `${page.title} | Eu Procuro` : "Eu Procuro",
+        description: page?.summary || page?.label || "Documentos legais da plataforma Eu Procuro.",
+        url: `${origin}/legal/${activeLegalPageSlug}`
+      });
+      return;
+    }
+
+    if (selectedInterest?.id && loggedSection === loggedSections.EXPLORE) {
+      const location = [selectedInterest.location?.city, selectedInterest.location?.state]
+        .filter(Boolean)
+        .join("/");
+      const description = [
+        selectedInterest.description,
+        location ? `Localidade: ${location}.` : "",
+        "Veja este interesse no Eu Procuro."
+      ].filter(Boolean).join(" ");
+      applyPageMeta({
+        title: `${selectedInterest.title} | Eu Procuro`,
+        description: limitText(description, 155),
+        url: `${origin}/interesses/${encodeURIComponent(selectedInterest.id)}`
+      });
+      return;
+    }
+
+    const routeMeta = {
+      [loggedSections.EXPLORE]: {
+        title: "Eu Procuro - Marketplace reverso",
+        description: "Publique o que você procura e receba ofertas de vendedores interessados.",
+        robots: "index,follow"
+      },
+      [loggedSections.NEW_INTEREST]: {
+        title: "Cadastrar interesse | Eu Procuro",
+        description: "Publique um interesse para receber ofertas de vendedores na plataforma Eu Procuro.",
+        robots: "noindex,nofollow"
+      },
+      [loggedSections.MY_INTERESTS]: {
+        title: "Meus interesses | Eu Procuro",
+        description: "Área privada de interesses cadastrados no Eu Procuro.",
+        robots: "noindex,nofollow"
+      },
+      [loggedSections.SENT_OFFERS]: {
+        title: "Ofertas enviadas | Eu Procuro",
+        description: "Área privada de ofertas enviadas no Eu Procuro.",
+        robots: "noindex,nofollow"
+      },
+      [loggedSections.RECEIVED_OFFERS]: {
+        title: "Ofertas recebidas | Eu Procuro",
+        description: "Área privada de ofertas recebidas no Eu Procuro.",
+        robots: "noindex,nofollow"
+      },
+      [loggedSections.SELLER_ITEMS]: {
+        title: "Meus itens | Eu Procuro",
+        description: "Área privada de itens cadastrados no Eu Procuro.",
+        robots: "noindex,nofollow"
+      },
+      [loggedSections.CREDITS]: {
+        title: "Créditos | Eu Procuro",
+        description: "Área privada de créditos e pagamentos no Eu Procuro.",
+        robots: "noindex,nofollow"
+      },
+      [loggedSections.ADMIN]: {
+        title: "Admin | Eu Procuro",
+        description: "Área administrativa do Eu Procuro.",
+        robots: "noindex,nofollow"
+      }
+    };
+
+    const meta = routeMeta[loggedSection] ?? routeMeta[loggedSections.EXPLORE];
+    applyPageMeta({
+      ...meta,
+      url: `${origin}${currentSectionPath(loggedSection)}`
+    });
+  }, [activeLegalPageSlug, selectedInterest?.id, selectedInterest?.title, selectedInterest?.description, loggedSection]);
 
   useEffect(() => {
     if (!session || !currentUser?.id) {
@@ -4270,7 +4386,7 @@ export default function App() {
                 value={card.value}
                 accent={card.accent}
                 clickable
-                onClick={() => navigateTo(card.key)}
+                onClick={() => navigateFromDashboardControl(card.key)}
               />
             ))}
           </div>
@@ -4280,8 +4396,9 @@ export default function App() {
           <button
             type="button"
             className={loggedSection === loggedSections.EXPLORE ? "active" : ""}
-            onClick={() => navigateTo(loggedSections.EXPLORE)}
+            onClick={() => navigateFromDashboardControl(loggedSections.EXPLORE)}
           >
+            <span className="nav-icon" aria-hidden="true">⌂</span>
             {t("header.nav.home")}
           </button>
           <button
@@ -4289,42 +4406,48 @@ export default function App() {
               className={loggedSection === loggedSections.NEW_INTEREST ? "active" : ""}
               onClick={openNewInterestForm}
           >
+            <span className="nav-icon" aria-hidden="true">+</span>
             {t("dashboard.nav.newInterest")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.MY_INTERESTS ? "active" : ""}
-            onClick={() => navigateTo(loggedSections.MY_INTERESTS)}
+            onClick={() => navigateFromDashboardControl(loggedSections.MY_INTERESTS)}
           >
+            <span className="nav-icon" aria-hidden="true">●</span>
             {t("dashboard.nav.myInterests")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.SENT_OFFERS ? "active" : ""}
-            onClick={() => navigateTo(loggedSections.SENT_OFFERS)}
+            onClick={() => navigateFromDashboardControl(loggedSections.SENT_OFFERS)}
           >
+            <span className="nav-icon" aria-hidden="true">↗</span>
             {t("dashboard.nav.sentOffers")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.RECEIVED_OFFERS ? "active" : ""}
-            onClick={() => navigateTo(loggedSections.RECEIVED_OFFERS)}
+            onClick={() => navigateFromDashboardControl(loggedSections.RECEIVED_OFFERS)}
           >
+            <span className="nav-icon" aria-hidden="true">↙</span>
             {t("dashboard.nav.receivedOffers")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.SELLER_ITEMS ? "active" : ""}
-            onClick={() => navigateTo(loggedSections.SELLER_ITEMS)}
+            onClick={() => navigateFromDashboardControl(loggedSections.SELLER_ITEMS)}
           >
+            <span className="nav-icon" aria-hidden="true">▣</span>
             {t("dashboard.nav.sellerItems")}
           </button>
           {creditPurchasesEnabled ? (
             <button
               type="button"
               className={loggedSection === loggedSections.CREDITS ? "active" : ""}
-              onClick={() => navigateTo(loggedSections.CREDITS)}
+              onClick={() => navigateFromDashboardControl(loggedSections.CREDITS)}
             >
+              <span className="nav-icon" aria-hidden="true">¤</span>
               {t("dashboard.nav.credits")}
             </button>
           ) : null}
@@ -4334,9 +4457,10 @@ export default function App() {
               className={`admin-nav-button ${loggedSection === loggedSections.ADMIN ? "active" : ""}`}
               onClick={() => {
                 markAdminReportsSeen();
-                navigateTo(loggedSections.ADMIN);
+                navigateFromDashboardControl(loggedSections.ADMIN);
               }}
             >
+              <span className="nav-icon" aria-hidden="true">⚙</span>
               <span>{t("admin.moderation.nav")}</span>
               {unreadAdminReportCount > 0 ? (
                 <strong className="admin-nav-badge">{unreadAdminReportCount}</strong>
