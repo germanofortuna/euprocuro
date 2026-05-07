@@ -332,6 +332,13 @@ export async function reportInterest(interestId, payload) {
   });
 }
 
+export async function createOmbudsmanRequest(payload) {
+  return request("/ouvidoria", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function fetchOfferConversation(offerId) {
   return request(`/offers/${offerId}/conversation`);
 }
@@ -383,6 +390,25 @@ export async function shareSellerItemOffer(itemId, interestId, payload) {
 
 export async function fetchAdminModeration() {
   return request("/admin/moderation");
+}
+
+export async function fetchAdminOmbudsman(status = "") {
+  const query = status ? `?${new URLSearchParams({ status }).toString()}` : "";
+  return request(`/admin/ouvidoria${query}`);
+}
+
+export async function respondAdminOmbudsmanRequest(requestId, payload) {
+  return request(`/admin/ouvidoria/${requestId}/response`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateAdminOmbudsmanStatus(requestId, status) {
+  return request(`/admin/ouvidoria/${requestId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status })
+  });
 }
 
 export async function fetchAdminContent() {

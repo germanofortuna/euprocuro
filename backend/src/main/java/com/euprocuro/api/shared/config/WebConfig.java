@@ -45,6 +45,7 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/auth/forgot-password",
                         "/api/auth/reset-password",
                         "/api/auth/verify-email",
+                        "/api/ouvidoria",
                         "/api/addresses/**",
                         "/api/content/public",
                         "/api/monetization/mercado-pago/webhook",

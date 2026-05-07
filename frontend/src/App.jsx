@@ -9,6 +9,7 @@ import {
   closeInterest,
   connectChatSocket,
   createInterest,
+  createOmbudsmanRequest,
   createOffer,
   createSellerItem,
   decideInterestModeration,
@@ -16,6 +17,7 @@ import {
   deleteModerationRule,
   deleteInterest,
   fetchAdminModeration,
+  fetchAdminOmbudsman,
   fetchCategories,
   fetchInterest,
   fetchDashboard,
@@ -35,12 +37,14 @@ import {
   register,
   reportInterest,
   renewInterest,
+  respondAdminOmbudsmanRequest,
   resetPassword,
   saveModerationRule,
   sendOfferMessage,
   shareSellerItemOffer,
   syncPayment,
   updateInterest,
+  updateAdminOmbudsmanStatus,
   updateSellerItem,
   storeSession,
   verifyEmail
@@ -115,6 +119,26 @@ const initialReportForm = {
   reason: "",
   message: ""
 };
+
+const initialOmbudsmanForm = {
+  name: "",
+  email: "",
+  type: "Reclamacao",
+  subject: "",
+  message: "",
+  relatedEntityType: "",
+  relatedEntityId: "",
+  truthDeclarationAccepted: false
+};
+
+const OMBUDSMAN_TYPES = [
+  "Reclamacao",
+  "Denuncia sobre atendimento",
+  "Problema com pagamento",
+  "Contestacao de moderacao",
+  "Sugestao",
+  "Outro"
+];
 
 const initialModerationRuleForm = {
   id: "",
@@ -364,8 +388,15 @@ function getActiveLegalPageSlug() {
   return legalPages[slug] ? slug : "";
 }
 
+function isOmbudsmanRoute() {
+  return window.location.pathname.replace(/\/+$/, "") === "/ouvidoria";
+}
+
 function getSectionFromPath() {
   const normalizedPath = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (normalizedPath === "/ouvidoria") {
+    return loggedSections.EXPLORE;
+  }
   return routeSections[normalizedPath] ?? loggedSections.EXPLORE;
 }
 
@@ -704,6 +735,7 @@ export default function App() {
   const newInterestSectionRef = useRef(null);
   const [session, setSession] = useState(() => getStoredSession());
   const [activeLegalPageSlug, setActiveLegalPageSlug] = useState(getActiveLegalPageSlug);
+  const [isOmbudsmanPageActive, setIsOmbudsmanPageActive] = useState(isOmbudsmanRoute);
   const [dashboard, setDashboard] = useState(null);
   const [monetizationAccount, setMonetizationAccount] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -734,7 +766,18 @@ export default function App() {
   const [isSellerItemModalVisible, setIsSellerItemModalVisible] = useState(false);
   const [sellerItemShareForm, setSellerItemShareForm] = useState(initialSellerItemShareForm);
   const [reportModal, setReportModal] = useState({ visible: false, interest: null, form: initialReportForm, isSubmitting: false });
+  const [ombudsmanForm, setOmbudsmanForm] = useState(() => ({
+    ...initialOmbudsmanForm,
+    name: getStoredSession()?.user?.name ?? "",
+    email: getStoredSession()?.user?.email ?? ""
+  }));
+  const [ombudsmanProtocol, setOmbudsmanProtocol] = useState("");
+  const [isSubmittingOmbudsman, setIsSubmittingOmbudsman] = useState(false);
   const [adminModeration, setAdminModeration] = useState(null);
+  const [adminOmbudsmanRequests, setAdminOmbudsmanRequests] = useState([]);
+  const [ombudsmanAdminFilter, setOmbudsmanAdminFilter] = useState("");
+  const [ombudsmanResponses, setOmbudsmanResponses] = useState({});
+  const [isOmbudsmanAdminLoading, setIsOmbudsmanAdminLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [moderationRuleForm, setModerationRuleForm] = useState(initialModerationRuleForm);
   const [isSubmittingModerationRule, setIsSubmittingModerationRule] = useState(false);
@@ -864,6 +907,29 @@ export default function App() {
 
   function openFeedback(type, title, message) {
     setFeedbackModal({ type, title, message });
+  }
+
+  function updateOmbudsmanForm(field, value) {
+    setOmbudsmanForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleOmbudsmanSubmit(event) {
+    event.preventDefault();
+    setIsSubmittingOmbudsman(true);
+    setOmbudsmanProtocol("");
+    try {
+      const response = await createOmbudsmanRequest(ombudsmanForm);
+      setOmbudsmanProtocol(response.protocol);
+      setOmbudsmanForm({
+        ...initialOmbudsmanForm,
+        name: session?.user?.name ?? "",
+        email: session?.user?.email ?? ""
+      });
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível enviar", requestError.message || "Tente novamente.");
+    } finally {
+      setIsSubmittingOmbudsman(false);
+    }
   }
 
   function updateAddressLookupState(scope, patch) {
@@ -1218,6 +1284,7 @@ export default function App() {
 
     setLoggedSection(section);
     setActiveLegalPageSlug("");
+    setIsOmbudsmanPageActive(false);
     sharedInterestIdRef.current = "";
     if (section !== loggedSections.NEW_INTEREST && !editingInterestId) {
       setIsInterestModalVisible(false);
@@ -1590,8 +1657,10 @@ export default function App() {
   useEffect(() => {
     function syncRouteFromLocation() {
       const legalSlug = getActiveLegalPageSlug();
+      const ombudsmanRoute = isOmbudsmanRoute();
       const nextSection = getSectionFromPath();
       setActiveLegalPageSlug(legalSlug);
+      setIsOmbudsmanPageActive(ombudsmanRoute);
       setLoggedSection(nextSection);
       if (nextSection === loggedSections.NEW_INTEREST) {
         setEditingInterestId(null);
@@ -1626,6 +1695,9 @@ export default function App() {
   useEffect(() => {
     if (activeLegalPageSlug && window.location.pathname !== `/legal/${activeLegalPageSlug}`) {
       replaceCurrentUrl(`/legal/${activeLegalPageSlug}`);
+    }
+    if (isOmbudsmanPageActive && window.location.pathname !== "/ouvidoria") {
+      replaceCurrentUrl("/ouvidoria");
     }
     if (getSectionFromPath() === loggedSections.NEW_INTEREST) {
       setIsInterestModalVisible(true);
@@ -1913,6 +1985,16 @@ export default function App() {
       return;
     }
 
+    if (isOmbudsmanPageActive) {
+      applyPageMeta({
+        title: "Ouvidoria | Eu Procuro",
+        description: "Canal formal da Ouvidoria Eu Procuro para reclamacoes, contestacoes, sugestoes e problemas com a plataforma.",
+        url: `${origin}/ouvidoria`,
+        robots: "index,follow"
+      });
+      return;
+    }
+
     if (selectedInterest?.id && loggedSection === loggedSections.EXPLORE) {
       const location = [selectedInterest.location?.city, selectedInterest.location?.state]
         .filter(Boolean)
@@ -1978,7 +2060,7 @@ export default function App() {
       ...meta,
       url: `${origin}${currentSectionPath(loggedSection)}`
     });
-  }, [activeLegalPageSlug, selectedInterest?.id, selectedInterest?.title, selectedInterest?.description, loggedSection]);
+  }, [activeLegalPageSlug, isOmbudsmanPageActive, selectedInterest?.id, selectedInterest?.title, selectedInterest?.description, loggedSection]);
 
   useEffect(() => {
     if (!session || !currentUser?.id) {
@@ -2145,6 +2227,12 @@ export default function App() {
   }, [session, currentUser?.id, receivedOffers, sentOffers, sellerItems, activeMyInterests, isAdmin, adminModeration?.openReports, messageSyncKey]);
 
   useEffect(() => {
+    if (isAdmin && loggedSection === loggedSections.ADMIN) {
+      refreshAdminOmbudsmanData().catch(() => {});
+    }
+  }, [isAdmin, loggedSection, ombudsmanAdminFilter]);
+
+  useEffect(() => {
     if (!session) {
       return undefined;
     }
@@ -2176,8 +2264,6 @@ export default function App() {
       setPasswordRecoveryPreview(null);
       setLoginForm(initialLoginForm);
       closeAuthModal();
-
-      openFeedback("success", t("auth.feedback.login.success.title"), t("auth.feedback.login.success.message"));
     } catch (requestError) {
       clearSession();
       setSession(null);
@@ -2278,7 +2364,6 @@ export default function App() {
       replaceCurrentUrl(sectionRoutes[loggedSections.EXPLORE]);
       setOffers([]);
       setConversationModal((current) => ({ ...current, visible: false, data: null, draftMessage: "" }));
-      openFeedback("success", "Sessão encerrada", "Você saiu da área logada.");
     }
   }
 
@@ -2500,6 +2585,47 @@ export default function App() {
       setAdminModeration(null);
       setIsAdmin(false);
       throw requestError;
+    }
+  }
+
+  async function refreshAdminOmbudsmanData(status = ombudsmanAdminFilter) {
+    setIsOmbudsmanAdminLoading(true);
+    try {
+      const data = await fetchAdminOmbudsman(status);
+      setAdminOmbudsmanRequests(data ?? []);
+    } catch (requestError) {
+      openFeedback("error", "Falha ao carregar ouvidoria", requestError.message || "Tente novamente.");
+    } finally {
+      setIsOmbudsmanAdminLoading(false);
+    }
+  }
+
+  async function handleOmbudsmanStatusChange(requestId, status) {
+    try {
+      const updated = await updateAdminOmbudsmanStatus(requestId, status);
+      setAdminOmbudsmanRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (requestError) {
+      openFeedback("error", "Falha ao atualizar status", requestError.message || "Tente novamente.");
+    }
+  }
+
+  async function handleOmbudsmanResponseSubmit(requestItem) {
+    const responseText = ombudsmanResponses[requestItem.id]?.trim();
+    if (!responseText) {
+      openFeedback("error", "Resposta obrigatória", "Informe uma resposta antes de enviar.");
+      return;
+    }
+
+    try {
+      const updated = await respondAdminOmbudsmanRequest(requestItem.id, {
+        adminResponse: responseText,
+        status: "ANSWERED"
+      });
+      setAdminOmbudsmanRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setOmbudsmanResponses((current) => ({ ...current, [requestItem.id]: "" }));
+      openFeedback("success", "Resposta enviada", `A manifestação ${updated.protocol} foi respondida.`);
+    } catch (requestError) {
+      openFeedback("error", "Falha ao responder", requestError.message || "Tente novamente.");
     }
   }
 
@@ -4344,9 +4470,184 @@ export default function App() {
             </div>
           </article>
         </div>
+        {renderAdminOmbudsmanPanel()}
         <ContentAdminPanel onFeedback={openFeedback} />
         <OperationalCatalogAdminPanel onFeedback={openFeedback} />
       </section>
+    );
+  }
+
+  function renderOmbudsmanPage() {
+    return (
+      <section className="ombudsman-page panel panel--spaced">
+        <div className="panel__header">
+          <div>
+            <span className="eyebrow">Ouvidoria</span>
+            <h2>Fale com a Ouvidoria do Eu Procuro</h2>
+            <p className="panel__header-note">
+              Use este canal para reclamações formais, contestação de moderação, problemas com pagamento ou sugestões.
+            </p>
+          </div>
+        </div>
+
+        {ombudsmanProtocol ? (
+          <div className="success-callout">
+            <strong>Manifestação registrada</strong>
+            <span>Protocolo: {ombudsmanProtocol}</span>
+          </div>
+        ) : null}
+
+        <form className="stacked-form ombudsman-form" onSubmit={handleOmbudsmanSubmit}>
+          <div className="form-grid">
+            <input
+              placeholder="Nome"
+              value={ombudsmanForm.name}
+              onChange={(event) => updateOmbudsmanForm("name", event.target.value)}
+              maxLength={120}
+              required
+            />
+            <input
+              type="email"
+              placeholder="E-mail"
+              value={ombudsmanForm.email}
+              onChange={(event) => updateOmbudsmanForm("email", event.target.value)}
+              maxLength={120}
+              required
+            />
+            <select
+              value={ombudsmanForm.type}
+              onChange={(event) => updateOmbudsmanForm("type", event.target.value)}
+              required
+            >
+              {OMBUDSMAN_TYPES.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+            <input
+              placeholder="Assunto"
+              value={ombudsmanForm.subject}
+              onChange={(event) => updateOmbudsmanForm("subject", event.target.value)}
+              maxLength={140}
+              required
+            />
+            <input
+              placeholder="Tipo de referência (opcional)"
+              value={ombudsmanForm.relatedEntityType}
+              onChange={(event) => updateOmbudsmanForm("relatedEntityType", event.target.value)}
+              maxLength={120}
+            />
+            <input
+              placeholder="ID relacionado (opcional)"
+              value={ombudsmanForm.relatedEntityId}
+              onChange={(event) => updateOmbudsmanForm("relatedEntityId", event.target.value)}
+              maxLength={120}
+            />
+          </div>
+          <div className="field-with-counter">
+            <textarea
+              placeholder="Descreva sua manifestação"
+              value={ombudsmanForm.message}
+              onChange={(event) => updateOmbudsmanForm("message", event.target.value)}
+              maxLength={2000}
+              rows={8}
+              required
+            />
+            <FieldCounter value={ombudsmanForm.message} max={2000} />
+          </div>
+          <label className="checkbox-row checkbox-row--panel">
+            <input
+              type="checkbox"
+              checked={ombudsmanForm.truthDeclarationAccepted}
+              onChange={(event) => updateOmbudsmanForm("truthDeclarationAccepted", event.target.checked)}
+              required
+            />
+            <span>Declaro que as informações enviadas são verdadeiras.</span>
+          </label>
+          <button type="submit" className="primary-button primary-button--compact" disabled={isSubmittingOmbudsman}>
+            {isSubmittingOmbudsman ? "Enviando..." : "Enviar manifestação"}
+          </button>
+        </form>
+      </section>
+    );
+  }
+
+  function renderAdminOmbudsmanPanel() {
+    return (
+      <article className="admin-card admin-card--ombudsman">
+        <div className="content-admin__header">
+          <div>
+            <span className="eyebrow">Ouvidoria</span>
+            <h3>Manifestações recebidas</h3>
+            <p>Acompanhe protocolos, responda usuários e atualize o status.</p>
+          </div>
+          <div className="inline-actions">
+            <select
+              value={ombudsmanAdminFilter}
+              onChange={(event) => setOmbudsmanAdminFilter(event.target.value)}
+            >
+              <option value="">Todos</option>
+              <option value="OPEN">Abertas</option>
+              <option value="IN_REVIEW">Em análise</option>
+              <option value="ANSWERED">Respondidas</option>
+              <option value="CLOSED">Encerradas</option>
+            </select>
+            <button type="button" className="ghost-button ghost-button--small" onClick={() => refreshAdminOmbudsmanData()}>
+              {isOmbudsmanAdminLoading ? "Atualizando..." : "Atualizar"}
+            </button>
+          </div>
+        </div>
+
+        <div className="admin-list admin-list--ombudsman">
+          {adminOmbudsmanRequests.length ? adminOmbudsmanRequests.map((requestItem) => (
+            <article key={requestItem.id} className="admin-list-item admin-list-item--stacked ombudsman-admin-item">
+              <div>
+                <strong>{requestItem.protocol} · {requestItem.subject}</strong>
+                <span>{requestItem.type} · {requestItem.status} · {formatTimestamp(requestItem.createdAt, t)}</span>
+                <p>{requestItem.message}</p>
+                <small>{requestItem.name} · {requestItem.email}</small>
+                {requestItem.relatedEntityId ? (
+                  <small>Referência: {requestItem.relatedEntityType || "item"} · {requestItem.relatedEntityId}</small>
+                ) : null}
+                {requestItem.adminResponse ? (
+                  <div className="admin-response-box">
+                    <strong>Resposta enviada</strong>
+                    <p>{requestItem.adminResponse}</p>
+                  </div>
+                ) : null}
+              </div>
+              <div className="ombudsman-admin-actions">
+                <select
+                  value={requestItem.status}
+                  onChange={(event) => handleOmbudsmanStatusChange(requestItem.id, event.target.value)}
+                >
+                  <option value="OPEN">Aberta</option>
+                  <option value="IN_REVIEW">Em análise</option>
+                  <option value="ANSWERED">Respondida</option>
+                  <option value="CLOSED">Encerrada</option>
+                </select>
+                <textarea
+                  placeholder="Resposta da Ouvidoria"
+                  value={ombudsmanResponses[requestItem.id] ?? ""}
+                  onChange={(event) => setOmbudsmanResponses((current) => ({
+                    ...current,
+                    [requestItem.id]: event.target.value
+                  }))}
+                  rows={4}
+                />
+                <button
+                  type="button"
+                  className="primary-button primary-button--compact"
+                  onClick={() => handleOmbudsmanResponseSubmit(requestItem)}
+                >
+                  Responder
+                </button>
+              </div>
+            </article>
+          )) : (
+            <EmptyState title="Nenhuma manifestação" description="Novas manifestações da Ouvidoria aparecerão aqui." />
+          )}
+        </div>
+      </article>
     );
   }
 
@@ -4449,22 +4750,6 @@ export default function App() {
             >
               <span className="nav-icon" aria-hidden="true">¤</span>
               {t("dashboard.nav.credits")}
-            </button>
-          ) : null}
-          {isAdmin ? (
-            <button
-              type="button"
-              className={`admin-nav-button ${loggedSection === loggedSections.ADMIN ? "active" : ""}`}
-              onClick={() => {
-                markAdminReportsSeen();
-                navigateFromDashboardControl(loggedSections.ADMIN);
-              }}
-            >
-              <span className="nav-icon" aria-hidden="true">⚙</span>
-              <span>{t("admin.moderation.nav")}</span>
-              {unreadAdminReportCount > 0 ? (
-                <strong className="admin-nav-badge">{unreadAdminReportCount}</strong>
-              ) : null}
             </button>
           ) : null}
         </section>
@@ -5010,6 +5295,27 @@ export default function App() {
     );
   }
 
+  if (isOmbudsmanPageActive) {
+    return (
+      <div className="app-shell">
+        <div className="background-grid" />
+
+        <main className="page">
+          <Header
+            hideActions
+            onNavigate={() => {
+              setIsOmbudsmanPageActive(false);
+              replaceCurrentUrl(sectionRoutes[loggedSections.EXPLORE]);
+            }}
+          />
+          {renderOmbudsmanPage()}
+        </main>
+
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <div className="background-grid" />
@@ -5022,11 +5328,17 @@ export default function App() {
           sellerCredits={monetizationAccount?.sellerCredits}
           subscriptionActive={monetizationAccount?.subscriptionActive}
           creditPurchasesEnabled={creditPurchasesEnabled}
+          isAdmin={isAdmin}
+          unreadAdminReportCount={unreadAdminReportCount}
           isLoggedIn={Boolean(session)}
           notificationButtonRef={notificationButtonRef}
           onLoginClick={() => openAuthModal("login")}
           onRegisterClick={() => openAuthModal("register")}
           onCreditsClick={() => creditPurchasesEnabled && navigateTo(loggedSections.CREDITS)}
+          onAdminClick={() => {
+            markAdminReportsSeen();
+            navigateFromDashboardControl(loggedSections.ADMIN);
+          }}
           onNotificationClick={openNotificationModal}
           onLogout={handleLogout}
           onNavigate={(section) => {

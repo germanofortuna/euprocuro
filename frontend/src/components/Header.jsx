@@ -4,7 +4,8 @@ import { useContentText } from "../content/ContentContext";
 const loggedSections = {
   EXPLORE: "EXPLORE",
   CREDITS: "CREDITS",
-  NEW_INTEREST: "NEW_INTEREST"
+  NEW_INTEREST: "NEW_INTEREST",
+  ADMIN: "ADMIN"
 };
 
 function BellIcon() {
@@ -41,9 +42,12 @@ export default function Header({
   sellerCredits,
   subscriptionActive,
   creditPurchasesEnabled = false,
+  isAdmin = false,
+  unreadAdminReportCount = 0,
   notificationButtonRef,
   onNavigate,
   onCreditsClick,
+  onAdminClick,
   onNotificationClick,
   onLoginClick,
   onRegisterClick,
@@ -77,6 +81,19 @@ export default function Header({
               <span className="nav-icon" aria-hidden="true">+</span>
               {t("header.nav.publish")}
             </button>
+            {isAdmin ? (
+              <button
+                type="button"
+                className={`admin-header-button ${currentSection === loggedSections.ADMIN ? "active" : ""}`}
+                onClick={onAdminClick}
+              >
+                <span className="nav-icon" aria-hidden="true">⚙</span>
+                {t("admin.moderation.nav")}
+                {unreadAdminReportCount > 0 ? (
+                  <strong className="admin-nav-badge">{unreadAdminReportCount}</strong>
+                ) : null}
+              </button>
+            ) : null}
           </nav>
 
           {creditPurchasesEnabled ? (

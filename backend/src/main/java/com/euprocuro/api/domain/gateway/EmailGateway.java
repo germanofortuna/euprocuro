@@ -14,4 +14,8 @@ public interface EmailGateway {
     boolean sendPurchaseConfirmationEmail(UserProfile user, String productName, String paymentMethod);
 
     boolean sendBoostActivatedEmail(UserProfile user, String interestTitle, String boostedUntil);
+
+    boolean sendOmbudsmanConfirmationEmail(String name, String email, String protocol, String subject);
+
+    boolean sendOmbudsmanResponseEmail(String name, String email, String protocol, String subject, String response);
 }

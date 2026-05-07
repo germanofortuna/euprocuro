@@ -645,6 +645,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 - `POST /api/monetization/purchase`
 - `POST /api/monetization/interests/{interestId}/boost`
 - `POST /api/monetization/mercado-pago/webhook`
+- `POST /api/ouvidoria`
+- `GET /api/admin/ouvidoria`
+- `POST /api/admin/ouvidoria/{id}/response`
+- `PATCH /api/admin/ouvidoria/{id}/status`
 - `GET /api/content/public`
 - `GET /api/admin/content`
 - `POST /api/admin/content`
@@ -655,6 +659,24 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 - `PUT /api/admin/catalog`
 - `GET /api/admin/cache`
 - `POST /api/admin/cache/invalidate?scope=all`
+
+## Ouvidoria
+
+A Ouvidoria e um canal formal e simples para reclamacoes, contestacoes de moderacao, problemas com pagamento e sugestoes.
+
+- O link publico fica no footer e abre `/ouvidoria`.
+- O envio publico usa `POST /api/ouvidoria` e grava na collection `ombudsman_requests`.
+- Cada manifestacao recebe um protocolo no formato `OUV-AAAA-XXXXXXXX`.
+- O painel administrativo exibe as manifestacoes dentro da area `Admin`.
+- Administradores podem filtrar por status, mudar status e enviar uma resposta.
+- Ao enviar uma manifestacao ou resposta, o sistema tenta enviar e-mail ao usuario. Falha de e-mail nao impede a gravacao da manifestacao.
+
+Status disponiveis:
+
+- `OPEN`
+- `IN_REVIEW`
+- `ANSWERED`
+- `CLOSED`
 
 ## Testes e cobertura
 
