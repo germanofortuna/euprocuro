@@ -168,6 +168,20 @@ Em hospedagem, configure `VITE_API_BASE` para a URL publica da API, por exemplo:
 VITE_API_BASE=https://api.seudominio.com/api
 ```
 
+### Google Analytics
+
+O frontend suporta Google Analytics 4 via Google tag (`gtag.js`). Para ativar, crie uma propriedade GA4, adicione uma stream Web para o dominio da aplicacao e copie o ID de medicao, que comeca com `G-`.
+
+Configure no ambiente do frontend:
+
+```bash
+VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX
+```
+
+Se a variavel ficar vazia, o Analytics nao e carregado. Isso permite deixar local e HML sem medicao, ou usar propriedades separadas por ambiente.
+
+A implementacao registra pageviews nas rotas do SPA e eventos basicos de compartilhamento de interesse (`share_interest`). Nao envie dados pessoais ao Google Analytics; use apenas identificadores tecnicos e propriedades agregadas.
+
 ## Ambiente local esperado
 
 - Java 11

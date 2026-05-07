@@ -45,6 +45,7 @@ import {
   storeSession,
   verifyEmail
 } from "./api";
+import { trackEvent, trackPageView } from "./analytics";
 import logo from "./assets/eu-procuro-logo.png";
 import mercadoPagoLogo from "./assets/mercado-pago.svg";
 import AuthModal from "./components/AuthModal";
@@ -933,7 +934,9 @@ export default function App() {
   }
 
   function replaceCurrentUrl(pathname, search = "") {
-    window.history.replaceState({}, "", `${pathname}${search}`);
+    const nextPath = `${pathname}${search}`;
+    window.history.replaceState({}, "", nextPath);
+    trackPageView(nextPath);
   }
 
   function currentSectionPath(section = loggedSection) {
@@ -946,6 +949,7 @@ export default function App() {
       ? `/interesses/${encodeURIComponent(interestId)}`
       : currentSectionPath();
     window.history[replace ? "replaceState" : "pushState"]({}, "", nextPath);
+    trackPageView(nextPath);
   }
 
   async function loadInterestDetail(interestId, options = {}) {
@@ -1065,6 +1069,10 @@ export default function App() {
   async function handleCopyInterestLink(interest) {
     try {
       await copyInterestLinkToClipboard(interest);
+      trackEvent("share_interest", {
+        method: "copy_link",
+        interest_id: interest.id
+      });
       openFeedback("success", t("share.feedback.success.title"), t("share.feedback.success.message"));
     } catch (error) {
       window.prompt(t("share.prompt"), buildInterestShareUrl(interest));
@@ -1093,6 +1101,7 @@ export default function App() {
             target="_blank"
             rel="noreferrer"
             aria-label={t("share.whatsapp")}
+            onClick={() => trackEvent("share_interest", { method: "whatsapp", interest_id: interest.id })}
           >
             <WhatsAppIcon />
           </a>
@@ -1102,6 +1111,7 @@ export default function App() {
             target="_blank"
             rel="noreferrer"
             aria-label={t("share.x")}
+            onClick={() => trackEvent("share_interest", { method: "x", interest_id: interest.id })}
           >
             <XIcon />
           </a>
@@ -1111,6 +1121,7 @@ export default function App() {
             target="_blank"
             rel="noreferrer"
             aria-label={t("share.facebook")}
+            onClick={() => trackEvent("share_interest", { method: "facebook", interest_id: interest.id })}
           >
             <FacebookIcon />
           </a>
@@ -1183,7 +1194,9 @@ export default function App() {
     }
 
     if (options.updateUrl !== false) {
-      window.history[options.replace ? "replaceState" : "pushState"]({}, "", currentSectionPath(section));
+      const nextPath = currentSectionPath(section);
+      window.history[options.replace ? "replaceState" : "pushState"]({}, "", nextPath);
+      trackPageView(nextPath);
     }
 
     if (section === loggedSections.EXPLORE) {
