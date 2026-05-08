@@ -409,6 +409,54 @@ class ContentServiceTest {
     }
 
     @Test
+    void applyDefaultDraftShouldCopyDefaultValueToDraftWithoutPublishing() {
+        ContentEntry entry = ContentEntry.builder()
+                .id("entry-1")
+                .key("home.title")
+                .status(ContentEntryStatus.PUBLISHED)
+                .version(3)
+                .draftValue("Texto atual")
+                .publishedValue("Texto atual")
+                .defaultValue("Texto padrao novo")
+                .defaultValueHash("hash-1")
+                .defaultUpdateAvailable(true)
+                .build();
+
+        when(adminAccessService.requireAdmin("admin-1")).thenReturn(admin);
+        when(contentEntryGateway.findById("entry-1")).thenReturn(Optional.of(entry));
+        when(contentEntryGateway.save(any(ContentEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ContentEntryView result = contentService.applyDefaultDraft("admin-1", "entry-1");
+
+        assertThat(result.getDraftValue()).isEqualTo("Texto padrao novo");
+        assertThat(result.getPublishedValue()).isEqualTo("Texto atual");
+        assertThat(result.isDefaultUpdateAvailable()).isFalse();
+        assertThat(result.getStatus()).isEqualTo(ContentEntryStatus.PUBLISHED);
+    }
+
+    @Test
+    void dismissDefaultUpdateShouldIgnoreCurrentDefaultHash() {
+        ContentEntry entry = ContentEntry.builder()
+                .id("entry-1")
+                .key("home.title")
+                .defaultValue("Texto padrao novo")
+                .defaultValueHash("hash-1")
+                .defaultUpdateAvailable(true)
+                .build();
+
+        when(adminAccessService.requireAdmin("admin-1")).thenReturn(admin);
+        when(contentEntryGateway.findById("entry-1")).thenReturn(Optional.of(entry));
+        when(contentEntryGateway.save(any(ContentEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ContentEntryView result = contentService.dismissDefaultUpdate("admin-1", "entry-1");
+
+        assertThat(result.isDefaultUpdateAvailable()).isFalse();
+        ArgumentCaptor<ContentEntry> entryCaptor = ArgumentCaptor.forClass(ContentEntry.class);
+        verify(contentEntryGateway).save(entryCaptor.capture());
+        assertThat(entryCaptor.getValue().getIgnoredDefaultValueHash()).isEqualTo("hash-1");
+    }
+
+    @Test
     void getRevisionsShouldRequireAdminAccess() {
         when(adminAccessService.requireAdmin("user-1"))
                 .thenThrow(new ForbiddenException("Sem permissao"));

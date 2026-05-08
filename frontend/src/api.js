@@ -435,6 +435,18 @@ export async function archiveContentEntry(entryId) {
   });
 }
 
+export async function applyDefaultContentEntry(entryId) {
+  return request(`/admin/content/${entryId}/apply-default`, {
+    method: "POST"
+  });
+}
+
+export async function dismissDefaultContentEntry(entryId) {
+  return request(`/admin/content/${entryId}/dismiss-default`, {
+    method: "POST"
+  });
+}
+
 export async function fetchAdminCatalog() {
   return request("/admin/catalog");
 }
@@ -471,5 +483,12 @@ export async function decideInterestModeration(interestId, payload) {
   return request(`/admin/moderation/interests/${interestId}/decision`, {
     method: "POST",
     body: JSON.stringify(payload)
+  });
+}
+
+export async function updateContentReportStatus(reportId, status) {
+  return request(`/admin/moderation/reports/${reportId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status })
   });
 }

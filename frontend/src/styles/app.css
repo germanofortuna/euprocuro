@@ -451,6 +451,7 @@ img {
 .detail-block,
 .offers,
 .activity-grid,
+.how-it-works-grid,
 .interest-list,
 .accordion-list,
 .media-field,
@@ -480,6 +481,9 @@ img {
 }
 
 .hero__copy p,
+.how-it-works-card p,
+.how-it-works-secondary p,
+.form-heading p,
 .panel__header-note,
 .detail-description,
 .offer-card p,
@@ -503,6 +507,9 @@ img {
 }
 
 .hero-card,
+.how-it-works-section,
+.how-it-works-card,
+.how-it-works-secondary,
 .cta-card,
 .sent-offer-summary,
 .preview-card,
@@ -514,6 +521,51 @@ img {
   border: 1px solid var(--line);
   background: var(--surface-soft);
   contain: layout paint;
+}
+
+.hero__supporting {
+  max-width: 62ch;
+}
+
+.how-it-works-section {
+  margin-top: 20px;
+  padding: 24px;
+}
+
+.how-it-works-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.how-it-works-card {
+  position: relative;
+  min-height: 160px;
+  align-content: start;
+}
+
+.how-it-works-card__number {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #031018;
+  font-weight: 900;
+  margin-right: 10px;
+}
+
+.how-it-works-secondary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.how-it-works-secondary > div {
+  display: grid;
+  gap: 6px;
 }
 
 .cta-card {
@@ -1470,13 +1522,23 @@ textarea:focus {
 }
 
 .boost-rocket {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 30px;
   height: 30px;
+  margin-left: 8px;
   border-radius: 999px;
   color: var(--accent-strong);
-  font-size: 1rem;
+  vertical-align: middle;
+  flex: 0 0 auto;
+}
+
+.boost-rocket svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+  color: greenyellow;
 }
 
 .panel-title-stack {
@@ -2256,6 +2318,19 @@ textarea:focus {
   background: rgba(255, 255, 255, 0.74);
 }
 
+.admin-list-item--button {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-list-item--button:hover,
+.admin-list-item--button.selected {
+  border-color: rgba(53, 211, 255, 0.42);
+  background: rgba(53, 211, 255, 0.1);
+}
+
 .admin-list-item--stacked {
   align-items: flex-start;
   display: grid;
@@ -2296,6 +2371,76 @@ textarea:focus {
   margin-bottom: 0;
   padding: 0 12px;
   font-size: 0.9rem;
+}
+
+.admin-reports {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(280px, 1.05fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-reports__lists,
+.admin-reports__group {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.admin-reports__group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-report-detail {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(53, 211, 255, 0.2);
+  border-radius: 18px;
+  background: rgba(3, 8, 16, 0.46);
+}
+
+.admin-report-detail h3,
+.admin-report-detail p {
+  margin: 0;
+}
+
+.admin-report-detail h3 {
+  color: var(--ink);
+}
+
+.admin-report-detail p,
+.admin-report-detail dd {
+  color: var(--muted);
+}
+
+.admin-report-detail dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.admin-report-detail dl div {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-report-detail dt {
+  color: var(--accent-strong);
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-report-detail dd {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .seller-item-tabs button.active {
@@ -2623,6 +2768,38 @@ textarea:focus {
 .content-entry-button span,
 .content-entry-button small {
   color: var(--muted);
+}
+
+.content-entry-button__badge {
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(53, 211, 255, 0.14);
+  color: var(--accent-strong);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.content-entry-button .content-entry-button__badge {
+  color: var(--accent-strong);
+}
+
+.content-admin__default-update {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(53, 211, 255, 0.24);
+  border-radius: 18px;
+  background: rgba(11, 79, 187, 0.12);
+}
+
+.content-admin__default-update p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.content-admin__default-update textarea {
+  min-height: 120px;
 }
 
 .content-admin__empty-note {
@@ -3269,6 +3446,8 @@ textarea:focus {
 .accordion-card,
 .offer-card,
 .hero-card,
+.how-it-works-card,
+.how-it-works-secondary,
 .stat-card,
 .cta-card,
 .sent-offer-summary,
@@ -3584,6 +3763,7 @@ textarea:focus {
   .hero,
   .workspace-grid,
   .filters,
+  .how-it-works-grid,
   .two-columns,
   .three-columns,
   .legal-layout,
@@ -3596,6 +3776,7 @@ textarea:focus {
   .auth-tabs,
   .activity-grid,
   .content-admin,
+  .admin-reports,
   .conversation-meta,
   .hero--private .hero__stats {
     grid-template-columns: 1fr;
@@ -3608,6 +3789,7 @@ textarea:focus {
   .content-admin__header,
   .hero__actions,
   .hero__aside,
+  .how-it-works-secondary,
   .monetization-panel {
     flex-direction: column;
     align-items: stretch;

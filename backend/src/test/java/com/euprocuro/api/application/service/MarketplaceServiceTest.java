@@ -19,12 +19,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-import com.euprocuro.api.domain.gateway.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -35,12 +35,22 @@ import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
+import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
+import com.euprocuro.api.domain.gateway.EmailGateway;
+import com.euprocuro.api.domain.gateway.EventPublisherGateway;
+import com.euprocuro.api.domain.gateway.InterestGateway;
+import com.euprocuro.api.domain.gateway.InterestSearchGateway;
+import com.euprocuro.api.domain.gateway.OfferGateway;
+import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
+import com.euprocuro.api.domain.gateway.SellerItemGateway;
+import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestSearchCriteria;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.OfferStatus;
+import com.euprocuro.api.domain.model.SellerItem;
 import com.euprocuro.api.domain.model.UserProfile;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,6 +78,10 @@ class MarketplaceServiceTest {
     private PublicCacheService publicCacheService;
     @Mock
     private AuditLogService auditLogService;
+    @Mock
+    private SellerItemGateway sellerItemGateway;
+    @Spy
+    private InterestDeliveryRankingService interestDeliveryRankingService;
 
     @InjectMocks
     private MarketplaceService marketplaceService;
@@ -617,6 +631,56 @@ class MarketplaceServiceTest {
                 .build(), -5, 999);
 
         assertThat(result).extracting(InterestPost::getId).containsExactly("active");
+    }
+
+    @Test
+    void listInterestsWithCurrentUserShouldPrioritizeLocationAndSellerItemMatches() {
+        UserProfile currentUser = UserProfile.builder()
+                .id("seller-1")
+                .city("Erechim")
+                .state("RS")
+                .country("Brasil")
+                .build();
+        SellerItem sellerItem = SellerItem.builder()
+                .id("item-1")
+                .ownerId("seller-1")
+                .title("Celta 2012")
+                .description("Carro conservado")
+                .category("AUTOMOVEIS")
+                .location(LocationInfo.builder().city("Erechim").state("RS").country("Brasil").build())
+                .tags(List.of("celta", "chevrolet"))
+                .active(true)
+                .build();
+        InterestPost genericRecent = baseInterest().toBuilder()
+                .id("generic")
+                .title("Procuro apartamento")
+                .description("Preciso alugar imovel")
+                .category("IMOVEIS")
+                .location(LocationInfo.builder().city("Porto Alegre").state("RS").country("Brasil").build())
+                .tags(List.of("apartamento"))
+                .createdAt(Instant.now())
+                .build();
+        InterestPost matchingOlder = baseInterest().toBuilder()
+                .id("matching")
+                .title("Procuro Celta 2012")
+                .description("Busco Chevrolet Celta em Erechim")
+                .category("AUTOMOVEIS")
+                .location(LocationInfo.builder().city("Erechim").state("RS").country("Brasil").build())
+                .tags(List.of("celta"))
+                .createdAt(Instant.now().minus(20, ChronoUnit.DAYS))
+                .build();
+
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(currentUser));
+        when(sellerItemGateway.findByOwnerIdOrderByCreatedAtDesc("seller-1")).thenReturn(List.of(sellerItem));
+        when(interestSearchGateway.search(any(InterestSearchCriteria.class), eq(0), eq(100)))
+                .thenReturn(List.of(genericRecent, matchingOlder));
+
+        List<InterestPost> result = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(true)
+                .currentUserId("seller-1")
+                .build(), 0, 10);
+
+        assertThat(result).extracting(InterestPost::getId).containsExactly("matching", "generic");
     }
 
     @Test

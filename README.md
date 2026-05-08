@@ -299,6 +299,19 @@ Fluxo de conteudo:
 3. Ao publicar, a versao passa a ser carregada em runtime pelo frontend, sem redeploy.
 4. Documentos legais publicados alimentam as paginas do footer e o modal de aceite dos Termos de Uso.
 
+Atualizacoes do `default-content.json`:
+
+- O arquivo `default-content.json` e tratado como baseline de produto, nao como uma sobrescrita automatica do CRM.
+- Em cada subida, o backend compara o valor padrao atual com o conteudo ja existente no Mongo.
+- Chaves novas sao criadas e publicadas automaticamente, como no seed inicial.
+- Chaves existentes nao sao sobrescritas. Se o valor padrao mudou e ainda nao esta publicado nem em rascunho, a entrada recebe `defaultUpdateAvailable=true`.
+- No CRM de conteudo, essas entradas aparecem com o selo `Atualizacao padrao` e no filtro `Atualizacoes padrao`.
+- O admin pode clicar em `Aplicar como rascunho` para copiar a versao do arquivo para o rascunho e depois publicar normalmente.
+- O admin tambem pode clicar em `Ignorar sugestao`; essa versao padrao nao volta a aparecer ate o hash do default mudar de novo em outro deploy.
+- Isso permite que novas copies vindas do codigo sejam revisadas, aprovadas e publicadas em runtime sem apagar customizacoes feitas diretamente no CRM.
+
+Se a collection `content_entries` for apagada em local/HML, o proximo boot recria tudo a partir do `default-content.json`. Em producao, prefira backup e fluxo de aprovacao pelo CRM, porque apagar a collection remove rascunhos, publicacoes, flags legais, autoria e historico operacional associado.
+
 Fluxo de catalogo operacional:
 
 1. O admin altera categorias ou produtos em `CRM operacional`.
@@ -330,6 +343,68 @@ Boost:
 - O interesse nasce sem destaque.
 - Depois de publicado/aprovado, o usuario pode comprar um produto do tipo `BOOST`.
 - Quando o pagamento e processado, o backend grava `boostedUntil`; a busca usa esse campo para priorizar o anuncio enquanto estiver vigente.
+
+## Entrega dinamica de procuras
+
+A vitrine agora possui uma etapa de ranking deterministico para usuarios logados. A regra central e:
+
+> Toda procura tem uma area natural de entrega. O boost nao muda o conteudo da procura; ele aumenta alcance e prioridade.
+
+O endpoint continua sendo `GET /api/interests`; nao houve mudanca de contrato para o frontend. Quando a requisicao possui usuario autenticado, o backend usa `CurrentUserContext.optionalUserId` para aplicar uma ordenacao personalizada. Quando nao ha usuario logado, a vitrine continua usando a ordenacao publica cacheavel: boost ativo primeiro e depois mais recentes.
+
+Pontuacao inicial usada pelo `InterestDeliveryRankingService`:
+
+- boost ativo: `+30`
+- procura criada nas ultimas 24h: `+10`; ate 7 dias: `+6`; ate 30 dias: `+3`
+- mesma cidade do usuario: `+40`
+- mesmo estado do usuario: `+20`
+- mesmo pais do usuario: `+5`
+- categoria igual a algum item ativo em `Tenho para negociar`: `+25`
+- mesma cidade de algum item ativo: `+20`
+- mesmo estado de algum item ativo: `+10`
+- tags iguais entre procura e item ativo: `+12` por tag, limitado a `+36`
+- tokens parecidos entre titulo/descricao/tags da procura e titulo/descricao/tags dos itens ativos: `+8` por token, limitado a `+40`
+
+Preferencias usadas hoje:
+
+- localizacao do perfil do usuario (`city`, `state`, `country`)
+- itens ativos cadastrados em `Tenho para negociar`
+- categoria, tags, titulo e descricao desses itens
+
+Ainda nao existe uma tabela de preferencias explicitas. Isso foi proposital para manter a primeira versao simples: o usuario ja personaliza a entrega indiretamente ao preencher endereco e cadastrar itens que possui.
+
+Comportamento com cache:
+
+- visitantes anonimos continuam usando cache `marketplace`
+- usuarios logados nao usam o cache publico compartilhado para a lista personalizada
+- a busca Mongo continua atras do contrato `InterestSearchGateway`
+- para ranking personalizado, o backend busca uma janela maior de candidatos e reordena em memoria antes de aplicar `offset` e `limit`
+
+Como testar localmente:
+
+1. Crie ou use um usuario com cidade/estado preenchidos, por exemplo `Erechim/RS`.
+2. Cadastre um item ativo em `Tenho para negociar`, por exemplo `Celta 2012`, categoria `AUTOMOVEIS`, tags `celta`, `chevrolet`.
+3. Com outro usuario, publique procuras variadas:
+   - uma procura por `Celta 2012` em `Erechim/RS`
+   - uma procura generica mais recente de outra categoria
+   - uma procura com boost ativo, se boosts estiverem habilitados
+4. Acesse a home logado com o usuario que possui o item. A procura por `Celta 2012` deve ganhar prioridade por categoria, texto, tags e localizacao.
+5. Acesse a home deslogado. A ordenacao deve voltar ao comportamento publico: boost ativo e recencia.
+
+Testes automatizados relacionados:
+
+```bash
+mvn -q "-Dtest=InterestDeliveryRankingServiceTest,MarketplaceServiceTest" test
+```
+
+Proximos passos recomendados:
+
+- Criar preferencias explicitas no perfil do usuario: categorias favoritas, palavras-chave/tags, cidades/regioes e raio padrao.
+- Permitir editar essas preferencias em uma tela simples de perfil.
+- Registrar sinais de interacao, como procuras abertas, propostas enviadas e itens ignorados, para melhorar ranking sem depender so de cadastro manual.
+- Exibir explicacoes discretas no front, por exemplo `Combina com um item seu` ou `Procura proxima de voce`.
+- Criar notificacoes controladas para novas procuras compativeis, com limite por periodo para evitar spam.
+- Migrar a parte textual para busca dedicada quando a base crescer: Atlas Search, OpenSearch, Meilisearch ou Typesense. O contrato `InterestSearchGateway` ja deixa essa troca isolada.
 
 ## Cache, indices e busca
 
@@ -655,6 +730,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 - `PUT /api/admin/content/{id}`
 - `POST /api/admin/content/{id}/publish`
 - `POST /api/admin/content/{id}/archive`
+- `POST /api/admin/content/{id}/apply-default`
+- `POST /api/admin/content/{id}/dismiss-default`
 - `GET /api/admin/catalog`
 - `PUT /api/admin/catalog`
 - `GET /api/admin/cache`

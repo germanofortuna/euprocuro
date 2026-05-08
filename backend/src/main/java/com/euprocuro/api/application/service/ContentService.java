@@ -2,12 +2,16 @@ package com.euprocuro.api.application.service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -133,13 +137,18 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
                 .version(existing == null ? 0 : existing.getVersion())
                 .draftValue(command.getDraftValue().trim())
                 .publishedValue(existing == null ? null : existing.getPublishedValue())
+                .defaultValue(existing == null ? null : existing.getDefaultValue())
+                .defaultValueHash(existing == null ? null : existing.getDefaultValueHash())
                 .description(trimToNull(command.getDescription()))
                 .screen(resolveScreen(command.getScreen(), command.getKey()))
                 .legalSlug(trimToNull(command.getLegalSlug()))
                 .requiresUserAcceptance(command.isRequiresUserAcceptance())
+                .defaultUpdateAvailable(isDefaultUpdateAvailableAfterDraft(existing, command.getDraftValue().trim()))
+                .ignoredDefaultValueHash(existing == null ? null : existing.getIgnoredDefaultValueHash())
                 .effectiveFrom(command.getEffectiveFrom())
                 .createdAt(existing == null ? now : existing.getCreatedAt())
                 .updatedAt(now)
+                .defaultUpdatedAt(existing == null ? null : existing.getDefaultUpdatedAt())
                 .publishedAt(existing == null ? null : existing.getPublishedAt())
                 .updatedBy(admin.getId())
                 .publishedBy(existing == null ? null : existing.getPublishedBy())
@@ -164,6 +173,8 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
                 .status(ContentEntryStatus.PUBLISHED)
                 .version(existing.getVersion() + 1)
                 .publishedValue(existing.getDraftValue())
+                .defaultUpdateAvailable(false)
+                .ignoredDefaultValueHash(ignoredDefaultHashAfterPublish(existing))
                 .publishedAt(now)
                 .updatedAt(now)
                 .publishedBy(admin.getId())
@@ -199,6 +210,52 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
                 .build());
         publicCacheService.invalidate(PublicCacheService.CONTENT);
         return toAdminView(archived);
+    }
+
+    @Override
+    public ContentEntryView applyDefaultDraft(String currentUserId, String entryId) {
+        ensureDefaultContentSeeded();
+        UserProfile admin = adminAccessService.requireAdmin(currentUserId);
+        ContentEntry existing = contentEntryGateway.findById(entryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conteudo nao encontrado."));
+
+        if (!StringUtils.hasText(existing.getDefaultValue())) {
+            throw new BusinessException("Esta chave nao possui sugestao padrao disponivel.");
+        }
+
+        Instant now = Instant.now();
+        ContentEntry updated = contentEntryGateway.save(existing.toBuilder()
+                .draftValue(existing.getDefaultValue())
+                .status(nextDraftStatus(existing))
+                .defaultUpdateAvailable(false)
+                .ignoredDefaultValueHash(null)
+                .updatedAt(now)
+                .updatedBy(admin.getId())
+                .build());
+
+        return toAdminView(updated);
+    }
+
+    @Override
+    public ContentEntryView dismissDefaultUpdate(String currentUserId, String entryId) {
+        ensureDefaultContentSeeded();
+        UserProfile admin = adminAccessService.requireAdmin(currentUserId);
+        ContentEntry existing = contentEntryGateway.findById(entryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conteudo nao encontrado."));
+
+        if (!StringUtils.hasText(existing.getDefaultValueHash())) {
+            throw new BusinessException("Esta chave nao possui sugestao padrao disponivel.");
+        }
+
+        Instant now = Instant.now();
+        ContentEntry updated = contentEntryGateway.save(existing.toBuilder()
+                .defaultUpdateAvailable(false)
+                .ignoredDefaultValueHash(existing.getDefaultValueHash())
+                .updatedAt(now)
+                .updatedBy(admin.getId())
+                .build());
+
+        return toAdminView(updated);
     }
 
     @Override
@@ -260,11 +317,18 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
             String legalSlug,
             boolean requiresUserAcceptance
     ) {
-        if (!StringUtils.hasText(value) || contentEntryGateway.findByKeyAndLocale(key, DEFAULT_LOCALE).isPresent()) {
+        if (!StringUtils.hasText(value)) {
             return;
         }
 
         Instant now = Instant.now();
+        String defaultValueHash = hashDefaultValue(type, value);
+        Optional<ContentEntry> existingEntry = contentEntryGateway.findByKeyAndLocale(key, DEFAULT_LOCALE);
+        if (existingEntry.isPresent()) {
+            syncDefaultMetadata(existingEntry.get(), type, value, defaultValueHash, now);
+            return;
+        }
+
         ContentEntry saved = contentEntryGateway.save(ContentEntry.builder()
                 .key(key)
                 .type(type)
@@ -273,12 +337,16 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
                 .version(1)
                 .draftValue(value)
                 .publishedValue(value)
+                .defaultValue(value)
+                .defaultValueHash(defaultValueHash)
                 .description("Conteudo inicial da plataforma.")
                 .screen(resolveScreen(null, key))
                 .legalSlug(legalSlug)
                 .requiresUserAcceptance(requiresUserAcceptance)
+                .defaultUpdateAvailable(false)
                 .createdAt(now)
                 .updatedAt(now)
+                .defaultUpdatedAt(now)
                 .publishedAt(now)
                 .build());
 
@@ -289,6 +357,31 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
                 .version(saved.getVersion())
                 .snapshotValue(saved.getPublishedValue())
                 .publishedAt(now)
+                .build());
+    }
+
+    private void syncDefaultMetadata(
+            ContentEntry existing,
+            ContentEntryType type,
+            String defaultValue,
+            String defaultValueHash,
+            Instant now
+    ) {
+        boolean defaultHashChanged = !Objects.equals(existing.getDefaultValueHash(), defaultValueHash);
+        boolean defaultUpdateAvailable = isDefaultUpdateAvailable(existing, defaultValue, defaultValueHash);
+
+        if (Objects.equals(existing.getDefaultValue(), defaultValue)
+                && Objects.equals(existing.getDefaultValueHash(), defaultValueHash)
+                && existing.isDefaultUpdateAvailable() == defaultUpdateAvailable) {
+            return;
+        }
+
+        contentEntryGateway.save(existing.toBuilder()
+                .type(existing.getType() == null ? type : existing.getType())
+                .defaultValue(defaultValue)
+                .defaultValueHash(defaultValueHash)
+                .defaultUpdatedAt(defaultHashChanged ? now : existing.getDefaultUpdatedAt())
+                .defaultUpdateAvailable(defaultUpdateAvailable)
                 .build());
     }
 
@@ -357,6 +450,57 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
 
+    private boolean isDefaultUpdateAvailable(ContentEntry entry, String defaultValue, String defaultValueHash) {
+        if (entry == null || !StringUtils.hasText(defaultValue)) {
+            return false;
+        }
+        if (Objects.equals(entry.getPublishedValue(), defaultValue)) {
+            return false;
+        }
+        if (Objects.equals(entry.getDraftValue(), defaultValue)) {
+            return false;
+        }
+        return !Objects.equals(entry.getIgnoredDefaultValueHash(), defaultValueHash);
+    }
+
+    private boolean isDefaultUpdateAvailableAfterDraft(ContentEntry existing, String nextDraftValue) {
+        if (existing == null) {
+            return false;
+        }
+        return isDefaultUpdateAvailable(
+                existing.toBuilder().draftValue(nextDraftValue).build(),
+                existing.getDefaultValue(),
+                existing.getDefaultValueHash()
+        );
+    }
+
+    private String ignoredDefaultHashAfterPublish(ContentEntry existing) {
+        if (!StringUtils.hasText(existing.getDefaultValueHash())) {
+            return null;
+        }
+        return Objects.equals(existing.getDraftValue(), existing.getDefaultValue())
+                ? null
+                : existing.getDefaultValueHash();
+    }
+
+    private String hashDefaultValue(ContentEntryType type, String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest((type + "\n" + value).getBytes(StandardCharsets.UTF_8));
+            return toHex(hash);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("Nao foi possivel calcular o hash do conteudo padrao.", exception);
+        }
+    }
+
+    private String toHex(byte[] bytes) {
+        StringBuilder builder = new StringBuilder(bytes.length * 2);
+        for (byte value : bytes) {
+            builder.append(String.format("%02x", value));
+        }
+        return builder.toString();
+    }
+
     private String buildVersion(List<ContentEntryView> entries) {
         return Integer.toHexString(entries.stream()
                 .map(entry -> entry.getKey() + ":" + entry.getVersion())
@@ -388,13 +532,17 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
                 .version(entry.getVersion())
                 .draftValue(entry.getDraftValue())
                 .publishedValue(entry.getPublishedValue())
+                .defaultValue(entry.getDefaultValue())
+                .defaultValueHash(entry.getDefaultValueHash())
                 .description(entry.getDescription())
                 .screen(entry.getScreen())
                 .legalSlug(entry.getLegalSlug())
                 .requiresUserAcceptance(entry.isRequiresUserAcceptance())
+                .defaultUpdateAvailable(entry.isDefaultUpdateAvailable())
                 .effectiveFrom(entry.getEffectiveFrom())
                 .createdAt(entry.getCreatedAt())
                 .updatedAt(entry.getUpdatedAt())
+                .defaultUpdatedAt(entry.getDefaultUpdatedAt())
                 .publishedAt(entry.getPublishedAt())
                 .build();
     }

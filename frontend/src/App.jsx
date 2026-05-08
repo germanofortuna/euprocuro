@@ -45,6 +45,7 @@ import {
   syncPayment,
   updateInterest,
   updateAdminOmbudsmanStatus,
+  updateContentReportStatus,
   updateSellerItem,
   storeSession,
   verifyEmail
@@ -52,6 +53,7 @@ import {
 import { trackEvent, trackPageView } from "./analytics";
 import mercadoPagoLogo from "./assets/mercado-pago.svg";
 import AuthModal from "./components/AuthModal";
+import BoostRocket from "./components/BoostRocket";
 import ContentAdminPanel from "./components/ContentAdminPanel";
 import EmptyState from "./components/EmptyState";
 import FeedbackModal from "./components/FeedbackModal";
@@ -341,6 +343,10 @@ function moderationStatusTone(status) {
   return tones[status] ?? "pending";
 }
 
+function contentReportStatusLabel(status, t) {
+  return t ? t(`admin.moderation.reports.status.${status || "OPEN"}`) : (status || "OPEN");
+}
+
 function limitText(value, maxLength) {
   return String(value ?? "").slice(0, maxLength);
 }
@@ -560,10 +566,6 @@ function isBoostActive(interest) {
   );
 }
 
-function BoostRocket() {
-  return <span className="boost-rocket" aria-label="Procura impulsionada" title="Procura impulsionada">🚀</span>;
-}
-
 function WhatsAppIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -774,6 +776,7 @@ export default function App() {
   const [ombudsmanProtocol, setOmbudsmanProtocol] = useState("");
   const [isSubmittingOmbudsman, setIsSubmittingOmbudsman] = useState(false);
   const [adminModeration, setAdminModeration] = useState(null);
+  const [selectedAdminReportId, setSelectedAdminReportId] = useState(null);
   const [adminOmbudsmanRequests, setAdminOmbudsmanRequests] = useState([]);
   const [ombudsmanResponses, setOmbudsmanResponses] = useState({});
   const [isOmbudsmanAdminLoading, setIsOmbudsmanAdminLoading] = useState(false);
@@ -2699,6 +2702,24 @@ export default function App() {
     }
   }
 
+  async function handleContentReportStatusChange(reportId, status) {
+    if (!reportId) {
+      return;
+    }
+
+    setIsModerationActionLoading(true);
+    try {
+      const updated = await updateContentReportStatus(reportId, status);
+      setSelectedAdminReportId(updated.id);
+      await refreshAdminModerationData();
+      openFeedback("success", t("admin.moderation.reports.statusUpdated.title"), t("admin.moderation.reports.statusUpdated.message"));
+    } catch (requestError) {
+      openFeedback("error", t("admin.moderation.reports.statusError.title"), requestError.message || t("errors.retry"));
+    } finally {
+      setIsModerationActionLoading(false);
+    }
+  }
+
   async function handlePurchaseProduct(productCode, paymentMethod = "MERCADO_PAGO") {
     if (!creditPurchasesEnabled) {
       openFeedback("error", "Compra indisponível", "A compra de créditos e planos está desabilitada no momento.");
@@ -3135,11 +3156,14 @@ export default function App() {
               <p>
                 {t("home.hero.description")}
               </p>
+              <p className="hero__supporting">
+                {t("home.hero.complement")}
+              </p>
               <div className="hero__actions">
                 <button type="button" className="primary-button" onClick={() => openAuthModal("register")}>
                   {t("home.hero.primary")}
                 </button>
-                <button type="button" className="ghost-button" onClick={() => openAuthModal("login")}>
+                <button type="button" className="ghost-button" onClick={() => openAuthModal("register")}>
                   {t("home.hero.secondary")}
                 </button>
               </div>
@@ -3161,6 +3185,37 @@ export default function App() {
                 </button>
               </div>
             </div>
+          </section>
+        ) : null}
+
+        {showHero ? (
+          <section className="how-it-works-section">
+            <div className="panel__header">
+              <div>
+                <span className="eyebrow">{t("home.how.eyebrow")}</span>
+                <h2>{t("home.how.title")}</h2>
+              </div>
+            </div>
+
+            <div className="how-it-works-grid">
+              {[1, 2, 3].map((step) => (
+                <article key={step} className="how-it-works-card">
+                  <span className="how-it-works-card__number">{step}</span>
+                  <strong>{t(`home.how.step${step}.title`)}</strong>
+                  <p>{t(`home.how.step${step}.description`)}</p>
+                </article>
+              ))}
+            </div>
+
+            <article className="how-it-works-secondary">
+              <div>
+                <strong>{t("home.how.secondary.title")}</strong>
+                <p>{t("home.how.secondary.description")}</p>
+              </div>
+              <button type="button" className="ghost-button" onClick={() => openAuthModal("register")}>
+                {t("home.how.secondary.cta")}
+              </button>
+            </article>
           </section>
         ) : null}
 
@@ -3273,11 +3328,7 @@ export default function App() {
                 <span className="eyebrow detail-owner-line">
                   {selectedInterest ? (
                     canShowRestrictedInterestDetails ? (
-                      <>
-                        <span>{t("interest.detail.owner.before")}</span>
-                        <strong>{firstName(selectedInterest.ownerName, t)}</strong>
-                        <span>{t("interest.detail.owner.after")}</span>
-                      </>
+                      <span>{t("interest.detail.owner.line", { name: firstName(selectedInterest.ownerName, t) })}</span>
                     ) : (
                       <span>{t("interest.detail.publicEyebrow")}</span>
                     )
@@ -3407,6 +3458,7 @@ export default function App() {
                       <div className="form-heading">
                         <span className="eyebrow">{t("offer.form.eyebrow")}</span>
                         <h3>{t("offer.form.title")}</h3>
+                        <p>{t("offer.form.description")}</p>
                       </div>
                       <input
                         type="number"
@@ -4354,9 +4406,27 @@ export default function App() {
     const pendingInterests = adminModeration?.pendingInterests ?? [];
     const rules = adminModeration?.rules ?? [];
     const openReports = adminModeration?.openReports ?? [];
+    const processedReports = adminModeration?.processedReports ?? [];
+    const allReports = [...openReports, ...processedReports];
+    const selectedAdminReport = allReports.find((report) => report.id === selectedAdminReportId) ?? openReports[0] ?? processedReports[0] ?? null;
     const newOmbudsmanCount = adminOmbudsmanRequests.filter((requestItem) =>
       requestItem.status === "OPEN" && !requestItem.adminResponse
     ).length;
+
+    const renderReportItem = (report) => (
+      <button
+        key={report.id}
+        type="button"
+        className={`admin-list-item admin-list-item--button ${selectedAdminReport?.id === report.id ? "selected" : ""}`}
+        onClick={() => setSelectedAdminReportId(report.id)}
+      >
+        <div>
+          <strong>{report.reason}</strong>
+          <span>{report.contentTitle || t("admin.moderation.reportsContent", { id: report.contentId })}</span>
+          <small>{contentReportStatusLabel(report.status, t)} · {formatTimestamp(report.createdAt, t)}</small>
+        </div>
+      </button>
+    );
 
     return (
       <section className="admin-moderation panel panel--spaced">
@@ -4511,18 +4581,97 @@ export default function App() {
             title: t("admin.moderation.reportsCount", { count: openReports.length }),
             count: openReports.length,
             children: (
-            <div className="admin-list">
-              {openReports.length ? openReports.map((report) => (
-                <article key={report.id} className="admin-list-item">
-                  <div>
-                    <strong>{report.reason}</strong>
-                    <span>{t("admin.moderation.reportsContent", { id: report.contentId })}</span>
-                    {report.message ? <p>{report.message}</p> : null}
+            <div className="admin-reports">
+              <div className="admin-reports__lists">
+                <section className="admin-reports__group">
+                  <div className="admin-reports__group-header">
+                    <strong>{t("admin.moderation.reports.open.title")}</strong>
+                    <span className="admin-section-badge">{openReports.length}</span>
                   </div>
-                </article>
-              )) : (
-                <EmptyState title={t("admin.moderation.reports.empty.title")} description={t("admin.moderation.reports.empty.description")} />
-              )}
+                  <div className="admin-list">
+                    {openReports.length ? openReports.map(renderReportItem) : (
+                      <EmptyState title={t("admin.moderation.reports.empty.title")} description={t("admin.moderation.reports.empty.description")} />
+                    )}
+                  </div>
+                </section>
+                <section className="admin-reports__group">
+                  <div className="admin-reports__group-header">
+                    <strong>{t("admin.moderation.reports.processed.title")}</strong>
+                    <span className="admin-section-badge">{processedReports.length}</span>
+                  </div>
+                  <div className="admin-list">
+                    {processedReports.length ? processedReports.map(renderReportItem) : (
+                      <EmptyState title={t("admin.moderation.reports.processed.empty.title")} description={t("admin.moderation.reports.processed.empty.description")} />
+                    )}
+                  </div>
+                </section>
+              </div>
+              <aside className="admin-report-detail">
+                {selectedAdminReport ? (
+                  <>
+                    <div>
+                      <span className="eyebrow">{t("admin.moderation.reports.detail.eyebrow")}</span>
+                      <h3>{selectedAdminReport.reason}</h3>
+                      <p>{selectedAdminReport.message || t("admin.moderation.reports.detail.noMessage")}</p>
+                    </div>
+                    <dl>
+                      <div>
+                        <dt>{t("admin.moderation.reports.detail.content")}</dt>
+                        <dd>{selectedAdminReport.contentTitle || selectedAdminReport.contentId}</dd>
+                      </div>
+                      {selectedAdminReport.contentDescription ? (
+                        <div>
+                          <dt>{t("admin.moderation.reports.detail.description")}</dt>
+                          <dd>{selectedAdminReport.contentDescription}</dd>
+                        </div>
+                      ) : null}
+                      <div>
+                        <dt>{t("admin.moderation.reports.detail.status")}</dt>
+                        <dd>
+                          {contentReportStatusLabel(selectedAdminReport.status, t)}
+                          {selectedAdminReport.contentStatus ? ` · ${moderationStatusLabel(selectedAdminReport.contentStatus, t)}` : ""}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>{t("admin.moderation.reports.detail.reportedBy")}</dt>
+                        <dd>{selectedAdminReport.reportedBy || t("common.status.unavailable")}</dd>
+                      </div>
+                      <div>
+                        <dt>{t("admin.moderation.reports.detail.createdAt")}</dt>
+                        <dd>{formatTimestamp(selectedAdminReport.createdAt, t)}</dd>
+                      </div>
+                      {selectedAdminReport.reviewedAt ? (
+                        <div>
+                          <dt>{t("admin.moderation.reports.detail.reviewedAt")}</dt>
+                          <dd>{formatTimestamp(selectedAdminReport.reviewedAt, t)}</dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                    {selectedAdminReport.status === "OPEN" ? (
+                      <div className="inline-actions">
+                        <button
+                          type="button"
+                          className="primary-button primary-button--compact"
+                          disabled={isModerationActionLoading}
+                          onClick={() => handleContentReportStatusChange(selectedAdminReport.id, "RESOLVED")}
+                        >
+                          {t("admin.moderation.reports.resolve")}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-button ghost-button--small"
+                          disabled={isModerationActionLoading}
+                          onClick={() => handleContentReportStatusChange(selectedAdminReport.id, "DISMISSED")}
+                        >
+                          {t("admin.moderation.reports.dismiss")}
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <EmptyState title={t("admin.moderation.reports.detail.empty.title")} description={t("admin.moderation.reports.detail.empty.description")} />
+                )}
+              </aside>
             </div>
             )
           })}

@@ -16,5 +16,9 @@ public interface AdminContentUseCase {
 
     ContentEntryView archive(String currentUserId, String entryId);
 
+    ContentEntryView applyDefaultDraft(String currentUserId, String entryId);
+
+    ContentEntryView dismissDefaultUpdate(String currentUserId, String entryId);
+
     List<ContentRevisionView> getRevisions(String currentUserId, String entryId);
 }

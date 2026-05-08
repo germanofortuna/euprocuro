@@ -20,12 +20,16 @@ public class ContentEntryView {
     String draftValue;
     String publishedValue;
     String publicValue;
+    String defaultValue;
+    String defaultValueHash;
     String description;
     String screen;
     String legalSlug;
     boolean requiresUserAcceptance;
+    boolean defaultUpdateAvailable;
     Instant effectiveFrom;
     Instant createdAt;
     Instant updatedAt;
+    Instant defaultUpdatedAt;
     Instant publishedAt;
 }

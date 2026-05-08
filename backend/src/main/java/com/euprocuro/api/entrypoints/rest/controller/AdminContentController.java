@@ -76,6 +76,16 @@ public class AdminContentController {
         return RestMapper.toResponse(adminContentUseCase.archive(CurrentUserContext.userId(request), id));
     }
 
+    @PostMapping("/{id}/apply-default")
+    public ContentEntryResponse applyDefaultDraft(@PathVariable String id, HttpServletRequest request) {
+        return RestMapper.toResponse(adminContentUseCase.applyDefaultDraft(CurrentUserContext.userId(request), id));
+    }
+
+    @PostMapping("/{id}/dismiss-default")
+    public ContentEntryResponse dismissDefaultUpdate(@PathVariable String id, HttpServletRequest request) {
+        return RestMapper.toResponse(adminContentUseCase.dismissDefaultUpdate(CurrentUserContext.userId(request), id));
+    }
+
     @GetMapping("/{id}/revisions")
     public List<ContentRevisionResponse> getRevisions(@PathVariable String id, HttpServletRequest request) {
         return adminContentUseCase.getRevisions(CurrentUserContext.userId(request), id)

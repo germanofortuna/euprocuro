@@ -1,4 +1,6 @@
-﻿export default function InterestCard({ interest, selected, onClick }) {
+import BoostRocket from "./BoostRocket";
+
+export default function InterestCard({ interest, selected, onClick }) {
   const isBoosted = Boolean(
     interest.boostedUntil
     && new Date(interest.boostedUntil).getTime() > Date.now()
@@ -28,14 +30,9 @@
         <span>Procura publicada</span>
         <strong>
           {interest.title}
-          {isBoosted ? (
-            <span className="boost-rocket" aria-label="Procura impulsionada" title="Procura impulsionada">
-              ðŸš€
-            </span>
-          ) : null}
+          {isBoosted ? <BoostRocket /> : null}
         </strong>
       </div>
     </button>
   );
 }
-
