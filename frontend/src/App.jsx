@@ -1125,11 +1125,7 @@ export default function App() {
   function selectPublicInterest(interest, options = {}) {
     setSelectedInterest(interest);
     setLoggedSection(loggedSections.EXPLORE);
-    loadInterestDetail(interest.id, {
-      summary: interest,
-      replace: Boolean(options.replace),
-      preserveScroll: true
-    }).catch(() => {});
+    updateInterestUrl(interest.id, Boolean(options.replace));
     scrollPublicInterestDetailIntoViewOnMobile();
   }
 
@@ -1469,13 +1465,6 @@ export default function App() {
         ];
       });
 
-      if (!append && !sharedInterestIdRef.current && pageInterests[0]?.id) {
-        loadInterestDetail(pageInterests[0].id, {
-          summary: pageInterests[0],
-          updateUrl: false
-        }).catch(() => {});
-      }
-
       if (append) {
         return;
       }
@@ -1496,7 +1485,7 @@ export default function App() {
 
         return sharedInterestIdRef.current
           ? pageInterests.find((interest) => interest.id === sharedInterestIdRef.current) ?? currentSelected ?? null
-          : null;
+          : pageInterests[0] ?? null;
       });
     } catch (requestError) {
       if (requestId === publicRequestSeq.current) {
@@ -3145,7 +3134,7 @@ export default function App() {
   }
 
   function renderPublicHome(showHero = true) {
-    const canShowRestrictedInterestDetails = Boolean(session);
+    const canShowRestrictedInterestDetails = isSelectedInterestMine;
 
     return (
       <>

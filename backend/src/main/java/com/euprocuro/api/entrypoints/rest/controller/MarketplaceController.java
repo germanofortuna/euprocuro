@@ -2,6 +2,8 @@ package com.euprocuro.api.entrypoints.rest.controller;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
@@ -75,27 +77,33 @@ public class MarketplaceController {
             @RequestParam(defaultValue = "0") int offset,
             @RequestParam(defaultValue = "10") int limit
     ) {
+        Optional<String> currentUserId = CurrentUserContext.optionalUserId(request);
         InterestSearchFilter filter = InterestSearchFilter.builder()
                 .category(category)
                 .city(city)
                 .maxBudget(maxBudget)
                 .query(query)
-                .openOnly(openOnly)
-                .currentUserId(CurrentUserContext.optionalUserId(request).orElse(null))
+                .openOnly(true)
+                .currentUserId(currentUserId.orElse(null))
                 .build();
 
         return marketplaceUseCase.listInterests(filter, offset, limit)
                 .stream()
-                .map(interest -> RestMapper.toResponse(interest, CurrentUserContext.optionalUserId(request).isPresent()))
+                .filter(interest -> currentUserId
+                        .map(userId -> !Objects.equals(userId, interest.getOwnerId()))
+                        .orElse(true))
+                .map(RestMapper::toPublicInterestResponse)
                 .collect(Collectors.toList());
     }
 
     @GetMapping("/interests/{id}")
     public InterestResponse getInterest(@PathVariable String id, HttpServletRequest request) {
-        return RestMapper.toResponse(
-                marketplaceUseCase.getInterest(id),
-                CurrentUserContext.optionalUserId(request).isPresent()
-        );
+        Optional<String> currentUserId = CurrentUserContext.optionalUserId(request);
+        var interest = marketplaceUseCase.getInterest(id);
+        boolean viewerOwnsInterest = currentUserId
+                .map(userId -> Objects.equals(userId, interest.getOwnerId()))
+                .orElse(false);
+        return RestMapper.toResponse(interest, viewerOwnsInterest);
     }
 
     @PostMapping("/interests")

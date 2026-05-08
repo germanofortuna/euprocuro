@@ -3,6 +3,7 @@ import defaultContent from "./content/default-content.json";
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080/api";
 const SESSION_STORAGE_KEY = "eu-procuro-session";
 const GENERIC_REQUEST_ERROR = defaultContent.entries["errors.request.generic"];
+const inFlightGetRequests = new Map();
 
 function buildWebSocketUrl() {
   const configuredBase = import.meta.env.VITE_WS_BASE;
@@ -59,27 +60,54 @@ async function request(path, options = {}) {
     headers.set("Authorization", `Bearer ${session.token}`);
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const url = `${API_BASE}${path}`;
+  const method = options.method ?? "GET";
+  const requestOptions = {
     ...options,
     credentials: "include",
     headers
-  });
+  };
+  const shouldDeduplicate = method.toUpperCase() === "GET" && options.body === undefined;
+  const requestKey = shouldDeduplicate ? buildInFlightGetKey(url, headers) : null;
 
-  if (!response.ok) {
-    let payload = null;
-    try {
-      payload = await response.clone().json();
-    } catch (error) {
-      payload = await response.text().catch(() => null);
+  if (requestKey && inFlightGetRequests.has(requestKey)) {
+    return inFlightGetRequests.get(requestKey);
+  }
+
+  const requestPromise = fetch(url, requestOptions).then(async (response) => {
+    if (!response.ok) {
+      let payload = null;
+      try {
+        payload = await response.clone().json();
+      } catch (error) {
+        payload = await response.text().catch(() => null);
+      }
+
+      throw new ApiError(
+        buildErrorMessage(payload, GENERIC_REQUEST_ERROR),
+        { status: response.status, payload }
+      );
     }
 
-    throw new ApiError(
-      buildErrorMessage(payload, GENERIC_REQUEST_ERROR),
-      { status: response.status, payload }
+    return response.status === 204 ? null : response.json();
+  });
+
+  if (requestKey) {
+    inFlightGetRequests.set(requestKey, requestPromise);
+    requestPromise.then(
+      () => inFlightGetRequests.delete(requestKey),
+      () => inFlightGetRequests.delete(requestKey)
     );
   }
 
-  return response.status === 204 ? null : response.json();
+  return requestPromise;
+}
+
+function buildInFlightGetKey(url, headers) {
+  return [
+    url,
+    headers.get("Authorization") ?? ""
+  ].join("|");
 }
 
 export function getStoredSession() {

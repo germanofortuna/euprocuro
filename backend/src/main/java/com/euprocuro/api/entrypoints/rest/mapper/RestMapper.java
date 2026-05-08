@@ -52,6 +52,7 @@ import com.euprocuro.api.application.view.RegistrationView;
 import com.euprocuro.api.application.view.SellerItemMatchesView;
 import com.euprocuro.api.domain.model.InterestModeration;
 import com.euprocuro.api.domain.model.InterestPost;
+import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.ModerationRule;
 import com.euprocuro.api.domain.model.Offer;
@@ -488,6 +489,10 @@ public final class RestMapper {
         return toResponse(domain, true);
     }
 
+    public static InterestResponse toPublicInterestResponse(InterestPost domain) {
+        return toResponse(domain, false);
+    }
+
     public static InterestResponse toResponse(InterestPost domain, boolean exposeRestrictedDetails) {
         return InterestResponse.builder()
                 .id(domain.getId())
@@ -499,7 +504,7 @@ public final class RestMapper {
                 .category(domain.getCategory())
                 .budgetMin(exposeRestrictedDetails ? domain.getBudgetMin() : null)
                 .budgetMax(exposeRestrictedDetails ? domain.getBudgetMax() : null)
-                .location(toResponse(domain.getLocation()))
+                .location(toResponse(domain.getLocation(), exposeRestrictedDetails))
                 .tags(Optional.ofNullable(domain.getTags()).orElse(List.of()))
                 .desiredRadiusKm(domain.getDesiredRadiusKm())
                 .allowsWhatsappContact(exposeRestrictedDetails && domain.isAllowsWhatsappContact())
@@ -507,12 +512,19 @@ public final class RestMapper {
                 .boostedUntil(domain.getBoostedUntil())
                 .preferredCondition(domain.getPreferredCondition())
                 .preferredContactMode(domain.getPreferredContactMode())
-                .status(domain.getStatus())
-                .moderation(toResponse(domain.getModeration()))
+                .status(exposeRestrictedDetails ? domain.getStatus() : publicInterestStatus(domain.getStatus()))
+                .moderation(exposeRestrictedDetails ? toResponse(domain.getModeration()) : null)
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .expiresAt(domain.getExpiresAt())
                 .build();
+    }
+
+    private static InterestStatus publicInterestStatus(InterestStatus status) {
+        if (status == InterestStatus.OPEN || status == InterestStatus.APPROVED || status == InterestStatus.REPORTED) {
+            return InterestStatus.OPEN;
+        }
+        return null;
     }
 
     public static InterestModerationResponse toResponse(InterestModeration domain) {
@@ -720,7 +732,7 @@ public final class RestMapper {
         List<InterestPost> matchingInterests = Optional.ofNullable(view.getMatchingInterests()).orElse(List.of());
         return SellerItemMatchesResponse.builder()
                 .item(toResponse(view.getItem()))
-                .matchingInterests(matchingInterests.stream().map(RestMapper::toResponse).collect(Collectors.toList()))
+                .matchingInterests(matchingInterests.stream().map(RestMapper::toPublicInterestResponse).collect(Collectors.toList()))
                 .matchCount(matchingInterests.size())
                 .build();
     }
@@ -801,15 +813,19 @@ public final class RestMapper {
     }
 
     private static LocationResponse toResponse(LocationInfo location) {
+        return toResponse(location, true);
+    }
+
+    private static LocationResponse toResponse(LocationInfo location, boolean exposeExactDetails) {
         if (location == null) {
             return null;
         }
 
         return LocationResponse.builder()
-                .postalCode(location.getPostalCode())
+                .postalCode(exposeExactDetails ? location.getPostalCode() : null)
                 .city(location.getCity())
                 .state(location.getState())
-                .neighborhood(location.getNeighborhood())
+                .neighborhood(exposeExactDetails ? location.getNeighborhood() : null)
                 .country(location.getCountry())
                 .remote(location.isRemote())
                 .build();

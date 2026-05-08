@@ -52,6 +52,11 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
     private static final String DEFAULT_LOCALE = "pt-BR";
     private static final int MAX_KEY_LENGTH = 160;
     private static final int MAX_VALUE_LENGTH = 120_000;
+    private static final List<String> NON_PUBLIC_CONTENT_PREFIXES = List.of(
+            "admin.",
+            "contentadmin.",
+            "catalogadmin."
+    );
 
     private final AdminAccessService adminAccessService;
     private final ContentEntryGateway contentEntryGateway;
@@ -72,28 +77,21 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
     public PublicContentCatalogView getPublishedContent(String locale, List<String> keys) {
         ensureDefaultContentSeeded();
         String resolvedLocale = resolveLocale(locale);
-        List<String> sanitizedKeys = keys == null || keys.isEmpty()
-                ? List.of()
-                : sanitizeKeys(keys).stream().sorted().collect(Collectors.toList());
+        Optional<List<String>> requestedKeys = publicRequestedKeys(keys);
 
         return publicCacheService.getOrLoad(
                 PublicCacheService.CONTENT,
-                publishedContentCacheKey(resolvedLocale, sanitizedKeys),
+                publishedContentCacheKey(resolvedLocale, requestedKeys),
                 contentCacheTtlSeconds,
-                () -> getPublishedContentUncached(resolvedLocale, sanitizedKeys)
+                () -> getPublishedContentUncached(resolvedLocale, requestedKeys)
         );
     }
 
-    private PublicContentCatalogView getPublishedContentUncached(String resolvedLocale, List<String> keys) {
-        List<ContentEntry> entries = keys == null || keys.isEmpty()
-                ? contentEntryGateway.findByStatusAndLocale(ContentEntryStatus.PUBLISHED, resolvedLocale)
-                : contentEntryGateway.findByStatusAndLocaleAndKeyIn(
-                        ContentEntryStatus.PUBLISHED,
-                        resolvedLocale,
-                        keys
-                );
-        List<ContentEntryView> publishedEntries = entries.stream()
+    private PublicContentCatalogView getPublishedContentUncached(String resolvedLocale, Optional<List<String>> requestedKeys) {
+        List<ContentEntryView> publishedEntries = loadPublishedEntries(resolvedLocale, requestedKeys)
+                .stream()
                 .filter(entry -> entry.getType() != ContentEntryType.CATALOG)
+                .filter(entry -> isPubliclyExposableContentKey(entry.getKey()))
                 .filter(entry -> StringUtils.hasText(entry.getPublishedValue()))
                 .map(this::toPublicView)
                 .collect(Collectors.toList());
@@ -103,6 +101,35 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
                 .version(buildVersion(publishedEntries))
                 .entries(publishedEntries)
                 .build();
+    }
+
+    private Optional<List<String>> publicRequestedKeys(List<String> keys) {
+        if (keys == null || keys.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(sanitizeKeys(keys).stream()
+                .filter(this::isPubliclyExposableContentKey)
+                .sorted()
+                .collect(Collectors.toList()));
+    }
+
+    private List<ContentEntry> loadPublishedEntries(String locale, Optional<List<String>> requestedKeys) {
+        return requestedKeys
+                .map(keys -> findPublishedEntriesByKeys(locale, keys))
+                .orElseGet(() -> contentEntryGateway.findByStatusAndLocale(ContentEntryStatus.PUBLISHED, locale));
+    }
+
+    private List<ContentEntry> findPublishedEntriesByKeys(String locale, List<String> keys) {
+        if (keys.isEmpty()) {
+            return List.of();
+        }
+
+        return contentEntryGateway.findByStatusAndLocaleAndKeyIn(
+                ContentEntryStatus.PUBLISHED,
+                locale,
+                keys
+        );
     }
 
     @Override
@@ -433,8 +460,15 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
         return StringUtils.hasText(locale) ? locale.trim() : DEFAULT_LOCALE;
     }
 
-    private String publishedContentCacheKey(String locale, List<String> keys) {
-        return locale + "|keys=" + String.join(",", Optional.ofNullable(keys).orElse(List.of()));
+    private String publishedContentCacheKey(String locale, Optional<List<String>> requestedKeys) {
+        return locale + "|keys=" + requestedKeys
+                .map(keys -> String.join(",", keys))
+                .orElse("*");
+    }
+
+    private boolean isPubliclyExposableContentKey(String key) {
+        String normalizedKey = normalizeKey(key);
+        return NON_PUBLIC_CONTENT_PREFIXES.stream().noneMatch(normalizedKey::startsWith);
     }
 
     private String resolveScreen(String screen, String key) {

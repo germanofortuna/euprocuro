@@ -156,6 +156,98 @@ class ContentServiceTest {
     }
 
     @Test
+    void getPublishedContentShouldFilterOutAdministrativeEntriesWithoutKeys() {
+        ContentEntry publicEntry = ContentEntry.builder()
+                .id("entry-1")
+                .key("home.title")
+                .type(ContentEntryType.TEXT)
+                .locale("pt-BR")
+                .status(ContentEntryStatus.PUBLISHED)
+                .version(1)
+                .publishedValue("Bem vindo")
+                .build();
+        ContentEntry adminEntry = ContentEntry.builder()
+                .id("entry-2")
+                .key("admin.moderation.title")
+                .type(ContentEntryType.TEXT)
+                .locale("pt-BR")
+                .status(ContentEntryStatus.PUBLISHED)
+                .version(1)
+                .publishedValue("Moderacao")
+                .build();
+        ContentEntry contentAdminEntry = ContentEntry.builder()
+                .id("entry-3")
+                .key("contentadmin.title")
+                .type(ContentEntryType.TEXT)
+                .locale("pt-BR")
+                .status(ContentEntryStatus.PUBLISHED)
+                .version(1)
+                .publishedValue("CRM")
+                .build();
+        ContentEntry catalogAdminEntry = ContentEntry.builder()
+                .id("entry-4")
+                .key("catalogadmin.title")
+                .type(ContentEntryType.TEXT)
+                .locale("pt-BR")
+                .status(ContentEntryStatus.PUBLISHED)
+                .version(1)
+                .publishedValue("Catalogo")
+                .build();
+
+        when(contentEntryGateway.findByStatusAndLocale(ContentEntryStatus.PUBLISHED, "pt-BR"))
+                .thenReturn(List.of(publicEntry, adminEntry, contentAdminEntry, catalogAdminEntry));
+        when(publicCacheService.getOrLoad(eq("content"), any(), eq(300L), any()))
+                .thenAnswer(invocation -> invocation.getArgument(3, java.util.function.Supplier.class).get());
+
+        PublicContentCatalogView result = contentService.getPublishedContent("pt-BR", null);
+
+        assertThat(result.getEntries()).hasSize(1);
+        assertThat(result.getEntries()).extracting(ContentEntryView::getKey).containsExactly("home.title");
+    }
+
+    @Test
+    void getPublishedContentShouldIgnoreAdministrativeRequestedKeys() {
+        ContentEntry publicEntry = ContentEntry.builder()
+                .id("entry-1")
+                .key("home.title")
+                .type(ContentEntryType.TEXT)
+                .locale("pt-BR")
+                .status(ContentEntryStatus.PUBLISHED)
+                .version(1)
+                .publishedValue("Bem vindo")
+                .build();
+
+        when(contentEntryGateway.findByStatusAndLocaleAndKeyIn(
+                ContentEntryStatus.PUBLISHED,
+                "pt-BR",
+                List.of("home.title")))
+                .thenReturn(List.of(publicEntry));
+        when(publicCacheService.getOrLoad(eq("content"), any(), eq(300L), any()))
+                .thenAnswer(invocation -> invocation.getArgument(3, java.util.function.Supplier.class).get());
+
+        PublicContentCatalogView result = contentService.getPublishedContent(
+                "pt-BR",
+                List.of("admin.moderation.title", "contentAdmin.title", "catalogAdmin.title", "home.title")
+        );
+
+        assertThat(result.getEntries()).hasSize(1);
+        assertThat(result.getEntries()).extracting(ContentEntryView::getKey).containsExactly("home.title");
+    }
+
+    @Test
+    void getPublishedContentShouldReturnEmptyWhenOnlyAdministrativeKeysRequested() {
+        when(publicCacheService.getOrLoad(eq("content"), any(), eq(300L), any()))
+                .thenAnswer(invocation -> invocation.getArgument(3, java.util.function.Supplier.class).get());
+
+        PublicContentCatalogView result = contentService.getPublishedContent(
+                "pt-BR",
+                List.of("admin.moderation.title", "contentAdmin.title", "catalogAdmin.title")
+        );
+
+        assertThat(result.getEntries()).isEmpty();
+    }
+
+    @Test
     void getContentEntriesShouldRequireAdminAccess() {
         when(adminAccessService.requireAdmin("user-1"))
                 .thenThrow(new ForbiddenException("Sem permissao"));
