@@ -79,6 +79,8 @@ class MonetizationServiceTest {
         ReflectionTestUtils.setField(monetizationService, "localCheckoutEnabled", true);
         List<MonetizationProductView> products = defaultProducts();
         lenient().when(monetizationCatalog.products()).thenReturn(products);
+        lenient().when(monetizationCatalog.creditPurchasesEnabled()).thenReturn(true);
+        lenient().when(monetizationCatalog.boostPurchasesEnabled()).thenReturn(true);
         lenient().when(monetizationCatalog.findByCode(anyString())).thenReturn(Optional.empty());
         for (MonetizationProductView product : products) {
             lenient().when(monetizationCatalog.findByCode(product.getCode())).thenReturn(Optional.of(product));
@@ -249,6 +251,20 @@ class MonetizationServiceTest {
                 .build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Boost");
+    }
+
+    @Test
+    void purchaseShouldRejectWhenCreditPurchasesAreDisabled() {
+        when(monetizationCatalog.creditPurchasesEnabled()).thenReturn(false);
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+
+        assertThatThrownBy(() -> monetizationService.purchase("user-1", PurchaseProductCommand.builder()
+                .productCode("CREDITS_10")
+                .paymentMethod("PIX")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("creditos");
+        verify(paymentOrderGateway, never()).save(any(PaymentOrder.class));
     }
 
     @Test
@@ -694,6 +710,20 @@ class MonetizationServiceTest {
                 .build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("boost");
+    }
+
+    @Test
+    void boostInterestShouldRejectWhenBoostPurchasesAreDisabled() {
+        when(monetizationCatalog.boostPurchasesEnabled()).thenReturn(false);
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+
+        assertThatThrownBy(() -> monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+                .boostCode("BOOST_3_DAYS")
+                .paymentMethod("PIX")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("boosts");
+        verify(paymentOrderGateway, never()).save(any(PaymentOrder.class));
     }
 
     private UserProfile baseUser() {

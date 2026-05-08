@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  applyDefaultContentEntry,
   archiveContentEntry,
+  dismissDefaultContentEntry,
   fetchAdminContent,
   invalidatePublicCache,
   publishContentEntry,
@@ -21,7 +23,7 @@ const CONTENT_TYPES = [
   "CATALOG"
 ];
 
-const STATUS_OPTIONS = ["ALL", "DRAFT", "PUBLISHED", "ARCHIVED"];
+const STATUS_OPTIONS = ["ALL", "DEFAULT_UPDATE", "DRAFT", "PUBLISHED", "ARCHIVED"];
 
 const emptyForm = {
   id: "",
@@ -78,14 +80,16 @@ export default function ContentAdminPanel({ onFeedback }) {
     const normalizedSearch = normalizeSearch(search);
     return entries.filter((entry) => {
       const matchesStatus = statusFilter === "ALL" || entry.status === statusFilter;
+      const matchesDefaultUpdate = statusFilter === "DEFAULT_UPDATE" && entry.defaultUpdateAvailable;
       const searchable = [
         entry.key,
         entry.screen,
         entry.description,
         entry.draftValue,
-        entry.publishedValue
+        entry.publishedValue,
+        entry.defaultValue
       ].filter(Boolean).join(" ").toLowerCase();
-      return matchesStatus && (!normalizedSearch || searchable.includes(normalizedSearch));
+      return (matchesStatus || matchesDefaultUpdate) && (!normalizedSearch || searchable.includes(normalizedSearch));
     });
   }, [entries, search, statusFilter]);
 
@@ -189,6 +193,44 @@ export default function ContentAdminPanel({ onFeedback }) {
     }
   }
 
+  async function handleApplyDefaultDraft() {
+    if (!form.id) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const updated = await applyDefaultContentEntry(form.id);
+      setEntries((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
+      setSelectedId(updated.id);
+      setForm(toForm(updated));
+      showFeedback("success", "contentAdmin.feedback.defaultApplied.title", "contentAdmin.feedback.defaultApplied.message");
+    } catch (error) {
+      onFeedback?.("error", t("contentAdmin.feedback.defaultApplyError.title"), error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDismissDefaultUpdate() {
+    if (!form.id) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const updated = await dismissDefaultContentEntry(form.id);
+      setEntries((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
+      setSelectedId(updated.id);
+      setForm(toForm(updated));
+      showFeedback("success", "contentAdmin.feedback.defaultDismissed.title", "contentAdmin.feedback.defaultDismissed.message");
+    } catch (error) {
+      onFeedback?.("error", t("contentAdmin.feedback.defaultDismissError.title"), error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   async function handleInvalidateCache() {
     setIsInvalidatingCache(true);
     try {
@@ -254,6 +296,9 @@ export default function ContentAdminPanel({ onFeedback }) {
                 >
                   <strong>{entry.key}</strong>
                   <span>{entry.screen || entry.locale}</span>
+                  {entry.defaultUpdateAvailable ? (
+                    <span className="content-entry-button__badge">{t("contentAdmin.defaultUpdate.badge")}</span>
+                  ) : null}
                   <small>{t(`contentAdmin.status.${entry.status}`)} · v{entry.version}</small>
                 </button>
               ))}
@@ -271,6 +316,30 @@ export default function ContentAdminPanel({ onFeedback }) {
             <div className="content-admin__empty-note">
               <strong>{t("contentAdmin.form.emptyTitle")}</strong>
               <p>{t("contentAdmin.form.emptyDescription")}</p>
+            </div>
+          ) : null}
+
+          {selectedEntry?.defaultUpdateAvailable ? (
+            <div className="content-admin__default-update">
+              <div>
+                <span className="eyebrow">{t("contentAdmin.defaultUpdate.eyebrow")}</span>
+                <strong>{t("contentAdmin.defaultUpdate.title")}</strong>
+                <p>{t("contentAdmin.defaultUpdate.description")}</p>
+              </div>
+              <textarea
+                rows="5"
+                value={selectedEntry.defaultValue ?? ""}
+                readOnly
+                aria-label={t("contentAdmin.defaultUpdate.preview")}
+              />
+              <div className="inline-actions">
+                <button type="button" className="primary-button primary-button--compact" onClick={handleApplyDefaultDraft} disabled={isSaving}>
+                  {t("contentAdmin.defaultUpdate.apply")}
+                </button>
+                <button type="button" className="ghost-button ghost-button--small" onClick={handleDismissDefaultUpdate} disabled={isSaving}>
+                  {t("contentAdmin.defaultUpdate.dismiss")}
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -367,3 +436,4 @@ export default function ContentAdminPanel({ onFeedback }) {
     </article>
   );
 }
+

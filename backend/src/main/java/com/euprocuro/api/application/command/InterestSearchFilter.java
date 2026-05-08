@@ -14,4 +14,5 @@ public class InterestSearchFilter {
     BigDecimal maxBudget;
     String query;
     boolean openOnly;
+    String currentUserId;
 }

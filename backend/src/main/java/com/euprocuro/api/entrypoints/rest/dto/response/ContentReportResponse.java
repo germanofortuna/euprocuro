@@ -13,6 +13,9 @@ public class ContentReportResponse {
     String id;
     String contentType;
     String contentId;
+    String contentTitle;
+    String contentDescription;
+    String contentStatus;
     String reportedBy;
     String reason;
     String message;

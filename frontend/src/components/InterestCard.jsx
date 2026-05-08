@@ -1,3 +1,5 @@
+import BoostRocket from "./BoostRocket";
+
 export default function InterestCard({ interest, selected, onClick }) {
   const isBoosted = Boolean(
     interest.boostedUntil
@@ -25,13 +27,10 @@ export default function InterestCard({ interest, selected, onClick }) {
       )}
 
       <div className="interest-card__summary-copy">
+        <span>Procura publicada</span>
         <strong>
           {interest.title}
-          {isBoosted ? (
-            <span className="boost-rocket" aria-label="Interesse impulsionado" title="Interesse impulsionado">
-              🚀
-            </span>
-          ) : null}
+          {isBoosted ? <BoostRocket /> : null}
         </strong>
       </div>
     </button>

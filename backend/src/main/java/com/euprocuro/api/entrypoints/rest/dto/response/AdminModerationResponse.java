@@ -11,4 +11,5 @@ public class AdminModerationResponse {
     List<InterestResponse> pendingInterests;
     List<ModerationRuleResponse> rules;
     List<ContentReportResponse> openReports;
+    List<ContentReportResponse> processedReports;
 }

@@ -1,10 +1,11 @@
-import logo from "../assets/eu-procuro-logo.png";
+import logoDark from "../assets/eu-procuro-logo-dark.svg";
 import { useContentText } from "../content/ContentContext";
 
 const loggedSections = {
   EXPLORE: "EXPLORE",
   CREDITS: "CREDITS",
-  NEW_INTEREST: "NEW_INTEREST"
+  NEW_INTEREST: "NEW_INTEREST",
+  ADMIN: "ADMIN"
 };
 
 function BellIcon() {
@@ -40,9 +41,13 @@ export default function Header({
   hasNotifications,
   sellerCredits,
   subscriptionActive,
+  creditPurchasesEnabled = false,
+  isAdmin = false,
+  unreadAdminReportCount = 0,
   notificationButtonRef,
   onNavigate,
   onCreditsClick,
+  onAdminClick,
   onNotificationClick,
   onLoginClick,
   onRegisterClick,
@@ -62,10 +67,7 @@ export default function Header({
         className="topbar__brand topbar__brand-button"
         onClick={() => onNavigate(loggedSections.EXPLORE)}
       >
-        <img src={logo} alt={t("header.logo.alt")} />
-        <div className="topbar__brand-copy">
-          <span className="eyebrow">{t("header.brand.eyebrow")}</span>
-        </div>
+        <img className="brand-logo" src={logoDark} alt={t("header.logo.alt")} />
       </button>
 
       {hideActions ? null : authenticated ? (
@@ -76,19 +78,35 @@ export default function Header({
               className={currentSection === loggedSections.NEW_INTEREST ? "active" : ""}
               onClick={() => onNavigate(loggedSections.NEW_INTEREST)}
             >
+              <span className="nav-icon" aria-hidden="true">+</span>
               {t("header.nav.publish")}
             </button>
+            {isAdmin ? (
+              <button
+                type="button"
+                className={`admin-header-button ${currentSection === loggedSections.ADMIN ? "active" : ""}`}
+                onClick={onAdminClick}
+              >
+                <span className="nav-icon" aria-hidden="true">⚙</span>
+                {t("admin.moderation.nav")}
+                {unreadAdminReportCount > 0 ? (
+                  <strong className="admin-nav-badge">{unreadAdminReportCount}</strong>
+                ) : null}
+              </button>
+            ) : null}
           </nav>
 
-          <button
-            type="button"
-            className={`credits-badge ${hasNoCredits ? "credits-badge--empty" : ""}`}
-            onClick={onCreditsClick}
-            title={t("header.credits.title")}
-          >
-            <strong>{subscriptionActive ? t("header.credits.pro") : (sellerCredits ?? 0)}</strong>
-            <span>{subscriptionActive ? t("header.credits.planActive") : t("header.credits.credits")}</span>
-          </button>
+          {creditPurchasesEnabled ? (
+            <button
+              type="button"
+              className={`credits-badge ${hasNoCredits ? "credits-badge--empty" : ""}`}
+              onClick={onCreditsClick}
+              title={t("header.credits.title")}
+            >
+              <strong>{subscriptionActive ? t("header.credits.pro") : (sellerCredits ?? 0)}</strong>
+              <span>{subscriptionActive ? t("header.credits.planActive") : t("header.credits.credits")}</span>
+            </button>
+          ) : null}
 
           <button
             ref={notificationButtonRef}

@@ -9,6 +9,8 @@ import lombok.Value;
 @Value
 @Builder
 public class AdminOperationalCatalogResponse {
+    MonetizationSettingsResponse monetizationSettings;
+    ModerationSettingsResponse moderationSettings;
     List<CategoryOptionResponse> categories;
     List<MonetizationProductResponse> products;
     Instant updatedAt;

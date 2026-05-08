@@ -26,6 +26,7 @@ import com.euprocuro.api.domain.gateway.ContentReportGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.ModerationRuleGateway;
 import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
+import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.ContentReport;
 import com.euprocuro.api.domain.model.ContentReportStatus;
 import com.euprocuro.api.domain.model.InterestModeration;
@@ -35,6 +36,7 @@ import com.euprocuro.api.domain.model.ModerationContent;
 import com.euprocuro.api.domain.model.ModerationResult;
 import com.euprocuro.api.domain.model.ModerationRiskLevel;
 import com.euprocuro.api.domain.model.ModerationRule;
+import com.euprocuro.api.domain.model.UserProfile;
 
 import lombok.RequiredArgsConstructor;
 
@@ -53,6 +55,8 @@ public class ModerationService implements ModerationUseCase {
     private final AiModerationGateway aiModerationGateway;
     private final RealtimeMessageGateway realtimeMessageGateway;
     private final PublicCacheService publicCacheService;
+    private final UserGateway userGateway;
+    private final UserBlockListService userBlockListService;
 
     @Value("${application.moderation.local.blocked-terms:}")
     private String defaultBlockedTerms;
@@ -68,12 +72,21 @@ public class ModerationService implements ModerationUseCase {
         if (interest.getStatus() != InterestStatus.PENDING) {
             return;
         }
+        Optional<UserProfile> owner = loadOwner(interest);
 
         LocalRuleMatch localRuleMatch = findLocalRuleMatch(interest).orElse(null);
         if (localRuleMatch != null && localRuleMatch.riskLevel == ModerationRiskLevel.HIGH) {
-            saveDecision(interest, InterestStatus.REJECTED, ModerationRiskLevel.HIGH, "LOCAL_RULE",
+            InterestPost saved = saveDecision(interest, InterestStatus.REJECTED, ModerationRiskLevel.HIGH, "LOCAL_RULE",
                     Map.of("local_rule", true), Map.of(localRuleMatch.term, 1.0),
                     localRuleMatch.reason, false);
+            blockOwnerAfterAutomaticRejection(owner, saved, "LOCAL_RULE", localRuleMatch.reason);
+            return;
+        }
+
+        if (owner.flatMap(userBlockListService::findActiveBlock).isPresent()) {
+            saveDecision(interest, InterestStatus.REVIEW_REQUIRED, ModerationRiskLevel.MEDIUM, "BLOCK_LIST",
+                    Map.of("user_block_list", true), Map.of(),
+                    "Este anuncio precisa de revisao manual pela politica de seguranca da plataforma.", false);
             return;
         }
 
@@ -95,8 +108,10 @@ public class ModerationService implements ModerationUseCase {
         double highestScore = highestScore(result.getScores());
         log.info("AI moderation was flagged? {}", result.isFlagged());
         if (result.isFlagged() || highestScore >= rejectThreshold) {
-            saveDecision(interest, InterestStatus.REJECTED, ModerationRiskLevel.HIGH, result.getProvider(),
-                    result.getCategories(), result.getScores(), "A moderacao automatica rejeitou este anuncio.", result.isFlagged());
+            String reason = "A moderacao automatica rejeitou este anuncio.";
+            InterestPost saved = saveDecision(interest, InterestStatus.REJECTED, ModerationRiskLevel.HIGH, result.getProvider(),
+                    result.getCategories(), result.getScores(), reason, result.isFlagged());
+            blockOwnerAfterAutomaticRejection(owner, saved, result.getProvider(), reason);
             return;
         }
 
@@ -144,7 +159,7 @@ public class ModerationService implements ModerationUseCase {
         return report;
     }
 
-    private void saveDecision(
+    private InterestPost saveDecision(
             InterestPost interest,
             InterestStatus status,
             ModerationRiskLevel riskLevel,
@@ -169,6 +184,23 @@ public class ModerationService implements ModerationUseCase {
                 .build());
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         realtimeMessageGateway.publishInterestModerationUpdated(saved.getOwnerId(), saved.getId(), status.name(), reason);
+        return saved;
+    }
+
+    private Optional<UserProfile> loadOwner(InterestPost interest) {
+        if (interest == null || !StringUtils.hasText(interest.getOwnerId())) {
+            return Optional.empty();
+        }
+        return userGateway.findById(interest.getOwnerId());
+    }
+
+    private void blockOwnerAfterAutomaticRejection(
+            Optional<UserProfile> owner,
+            InterestPost interest,
+            String sourceProvider,
+            String reason
+    ) {
+        owner.ifPresent(user -> userBlockListService.block(user, interest, sourceProvider, reason));
     }
 
     private InterestModeration mergeModeration(InterestModeration current) {

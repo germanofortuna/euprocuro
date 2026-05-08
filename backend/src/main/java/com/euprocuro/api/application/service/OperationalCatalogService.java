@@ -3,15 +3,10 @@ package com.euprocuro.api.application.service;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,11 +16,15 @@ import org.springframework.util.StringUtils;
 
 import com.euprocuro.api.application.command.CatalogCategoryCommand;
 import com.euprocuro.api.application.command.CatalogProductCommand;
+import com.euprocuro.api.application.command.ModerationSettingsCommand;
+import com.euprocuro.api.application.command.MonetizationSettingsCommand;
 import com.euprocuro.api.application.command.SaveOperationalCatalogCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.view.AdminOperationalCatalogView;
 import com.euprocuro.api.application.view.CatalogCategoryView;
+import com.euprocuro.api.application.view.ModerationSettingsView;
 import com.euprocuro.api.application.view.MonetizationProductView;
+import com.euprocuro.api.application.view.MonetizationSettingsView;
 import com.euprocuro.api.domain.gateway.ContentEntryGateway;
 import com.euprocuro.api.domain.gateway.ContentRevisionGateway;
 import com.euprocuro.api.domain.model.ContentEntry;
@@ -45,6 +44,8 @@ public class OperationalCatalogService {
     private static final String DEFAULT_LOCALE = "pt-BR";
     private static final String CATEGORY_KEY = "catalog.categories";
     private static final String PRODUCT_KEY = "catalog.monetization.products";
+    private static final String MONETIZATION_SETTINGS_KEY = "catalog.monetization.settings";
+    private static final String MODERATION_SETTINGS_KEY = "catalog.moderation.settings";
     private static final String CODE_PATTERN = "[A-Z0-9][A-Z0-9_-]{1,48}";
 
     private final AdminAccessService adminAccessService;
@@ -73,10 +74,26 @@ public class OperationalCatalogService {
                 PublicCacheService.CATALOG,
                 "active-products",
                 catalogCacheTtlSeconds,
-                () -> listProducts().stream()
-                        .filter(MonetizationProductView::isEnabled)
-                        .collect(Collectors.toList())
+                () -> filterProductsForSettings(listProducts(), getMonetizationSettings())
         );
+    }
+
+    public MonetizationSettingsView getMonetizationSettings() {
+        ensureDefaultsSeeded();
+        return loadEntry(MONETIZATION_SETTINGS_KEY)
+                .map(ContentEntry::getPublishedValue)
+                .filter(StringUtils::hasText)
+                .map(this::readSettings)
+                .orElseGet(this::defaultMonetizationSettings);
+    }
+
+    public ModerationSettingsView getModerationSettings() {
+        ensureDefaultsSeeded();
+        return loadEntry(MODERATION_SETTINGS_KEY)
+                .map(ContentEntry::getPublishedValue)
+                .filter(StringUtils::hasText)
+                .map(this::readModerationSettings)
+                .orElseGet(this::defaultModerationSettings);
     }
 
     public String requireActiveCategory(String code) {
@@ -102,23 +119,34 @@ public class OperationalCatalogService {
 
         List<CatalogCategoryView> categories = validateCategories(command.getCategories());
         List<MonetizationProductView> products = validateProducts(command.getProducts());
+        MonetizationSettingsView monetizationSettings = validateMonetizationSettings(command.getMonetizationSettings());
+        ModerationSettingsView moderationSettings = validateModerationSettings(command.getModerationSettings());
 
         saveCatalogEntry(CATEGORY_KEY, "Categorias de anuncios", categories, admin.getId());
         saveCatalogEntry(PRODUCT_KEY, "Produtos, planos e promocoes", products, admin.getId());
+        saveCatalogEntry(MONETIZATION_SETTINGS_KEY, "Configuracao de monetizacao", monetizationSettings, admin.getId());
+        saveCatalogEntry(MODERATION_SETTINGS_KEY, "Configuracao de moderacao", moderationSettings, admin.getId());
         publicCacheService.invalidate(PublicCacheService.CATALOG);
         return buildAdminView();
     }
 
     private AdminOperationalCatalogView buildAdminView() {
         ensureDefaultsSeeded();
-        Instant updatedAt = List.of(loadEntry(CATEGORY_KEY), loadEntry(PRODUCT_KEY)).stream()
+        Instant updatedAt = Stream.of(
+                        loadEntry(CATEGORY_KEY),
+                        loadEntry(PRODUCT_KEY),
+                        loadEntry(MONETIZATION_SETTINGS_KEY),
+                        loadEntry(MODERATION_SETTINGS_KEY)
+                )
                 .flatMap(Optional::stream)
                 .map(ContentEntry::getUpdatedAt)
-                .filter(value -> value != null)
+                .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .orElse(null);
 
         return AdminOperationalCatalogView.builder()
+                .monetizationSettings(getMonetizationSettings())
+                .moderationSettings(getModerationSettings())
                 .categories(listCategories())
                 .products(listProducts())
                 .updatedAt(updatedAt)
@@ -159,6 +187,22 @@ public class OperationalCatalogService {
         }
     }
 
+    private MonetizationSettingsView readSettings(String value) {
+        try {
+            return objectMapper.readValue(value, MonetizationSettingsRecord.class).toView();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Configuracao de monetizacao invalida.", exception);
+        }
+    }
+
+    private ModerationSettingsView readModerationSettings(String value) {
+        try {
+            return objectMapper.readValue(value, ModerationSettingsRecord.class).toView();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Configuracao de moderacao invalida.", exception);
+        }
+    }
+
     private Optional<ContentEntry> loadEntry(String key) {
         ensureDefaultsSeeded();
         return contentEntryGateway.findByKeyAndLocale(key, DEFAULT_LOCALE);
@@ -170,6 +214,8 @@ public class OperationalCatalogService {
         }
         seedCatalogEntry(CATEGORY_KEY, "Categorias de anuncios", defaultCategories());
         seedCatalogEntry(PRODUCT_KEY, "Produtos, planos e promocoes", defaultProducts());
+        seedCatalogEntry(MONETIZATION_SETTINGS_KEY, "Configuracao de monetizacao", defaultMonetizationSettings());
+        seedCatalogEntry(MODERATION_SETTINGS_KEY, "Configuracao de moderacao", defaultModerationSettings());
     }
 
     private void seedCatalogEntry(String key, String description, Object value) {
@@ -287,6 +333,59 @@ public class OperationalCatalogService {
         return products;
     }
 
+    private MonetizationSettingsView validateMonetizationSettings(MonetizationSettingsCommand command) {
+        if (command == null) {
+            return defaultMonetizationSettings();
+        }
+        return MonetizationSettingsView.builder()
+                .creditPurchasesEnabled(command.isCreditPurchasesEnabled())
+                .boostPurchasesEnabled(command.isBoostPurchasesEnabled())
+                .build();
+    }
+
+    private ModerationSettingsView validateModerationSettings(ModerationSettingsCommand command) {
+        if (command == null) {
+            return defaultModerationSettings();
+        }
+        return ModerationSettingsView.builder()
+                .userBlockListEnabled(command.isUserBlockListEnabled())
+                .build();
+    }
+
+    private List<MonetizationProductView> filterProductsForSettings(
+            List<MonetizationProductView> products,
+            MonetizationSettingsView settings
+    ) {
+        boolean creditPurchasesEnabled = settings != null && settings.isCreditPurchasesEnabled();
+        boolean boostPurchasesEnabled = settings != null && settings.isBoostPurchasesEnabled();
+        return products.stream()
+                .filter(MonetizationProductView::isEnabled)
+                .filter(product -> {
+                    if (product.getType() == MonetizationProductType.BOOST) {
+                        return boostPurchasesEnabled;
+                    }
+                    if (product.getType() == MonetizationProductType.CREDIT_PACK
+                            || product.getType() == MonetizationProductType.SUBSCRIPTION) {
+                        return creditPurchasesEnabled;
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private MonetizationSettingsView defaultMonetizationSettings() {
+        return MonetizationSettingsView.builder()
+                .creditPurchasesEnabled(false)
+                .boostPurchasesEnabled(false)
+                .build();
+    }
+
+    private ModerationSettingsView defaultModerationSettings() {
+        return ModerationSettingsView.builder()
+                .userBlockListEnabled(true)
+                .build();
+    }
+
     private List<CatalogCategoryView> defaultCategories() {
         return List.of(
                 category("AUTOMOVEIS", "Automoveis", 10),
@@ -399,6 +498,30 @@ public class OperationalCatalogService {
                     .durationDays(durationDays)
                     .enabled(enabled)
                     .sortOrder(sortOrder)
+                    .build();
+        }
+    }
+
+    @Data
+    private static class MonetizationSettingsRecord {
+        private boolean creditPurchasesEnabled;
+        private boolean boostPurchasesEnabled;
+
+        private MonetizationSettingsView toView() {
+            return MonetizationSettingsView.builder()
+                    .creditPurchasesEnabled(creditPurchasesEnabled)
+                    .boostPurchasesEnabled(boostPurchasesEnabled)
+                    .build();
+        }
+    }
+
+    @Data
+    private static class ModerationSettingsRecord {
+        private boolean userBlockListEnabled = true;
+
+        private ModerationSettingsView toView() {
+            return ModerationSettingsView.builder()
+                    .userBlockListEnabled(userBlockListEnabled)
                     .build();
         }
     }

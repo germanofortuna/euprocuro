@@ -9,4 +9,8 @@ import com.euprocuro.api.infrastructure.persistence.document.ContentReportDocume
 
 public interface SpringDataContentReportRepository extends MongoRepository<ContentReportDocument, String> {
     List<ContentReportDocument> findByStatusOrderByCreatedAtDesc(ContentReportStatus status);
+
+    List<ContentReportDocument> findByStatusInOrderByCreatedAtDesc(List<ContentReportStatus> statuses);
+
+    List<ContentReportDocument> findByContentIdAndStatusOrderByCreatedAtDesc(String contentId, ContentReportStatus status);
 }

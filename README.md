@@ -41,6 +41,7 @@ O backend segue uma separacao clara entre camadas:
 - Busca publica por texto, categoria, cidade e teto de orcamento
 - Monetizacao MVP com creditos para vendedores, plano Pro e boost pago de interesses apos a publicacao
 - CRM administrativo para textos, politicas legais, categorias, precos, planos e promocoes em runtime
+- Block list automatica por CPF/CNPJ para usuarios com procuras rejeitadas pela moderacao
 - Cache publico server-side para conteudo, catalogo, CEP e vitrine de interesses, com invalidacao manual no admin
 - Indices Mongo para as consultas publicas mais frequentes e contrato de busca dedicado para evoluir para Atlas Search/OpenSearch
 - Checkout local simulado e Checkout Pro Mercado Pago com confirmacao por webhook
@@ -168,6 +169,20 @@ Em hospedagem, configure `VITE_API_BASE` para a URL publica da API, por exemplo:
 VITE_API_BASE=https://api.seudominio.com/api
 ```
 
+### Google Analytics
+
+O frontend suporta Google Analytics 4 via Google tag (`gtag.js`). Para ativar, crie uma propriedade GA4, adicione uma stream Web para o dominio da aplicacao e copie o ID de medicao, que comeca com `G-`.
+
+Configure no ambiente do frontend:
+
+```bash
+VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX
+```
+
+Se a variavel ficar vazia, o Analytics nao e carregado. Isso permite deixar local e HML sem medicao, ou usar propriedades separadas por ambiente.
+
+A implementacao registra pageviews nas rotas do SPA e eventos basicos de compartilhamento de interesse (`share_interest`). Nao envie dados pessoais ao Google Analytics; use apenas identificadores tecnicos e propriedades agregadas.
+
 ## Ambiente local esperado
 
 - Java 11
@@ -269,6 +284,27 @@ APP_ADMIN_ALLOWED_EMAILS=seu-email@dominio.com,outro-admin@dominio.com
 
 Depois reinicie o backend local ou faca redeploy no Render. Ao logar com um e-mail liberado, a opcao `Moderacao` aparece na area logada.
 
+### Block list por CPF/CNPJ
+
+A plataforma possui uma block list operacional em MongoDB para reduzir risco de reincidencia em conteudo rejeitado.
+
+Como funciona:
+
+1. Toda procura nasce como `PENDING` e passa pelo fluxo de moderacao.
+2. Se a moderacao automatica rejeitar a procura por regra local de alto risco ou pela IA, o CPF/CNPJ do dono da procura e usado para criar uma entrada em `user_block_list`.
+3. Em novas publicacoes, se o CPF/CNPJ estiver ativo na block list, a procura nao e publicada automaticamente. Ela fica como `REVIEW_REQUIRED` com provider `BLOCK_LIST`.
+4. O admin decide manualmente se aprova, rejeita ou arquiva a procura pelo painel de moderacao.
+
+Para reduzir exposicao de dado sensivel, a collection `user_block_list` nao duplica o CPF/CNPJ bruto: ela armazena `documentHash`, `documentLast4`, tipo do documento, origem da rejeicao e contadores de reincidencia. O frontend publico nao recebe a block list nem dados sensiveis de documento.
+
+Em producao, configure um segredo para fortalecer o hash deterministico:
+
+```bash
+APP_SECURITY_DOCUMENT_HASH_PEPPER=um-segredo-longo-e-randomico
+```
+
+A block list fica ativada por padrao. Para desativar temporariamente em local/HML/admin, acesse `Moderacao` > `CRM operacional` > `Politicas de moderacao` e desmarque `Ativar block list automatica por CPF/CNPJ`. Ao salvar, o backend para de consultar e de gravar entradas novas enquanto a opcao estiver desligada.
+
 ## CRM administrativo
 
 A aba `Moderacao` tambem concentra o CRM interno da plataforma. O acesso e sempre protegido pelo backend: somente usuarios autenticados cujo e-mail esteja em `APP_ADMIN_ALLOWED_EMAILS` conseguem ler ou alterar dados administrativos.
@@ -276,7 +312,7 @@ A aba `Moderacao` tambem concentra o CRM interno da plataforma. O acesso e sempr
 O CRM possui duas frentes:
 
 - **Conteudo**: textos da interface, mensagens, CTAs, erros e documentos legais. Rascunhos, historico e autoria ficam restritos ao admin; o site publico consome apenas entradas `PUBLISHED` por `GET /api/content/public`.
-- **Catalogo operacional**: categorias de anuncios, produtos de monetizacao, precos, planos, boosts e promocoes. O site recebe apenas categorias ativas e produtos habilitados; campos internos de admin nao sao expostos ao front publico.
+- **Catalogo operacional**: categorias de anuncios, disponibilidade da monetizacao, produtos, precos, planos, boosts e promocoes. O site recebe apenas categorias ativas e modalidades de monetizacao habilitadas; campos internos de admin nao sao expostos ao front publico.
 
 Fluxo de conteudo:
 
@@ -285,12 +321,31 @@ Fluxo de conteudo:
 3. Ao publicar, a versao passa a ser carregada em runtime pelo frontend, sem redeploy.
 4. Documentos legais publicados alimentam as paginas do footer e o modal de aceite dos Termos de Uso.
 
+Atualizacoes do `default-content.json`:
+
+- O arquivo `default-content.json` e tratado como baseline de produto, nao como uma sobrescrita automatica do CRM.
+- Em cada subida, o backend compara o valor padrao atual com o conteudo ja existente no Mongo.
+- Chaves novas sao criadas e publicadas automaticamente, como no seed inicial.
+- Chaves existentes nao sao sobrescritas. Se o valor padrao mudou e ainda nao esta publicado nem em rascunho, a entrada recebe `defaultUpdateAvailable=true`.
+- No CRM de conteudo, essas entradas aparecem com o selo `Atualizacao padrao` e no filtro `Atualizacoes padrao`.
+- O admin pode clicar em `Aplicar como rascunho` para copiar a versao do arquivo para o rascunho e depois publicar normalmente.
+- O admin tambem pode clicar em `Ignorar sugestao`; essa versao padrao nao volta a aparecer ate o hash do default mudar de novo em outro deploy.
+- Isso permite que novas copies vindas do codigo sejam revisadas, aprovadas e publicadas em runtime sem apagar customizacoes feitas diretamente no CRM.
+
+Se a collection `content_entries` for apagada em local/HML, o proximo boot recria tudo a partir do `default-content.json`. Em producao, prefira backup e fluxo de aprovacao pelo CRM, porque apagar a collection remove rascunhos, publicacoes, flags legais, autoria e historico operacional associado.
+
 Fluxo de catalogo operacional:
 
 1. O admin altera categorias ou produtos em `CRM operacional`.
-2. Ao salvar, o backend valida codigos, duplicidades, preco promocional e pelo menos uma categoria ativa.
+2. Ao salvar, o backend valida codigos, duplicidades, preco promocional, disponibilidade da monetizacao e pelo menos uma categoria ativa.
 3. Categorias ativas sao refletidas em `GET /api/categories`.
-4. Produtos habilitados sao refletidos em `GET /api/monetization/products` e na conta de monetizacao.
+4. Produtos habilitados sao refletidos em `GET /api/monetization/products` e na conta de monetizacao somente quando a modalidade correspondente tambem estiver habilitada.
+
+Disponibilidade da monetizacao:
+
+- `creditPurchasesEnabled=false` oculta o saldo/botao de creditos no topo, remove a aba `Comprar creditos`, nao entrega pacotes de credito/plano na conta de monetizacao e bloqueia `POST /api/monetization/purchase`.
+- `boostPurchasesEnabled=false` nao entrega produtos `BOOST`, oculta a area de impulsionamento do interesse e bloqueia `POST /api/monetization/interests/{interestId}/boost`.
+- O padrao semeado pelo backend e subir tudo desativado. Para liberar primeiro apenas boosts, habilite somente `Permitir compra de boosts` no CRM operacional e mantenha creditos/planos desligados.
 
 Promocoes:
 
@@ -310,6 +365,68 @@ Boost:
 - O interesse nasce sem destaque.
 - Depois de publicado/aprovado, o usuario pode comprar um produto do tipo `BOOST`.
 - Quando o pagamento e processado, o backend grava `boostedUntil`; a busca usa esse campo para priorizar o anuncio enquanto estiver vigente.
+
+## Entrega dinamica de procuras
+
+A vitrine agora possui uma etapa de ranking deterministico para usuarios logados. A regra central e:
+
+> Toda procura tem uma area natural de entrega. O boost nao muda o conteudo da procura; ele aumenta alcance e prioridade.
+
+O endpoint continua sendo `GET /api/interests`; nao houve mudanca de contrato para o frontend. Quando a requisicao possui usuario autenticado, o backend usa `CurrentUserContext.optionalUserId` para aplicar uma ordenacao personalizada. Quando nao ha usuario logado, a vitrine continua usando a ordenacao publica cacheavel: boost ativo primeiro e depois mais recentes.
+
+Pontuacao inicial usada pelo `InterestDeliveryRankingService`:
+
+- boost ativo: `+30`
+- procura criada nas ultimas 24h: `+10`; ate 7 dias: `+6`; ate 30 dias: `+3`
+- mesma cidade do usuario: `+40`
+- mesmo estado do usuario: `+20`
+- mesmo pais do usuario: `+5`
+- categoria igual a algum item ativo em `Tenho para negociar`: `+25`
+- mesma cidade de algum item ativo: `+20`
+- mesmo estado de algum item ativo: `+10`
+- tags iguais entre procura e item ativo: `+12` por tag, limitado a `+36`
+- tokens parecidos entre titulo/descricao/tags da procura e titulo/descricao/tags dos itens ativos: `+8` por token, limitado a `+40`
+
+Preferencias usadas hoje:
+
+- localizacao do perfil do usuario (`city`, `state`, `country`)
+- itens ativos cadastrados em `Tenho para negociar`
+- categoria, tags, titulo e descricao desses itens
+
+Ainda nao existe uma tabela de preferencias explicitas. Isso foi proposital para manter a primeira versao simples: o usuario ja personaliza a entrega indiretamente ao preencher endereco e cadastrar itens que possui.
+
+Comportamento com cache:
+
+- visitantes anonimos continuam usando cache `marketplace`
+- usuarios logados nao usam o cache publico compartilhado para a lista personalizada
+- a busca Mongo continua atras do contrato `InterestSearchGateway`
+- para ranking personalizado, o backend busca uma janela maior de candidatos e reordena em memoria antes de aplicar `offset` e `limit`
+
+Como testar localmente:
+
+1. Crie ou use um usuario com cidade/estado preenchidos, por exemplo `Erechim/RS`.
+2. Cadastre um item ativo em `Tenho para negociar`, por exemplo `Celta 2012`, categoria `AUTOMOVEIS`, tags `celta`, `chevrolet`.
+3. Com outro usuario, publique procuras variadas:
+   - uma procura por `Celta 2012` em `Erechim/RS`
+   - uma procura generica mais recente de outra categoria
+   - uma procura com boost ativo, se boosts estiverem habilitados
+4. Acesse a home logado com o usuario que possui o item. A procura por `Celta 2012` deve ganhar prioridade por categoria, texto, tags e localizacao.
+5. Acesse a home deslogado. A ordenacao deve voltar ao comportamento publico: boost ativo e recencia.
+
+Testes automatizados relacionados:
+
+```bash
+mvn -q "-Dtest=InterestDeliveryRankingServiceTest,MarketplaceServiceTest" test
+```
+
+Proximos passos recomendados:
+
+- Criar preferencias explicitas no perfil do usuario: categorias favoritas, palavras-chave/tags, cidades/regioes e raio padrao.
+- Permitir editar essas preferencias em uma tela simples de perfil.
+- Registrar sinais de interacao, como procuras abertas, propostas enviadas e itens ignorados, para melhorar ranking sem depender so de cadastro manual.
+- Exibir explicacoes discretas no front, por exemplo `Combina com um item seu` ou `Procura proxima de voce`.
+- Criar notificacoes controladas para novas procuras compativeis, com limite por periodo para evitar spam.
+- Migrar a parte textual para busca dedicada quando a base crescer: Atlas Search, OpenSearch, Meilisearch ou Typesense. O contrato `InterestSearchGateway` ja deixa essa troca isolada.
 
 ## Cache, indices e busca
 
@@ -364,6 +481,62 @@ O Mongo cria indices automaticamente via `spring.data.mongodb.auto-index-creatio
 
 A busca publica continua usando Mongo, mas a regra de busca ficou atras do contrato `InterestSearchGateway`. Para uma busca dedicada no futuro, crie outro adapter para esse contrato, por exemplo Atlas Search ou OpenSearch, sem alterar o caso de uso do marketplace.
 
+## Logs de auditoria e integracoes externas
+
+A aplicacao grava dois tipos de registro operacional no MongoDB:
+
+- `audit_events`: eventos internos de negocio e administracao, como cadastro, login, logout, criacao/edicao de interesse, envio de oferta e invalidacao manual de cache.
+- `external_integration_logs`: chamadas para servicos externos, com request/response agrupados para facilitar inspecao no Mongo.
+
+Os logs externos usam uma estrutura intencionalmente simples:
+
+```json
+{
+  "createdAt": "2026-05-06T20:00:00Z",
+  "operation": "OPEN_AI_MODERATION",
+  "correlationId": "interest-123",
+  "request": {
+    "method": "POST",
+    "url": "/v1/moderations",
+    "headers": {
+      "Authorization": "***"
+    },
+    "body": {
+      "model": "omni-moderation-latest",
+      "input": []
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {}
+  },
+  "durationMs": 123,
+  "success": true,
+  "errorMessage": null
+}
+```
+
+Operacoes registradas atualmente:
+
+- `OPEN_AI_MODERATION`: chamada de moderacao para a OpenAI.
+- `VIA_CEP`: consulta de endereco por CEP.
+- `MERCADO_PAGO_CREATE_CHECKOUT_PREFERENCE`: criacao de preferencia no Checkout Pro.
+- `MERCADO_PAGO_FIND_PAYMENT`: consulta de pagamento no Mercado Pago.
+
+Headers sensiveis sao mascarados antes de salvar (`Authorization`, tokens, API keys, cookies, passwords e secrets). Bodies grandes sao truncados por seguranca e controle de volume.
+
+Configuracao:
+
+```bash
+APP_AUDIT_TTL_SECONDS=604800
+APP_EXTERNAL_LOG_TTL_SECONDS=604800
+APP_EXTERNAL_LOG_BODY_MAX_LENGTH=4000
+```
+
+Por padrao, os registros expiram em 7 dias por indice TTL. Esse prazo e adequado para testes, HML e investigacao curta; para producao, ajuste conforme necessidade juridica/operacional.
+
+Observacao importante sobre OpenAI: o log `OPEN_AI_MODERATION` so aparece quando a chamada real para a OpenAI acontece. No fluxo atual, a criacao de interesse publica um evento de moderacao no RabbitMQ; se o consumidor nao estiver rodando, se o RabbitMQ estiver indisponivel, se `APP_OPENAI_MODERATION_ENABLED=false` ou se `OPENAI_API_KEY` estiver ausente/invalida, nao havera request externo para registrar nessa collection.
+
 ## Monetizacao e pagamentos
 
 O MVP ja possui produtos de monetizacao configuraveis por ambiente:
@@ -372,7 +545,7 @@ O MVP ja possui produtos de monetizacao configuraveis por ambiente:
 - plano vendedor Pro com propostas liberadas enquanto estiver ativo
 - boost de 3 ou 7 dias para destacar interesses na busca e na home
 
-Por padrao geral, o pagamento usa o provedor `LOCAL_MOCK`: a API simula aprovacao imediata para permitir testar produto, tela e regras de negocio sem dinheiro real.
+Por padrao geral, a disponibilidade comercial sobe desligada pelo CRM operacional, mesmo que o provedor de pagamento esteja configurado. O pagamento usa o provedor `LOCAL_MOCK`: a API simula aprovacao imediata para permitir testar produto, tela e regras de negocio sem dinheiro real quando uma modalidade for habilitada.
 
 No profile `local`, o provedor padrao e `LOCAL_CHECKOUT_MOCK`. Ele cria um pedido pendente, redireciona para um checkout fake local e aprova o pedido automaticamente antes de voltar ao frontend. Assim da para testar o fluxo ponta-a-ponta sem ngrok e sem webhook real:
 
@@ -569,16 +742,40 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 - `POST /api/monetization/purchase`
 - `POST /api/monetization/interests/{interestId}/boost`
 - `POST /api/monetization/mercado-pago/webhook`
+- `POST /api/ouvidoria`
+- `GET /api/admin/ouvidoria`
+- `POST /api/admin/ouvidoria/{id}/response`
+- `PATCH /api/admin/ouvidoria/{id}/status`
 - `GET /api/content/public`
 - `GET /api/admin/content`
 - `POST /api/admin/content`
 - `PUT /api/admin/content/{id}`
 - `POST /api/admin/content/{id}/publish`
 - `POST /api/admin/content/{id}/archive`
+- `POST /api/admin/content/{id}/apply-default`
+- `POST /api/admin/content/{id}/dismiss-default`
 - `GET /api/admin/catalog`
 - `PUT /api/admin/catalog`
 - `GET /api/admin/cache`
 - `POST /api/admin/cache/invalidate?scope=all`
+
+## Ouvidoria
+
+A Ouvidoria e um canal formal e simples para reclamacoes, contestacoes de moderacao, problemas com pagamento e sugestoes.
+
+- O link publico fica no footer e abre `/ouvidoria`.
+- O envio publico usa `POST /api/ouvidoria` e grava na collection `ombudsman_requests`.
+- Cada manifestacao recebe um protocolo no formato `OUV-AAAA-XXXXXXXX`.
+- O painel administrativo exibe as manifestacoes dentro da area `Admin`.
+- Administradores podem filtrar por status, mudar status e enviar uma resposta.
+- Ao enviar uma manifestacao ou resposta, o sistema tenta enviar e-mail ao usuario. Falha de e-mail nao impede a gravacao da manifestacao.
+
+Status disponiveis:
+
+- `OPEN`
+- `IN_REVIEW`
+- `ANSWERED`
+- `CLOSED`
 
 ## Testes e cobertura
 

@@ -9,6 +9,7 @@ import {
   closeInterest,
   connectChatSocket,
   createInterest,
+  createOmbudsmanRequest,
   createOffer,
   createSellerItem,
   decideInterestModeration,
@@ -16,6 +17,7 @@ import {
   deleteModerationRule,
   deleteInterest,
   fetchAdminModeration,
+  fetchAdminOmbudsman,
   fetchCategories,
   fetchInterest,
   fetchDashboard,
@@ -35,19 +37,23 @@ import {
   register,
   reportInterest,
   renewInterest,
+  respondAdminOmbudsmanRequest,
   resetPassword,
   saveModerationRule,
   sendOfferMessage,
   shareSellerItemOffer,
   syncPayment,
   updateInterest,
+  updateAdminOmbudsmanStatus,
+  updateContentReportStatus,
   updateSellerItem,
   storeSession,
   verifyEmail
 } from "./api";
-import logo from "./assets/eu-procuro-logo.png";
+import { trackEvent, trackPageView } from "./analytics";
 import mercadoPagoLogo from "./assets/mercado-pago.svg";
 import AuthModal from "./components/AuthModal";
+import BoostRocket from "./components/BoostRocket";
 import ContentAdminPanel from "./components/ContentAdminPanel";
 import EmptyState from "./components/EmptyState";
 import FeedbackModal from "./components/FeedbackModal";
@@ -116,6 +122,26 @@ const initialReportForm = {
   message: ""
 };
 
+const initialOmbudsmanForm = {
+  name: "",
+  email: "",
+  type: "Reclamacao",
+  subject: "",
+  message: "",
+  relatedEntityType: "",
+  relatedEntityId: "",
+  truthDeclarationAccepted: false
+};
+
+const OMBUDSMAN_TYPES = [
+  "Reclamacao",
+  "Denuncia sobre atendimento",
+  "Problema com pagamento",
+  "Contestacao de moderacao",
+  "Sugestao",
+  "Outro"
+];
+
 const initialModerationRuleForm = {
   id: "",
   term: "",
@@ -157,12 +183,27 @@ const loggedSections = {
   NEW_INTEREST: "NEW_INTEREST"
 };
 
+const sectionRoutes = {
+  [loggedSections.EXPLORE]: "/",
+  [loggedSections.NEW_INTEREST]: "/cadastrar-interesse",
+  [loggedSections.MY_INTERESTS]: "/meus-interesses",
+  [loggedSections.SENT_OFFERS]: "/ofertas-enviadas",
+  [loggedSections.RECEIVED_OFFERS]: "/ofertas-recebidas",
+  [loggedSections.SELLER_ITEMS]: "/meus-itens",
+  [loggedSections.CREDITS]: "/comprar-creditos",
+  [loggedSections.ADMIN]: "/admin"
+};
+
+const routeSections = Object.fromEntries(
+  Object.entries(sectionRoutes).map(([section, route]) => [route, section])
+);
+
 const MESSAGE_SEEN_STORAGE_KEY = "eu-procuro-message-seen";
 const MAX_REFERENCE_IMAGE_SIZE = 1200;
 const REFERENCE_IMAGE_QUALITY = 0.78;
 const HOME_PAGE_SIZE = 10;
 const TITLE_MAX_LENGTH = 80;
-const DESCRIPTION_MAX_LENGTH = 120;
+const DESCRIPTION_MAX_LENGTH = 250;
 const LISTING_EXPIRATION_DAYS = Number(import.meta.env.VITE_LISTING_EXPIRATION_DAYS ?? 30);
 const FALLBACK_CATEGORIES = [
   { value: "AUTOMOVEIS", labelKey: "categories.automoveis" },
@@ -302,6 +343,10 @@ function moderationStatusTone(status) {
   return tones[status] ?? "pending";
 }
 
+function contentReportStatusLabel(status, t) {
+  return t ? t(`admin.moderation.reports.status.${status || "OPEN"}`) : (status || "OPEN");
+}
+
 function limitText(value, maxLength) {
   return String(value ?? "").slice(0, maxLength);
 }
@@ -330,13 +375,64 @@ function createResetStateFromLocation() {
 }
 
 function createInitialSharedInterestId() {
+  const interestIdFromPath = window.location.pathname.match(/^\/interesses\/([^/]+)\/?$/)?.[1];
+  if (interestIdFromPath) {
+    return decodeURIComponent(interestIdFromPath);
+  }
+
   const params = new URLSearchParams(window.location.search);
   return params.get("interest") ?? "";
 }
 
 function getActiveLegalPageSlug() {
+  const slugFromPath = window.location.pathname.match(/^\/legal\/([^/]+)\/?$/)?.[1];
+  if (slugFromPath && legalPages[slugFromPath]) {
+    return slugFromPath;
+  }
+
   const slug = window.location.hash.replace("#", "");
   return legalPages[slug] ? slug : "";
+}
+
+function isOmbudsmanRoute() {
+  return window.location.pathname.replace(/\/+$/, "") === "/ouvidoria";
+}
+
+function getSectionFromPath() {
+  const normalizedPath = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (normalizedPath === "/ouvidoria") {
+    return loggedSections.EXPLORE;
+  }
+  return routeSections[normalizedPath] ?? loggedSections.EXPLORE;
+}
+
+function updateMetaTag(selector, attribute, value) {
+  const element = document.head.querySelector(selector);
+  if (element) {
+    element.setAttribute(attribute, value);
+  }
+}
+
+function upsertCanonical(url) {
+  let canonical = document.head.querySelector("link[rel='canonical']");
+  if (!canonical) {
+    canonical = document.createElement("link");
+    canonical.rel = "canonical";
+    document.head.appendChild(canonical);
+  }
+  canonical.href = url;
+}
+
+function applyPageMeta({ title, description, url, robots = "index,follow" }) {
+  document.title = title;
+  updateMetaTag("meta[name='description']", "content", description);
+  updateMetaTag("meta[name='robots']", "content", robots);
+  updateMetaTag("meta[property='og:title']", "content", title);
+  updateMetaTag("meta[property='og:description']", "content", description);
+  updateMetaTag("meta[property='og:url']", "content", url);
+  updateMetaTag("meta[name='twitter:title']", "content", title);
+  updateMetaTag("meta[name='twitter:description']", "content", description);
+  upsertCanonical(url);
 }
 
 function fileToDataUrl(file) {
@@ -421,6 +517,12 @@ function buildInterestPayload(interestForm) {
   };
 }
 
+function hasInvalidBudgetRange(interestForm) {
+  const min = Number(interestForm.budgetMin || 0);
+  const max = Number(interestForm.budgetMax || 0);
+  return Number.isFinite(min) && Number.isFinite(max) && min > max;
+}
+
 function buildSellerItemPayload(itemForm) {
   return {
     title: itemForm.title,
@@ -464,10 +566,6 @@ function isBoostActive(interest) {
   );
 }
 
-function BoostRocket() {
-  return <span className="boost-rocket" aria-label="Interesse impulsionado" title="Interesse impulsionado">🚀</span>;
-}
-
 function WhatsAppIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -491,6 +589,17 @@ function XIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path
         d="M4.8 4.5h4.5l3.5 4.8 4.1-4.8h2.3l-5.3 6.2 5.8 8.8h-4.5l-3.9-5.6-4.8 5.6H4.2l6-7L4.8 4.5Zm3.4 1.8 7.9 11.4h1.3L9.5 6.3H8.2Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function FacebookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M14.2 8.4h2.3V5.1c-.4-.1-1.7-.2-3.2-.2-3.2 0-5.3 1.9-5.3 5.5v3.1H4.5v3.7H8v6.7h4.2v-6.7h3.5l.6-3.7h-4.1v-2.7c0-1.1.3-2.4 2-2.4Z"
         fill="currentColor"
       />
     </svg>
@@ -620,6 +729,7 @@ export default function App() {
   const publicRequestSeq = useRef(0);
   const detailRequestSeq = useRef(0);
   const realtimeHandlerRef = useRef(null);
+  const publicInterestDetailRef = useRef(null);
   const myInterestsSectionRef = useRef(null);
   const sentOffersSectionRef = useRef(null);
   const receivedOffersSectionRef = useRef(null);
@@ -627,6 +737,7 @@ export default function App() {
   const newInterestSectionRef = useRef(null);
   const [session, setSession] = useState(() => getStoredSession());
   const [activeLegalPageSlug, setActiveLegalPageSlug] = useState(getActiveLegalPageSlug);
+  const [isOmbudsmanPageActive, setIsOmbudsmanPageActive] = useState(isOmbudsmanRoute);
   const [dashboard, setDashboard] = useState(null);
   const [monetizationAccount, setMonetizationAccount] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -657,11 +768,30 @@ export default function App() {
   const [isSellerItemModalVisible, setIsSellerItemModalVisible] = useState(false);
   const [sellerItemShareForm, setSellerItemShareForm] = useState(initialSellerItemShareForm);
   const [reportModal, setReportModal] = useState({ visible: false, interest: null, form: initialReportForm, isSubmitting: false });
+  const [ombudsmanForm, setOmbudsmanForm] = useState(() => ({
+    ...initialOmbudsmanForm,
+    name: getStoredSession()?.user?.name ?? "",
+    email: getStoredSession()?.user?.email ?? ""
+  }));
+  const [ombudsmanProtocol, setOmbudsmanProtocol] = useState("");
+  const [isSubmittingOmbudsman, setIsSubmittingOmbudsman] = useState(false);
   const [adminModeration, setAdminModeration] = useState(null);
+  const [selectedAdminReportId, setSelectedAdminReportId] = useState(null);
+  const [adminOmbudsmanRequests, setAdminOmbudsmanRequests] = useState([]);
+  const [ombudsmanResponses, setOmbudsmanResponses] = useState({});
+  const [isOmbudsmanAdminLoading, setIsOmbudsmanAdminLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [moderationRuleForm, setModerationRuleForm] = useState(initialModerationRuleForm);
   const [isSubmittingModerationRule, setIsSubmittingModerationRule] = useState(false);
   const [isModerationActionLoading, setIsModerationActionLoading] = useState(false);
+  const [collapsedAdminSections, setCollapsedAdminSections] = useState({
+    moderationQueue: true,
+    moderationRules: true,
+    reports: true,
+    ombudsman: true,
+    contentCrm: true,
+    catalogCrm: true
+  });
   const [expandedInterests, setExpandedInterests] = useState({});
   const [expandedOffers, setExpandedOffers] = useState({});
   const [filters, setFilters] = useState({
@@ -673,7 +803,7 @@ export default function App() {
   const [homeMatchFilter, setHomeMatchFilter] = useState(null);
   const [homeOffset, setHomeOffset] = useState(0);
   const [hasMoreInterests, setHasMoreInterests] = useState(false);
-  const [loggedSection, setLoggedSection] = useState(loggedSections.EXPLORE);
+  const [loggedSection, setLoggedSection] = useState(getSectionFromPath);
   const [passwordRecoveryPreview, setPasswordRecoveryPreview] = useState(null);
   const [isLoadingPublic, setIsLoadingPublic] = useState(true);
   const [isLoadingMorePublic, setIsLoadingMorePublic] = useState(false);
@@ -727,13 +857,19 @@ export default function App() {
   );
   const sentOffers = useMemo(() => (dashboard?.offersSent ?? []).slice().sort(byNewest), [dashboard?.offersSent]);
   const receivedOffers = useMemo(() => (dashboard?.offersReceived ?? []).slice().sort(byNewest), [dashboard?.offersReceived]);
+  const creditPurchasesEnabled = Boolean(monetizationAccount?.creditPurchasesEnabled);
+  const boostPurchasesEnabled = Boolean(monetizationAccount?.boostPurchasesEnabled);
   const creditProducts = useMemo(
-    () => (monetizationAccount?.products ?? []).filter((product) => product.type === "CREDIT_PACK"),
-    [monetizationAccount?.products]
+    () => creditPurchasesEnabled
+      ? (monetizationAccount?.products ?? []).filter((product) => product.type === "CREDIT_PACK")
+      : [],
+    [creditPurchasesEnabled, monetizationAccount?.products]
   );
   const subscriptionProducts = useMemo(
-    () => (monetizationAccount?.products ?? []).filter((product) => product.type === "SUBSCRIPTION"),
-    [monetizationAccount?.products]
+    () => creditPurchasesEnabled
+      ? (monetizationAccount?.products ?? []).filter((product) => product.type === "SUBSCRIPTION")
+      : [],
+    [creditPurchasesEnabled, monetizationAccount?.products]
   );
   const purchaseProducts = useMemo(
     () => [...creditProducts, ...subscriptionProducts],
@@ -744,8 +880,10 @@ export default function App() {
     [purchaseProducts, selectedPurchaseProductCode]
   );
   const boostProducts = useMemo(
-    () => (monetizationAccount?.products ?? []).filter((product) => product.type === "BOOST"),
-    [monetizationAccount?.products]
+    () => boostPurchasesEnabled
+      ? (monetizationAccount?.products ?? []).filter((product) => product.type === "BOOST")
+      : [],
+    [boostPurchasesEnabled, monetizationAccount?.products]
   );
   const visibleHomeInterests = useMemo(
     () => {
@@ -779,6 +917,29 @@ export default function App() {
 
   function openFeedback(type, title, message) {
     setFeedbackModal({ type, title, message });
+  }
+
+  function updateOmbudsmanForm(field, value) {
+    setOmbudsmanForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleOmbudsmanSubmit(event) {
+    event.preventDefault();
+    setIsSubmittingOmbudsman(true);
+    setOmbudsmanProtocol("");
+    try {
+      const response = await createOmbudsmanRequest(ombudsmanForm);
+      setOmbudsmanProtocol(response.protocol);
+      setOmbudsmanForm({
+        ...initialOmbudsmanForm,
+        name: session?.user?.name ?? "",
+        email: session?.user?.email ?? ""
+      });
+    } catch (requestError) {
+      openFeedback("error", "Não foi possível enviar", requestError.message || "Tente novamente.");
+    } finally {
+      setIsSubmittingOmbudsman(false);
+    }
   }
 
   function updateAddressLookupState(scope, patch) {
@@ -876,20 +1037,23 @@ export default function App() {
     setMessageSyncKey((current) => current + 1);
   }
 
+  function replaceCurrentUrl(pathname, search = "") {
+    const nextPath = `${pathname}${search}`;
+    window.history.replaceState({}, "", nextPath);
+    trackPageView(nextPath);
+  }
+
+  function currentSectionPath(section = loggedSection) {
+    return sectionRoutes[section] ?? sectionRoutes[loggedSections.EXPLORE];
+  }
+
   function updateInterestUrl(interestId, replace = false) {
-    const url = new URL(window.location.href);
-
-    if (interestId) {
-      url.searchParams.delete("mode");
-      url.searchParams.delete("token");
-      url.searchParams.set("interest", interestId);
-    } else {
-      url.searchParams.delete("interest");
-    }
-
     sharedInterestIdRef.current = interestId ?? "";
-    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
-    window.history[replace ? "replaceState" : "pushState"]({}, "", nextUrl);
+    const nextPath = interestId
+      ? `/interesses/${encodeURIComponent(interestId)}`
+      : currentSectionPath();
+    window.history[replace ? "replaceState" : "pushState"]({}, "", nextPath);
+    trackPageView(nextPath);
   }
 
   async function loadInterestDetail(interestId, options = {}) {
@@ -936,7 +1100,7 @@ export default function App() {
     } catch (requestError) {
       if (requestId === detailRequestSeq.current) {
         setSelectedInterest(null);
-        openFeedback("error", "Falha ao abrir anúncio", requestError.message || "Tente novamente.");
+        openFeedback("error", "Falha ao abrir procura", requestError.message || "Tente novamente.");
       }
     } finally {
       if (requestId === detailRequestSeq.current) {
@@ -945,20 +1109,28 @@ export default function App() {
     }
   }
 
+  function scrollPublicInterestDetailIntoViewOnMobile() {
+    if (!window.matchMedia("(max-width: 1080px)").matches) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      publicInterestDetailRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    });
+  }
+
   function selectPublicInterest(interest, options = {}) {
     setSelectedInterest(interest);
     setLoggedSection(loggedSections.EXPLORE);
-    loadInterestDetail(interest.id, {
-      summary: interest,
-      replace: Boolean(options.replace),
-      preserveScroll: true
-    }).catch(() => {});
+    updateInterestUrl(interest.id, Boolean(options.replace));
+    scrollPublicInterestDetailIntoViewOnMobile();
   }
 
   function buildInterestShareUrl(interest) {
-    const url = new URL(`${window.location.origin}${window.location.pathname}`);
-    url.searchParams.set("interest", interest.id);
-    return url.toString();
+    return `${window.location.origin}/interesses/${encodeURIComponent(interest.id)}`;
   }
 
   function buildInterestShareText(interest) {
@@ -976,6 +1148,13 @@ export default function App() {
     return url.toString();
   }
 
+  function buildFacebookShareUrl(interest) {
+    const url = new URL("https://www.facebook.com/sharer/sharer.php");
+    url.searchParams.set("u", buildInterestShareUrl(interest));
+    url.searchParams.set("quote", t("share.xMessage", { title: interest.title }));
+    return url.toString();
+  }
+
   async function copyInterestLinkToClipboard(interest) {
     const url = buildInterestShareUrl(interest);
 
@@ -990,6 +1169,10 @@ export default function App() {
   async function handleCopyInterestLink(interest) {
     try {
       await copyInterestLinkToClipboard(interest);
+      trackEvent("share_interest", {
+        method: "copy_link",
+        interest_id: interest.id
+      });
       openFeedback("success", t("share.feedback.success.title"), t("share.feedback.success.message"));
     } catch (error) {
       window.prompt(t("share.prompt"), buildInterestShareUrl(interest));
@@ -1018,6 +1201,7 @@ export default function App() {
             target="_blank"
             rel="noreferrer"
             aria-label={t("share.whatsapp")}
+            onClick={() => trackEvent("share_interest", { method: "whatsapp", interest_id: interest.id })}
           >
             <WhatsAppIcon />
           </a>
@@ -1027,8 +1211,19 @@ export default function App() {
             target="_blank"
             rel="noreferrer"
             aria-label={t("share.x")}
+            onClick={() => trackEvent("share_interest", { method: "x", interest_id: interest.id })}
           >
             <XIcon />
+          </a>
+          <a
+            className="share-button share-button--facebook"
+            href={buildFacebookShareUrl(interest)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={t("share.facebook")}
+            onClick={() => trackEvent("share_interest", { method: "facebook", interest_id: interest.id })}
+          >
+            <FacebookIcon />
           </a>
           <button
             type="button"
@@ -1090,8 +1285,22 @@ export default function App() {
     navigateTo(loggedSections.EXPLORE);
   }
 
-  function navigateTo(section) {
+  function navigateTo(section, options = {}) {
+    const shouldScrollToSection = options.scrollIntoView !== false;
+
     setLoggedSection(section);
+    setActiveLegalPageSlug("");
+    setIsOmbudsmanPageActive(false);
+    sharedInterestIdRef.current = "";
+    if (section !== loggedSections.NEW_INTEREST && !editingInterestId) {
+      setIsInterestModalVisible(false);
+    }
+
+    if (options.updateUrl !== false) {
+      const nextPath = currentSectionPath(section);
+      window.history[options.replace ? "replaceState" : "pushState"]({}, "", nextPath);
+      trackPageView(nextPath);
+    }
 
     if (section === loggedSections.EXPLORE) {
       setSelectedInterest((current) =>
@@ -1103,7 +1312,7 @@ export default function App() {
       setSelectedInterest((current) => myInterests.find((interest) => interest.id === current?.id) ?? myInterests[0] ?? null);
     }
 
-    if (section === loggedSections.NEW_INTEREST) {
+    if (shouldScrollToSection && section === loggedSections.NEW_INTEREST) {
       window.requestAnimationFrame(() => {
         newInterestSectionRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -1112,7 +1321,7 @@ export default function App() {
       });
     }
 
-    if (section === loggedSections.MY_INTERESTS) {
+    if (shouldScrollToSection && section === loggedSections.MY_INTERESTS) {
       window.requestAnimationFrame(() => {
         myInterestsSectionRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -1121,7 +1330,7 @@ export default function App() {
       });
     }
 
-    if (section === loggedSections.SENT_OFFERS) {
+    if (shouldScrollToSection && section === loggedSections.SENT_OFFERS) {
       window.requestAnimationFrame(() => {
         sentOffersSectionRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -1130,7 +1339,7 @@ export default function App() {
       });
     }
 
-    if (section === loggedSections.RECEIVED_OFFERS) {
+    if (shouldScrollToSection && section === loggedSections.RECEIVED_OFFERS) {
       window.requestAnimationFrame(() => {
         receivedOffersSectionRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -1139,7 +1348,7 @@ export default function App() {
       });
     }
 
-    if (section === loggedSections.SELLER_ITEMS) {
+    if (shouldScrollToSection && section === loggedSections.SELLER_ITEMS) {
       window.requestAnimationFrame(() => {
         sellerItemsSectionRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -1149,7 +1358,14 @@ export default function App() {
     }
   }
 
+  function navigateFromDashboardControl(section) {
+    navigateTo(section, {
+      scrollIntoView: !window.matchMedia("(min-width: 1081px)").matches
+    });
+  }
+
   function openNewInterestForm() {
+    navigateFromDashboardControl(loggedSections.NEW_INTEREST);
     setEditingInterestId(null);
     setInterestForm(initialInterestForm);
     setIsInterestModalVisible(true);
@@ -1249,13 +1465,6 @@ export default function App() {
         ];
       });
 
-      if (!append && !sharedInterestIdRef.current && pageInterests[0]?.id) {
-        loadInterestDetail(pageInterests[0].id, {
-          summary: pageInterests[0],
-          updateUrl: false
-        }).catch(() => {});
-      }
-
       if (append) {
         return;
       }
@@ -1276,7 +1485,7 @@ export default function App() {
 
         return sharedInterestIdRef.current
           ? pageInterests.find((interest) => interest.id === sharedInterestIdRef.current) ?? currentSelected ?? null
-          : null;
+          : pageInterests[0] ?? null;
       });
     } catch (requestError) {
       if (requestId === publicRequestSeq.current) {
@@ -1445,13 +1654,53 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    function handleHashChange() {
-      setActiveLegalPageSlug(getActiveLegalPageSlug());
+    function syncRouteFromLocation() {
+      const legalSlug = getActiveLegalPageSlug();
+      const ombudsmanRoute = isOmbudsmanRoute();
+      const nextSection = getSectionFromPath();
+      setActiveLegalPageSlug(legalSlug);
+      setIsOmbudsmanPageActive(ombudsmanRoute);
+      setLoggedSection(nextSection);
+      if (nextSection === loggedSections.NEW_INTEREST) {
+        setEditingInterestId(null);
+        setInterestForm(initialInterestForm);
+        setIsInterestModalVisible(true);
+      } else if (!editingInterestId) {
+        setIsInterestModalVisible(false);
+      }
+      sharedInterestIdRef.current = createInitialSharedInterestId();
+      if (sharedInterestIdRef.current) {
+        loadInterestDetail(sharedInterestIdRef.current, { replace: true }).catch(() => {});
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
+    function handleHashChange() {
+      const legalSlug = getActiveLegalPageSlug();
+      if (legalSlug) {
+        replaceCurrentUrl(`/legal/${legalSlug}`);
+      }
+      syncRouteFromLocation();
+    }
+
     window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", syncRouteFromLocation);
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("popstate", syncRouteFromLocation);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeLegalPageSlug && window.location.pathname !== `/legal/${activeLegalPageSlug}`) {
+      replaceCurrentUrl(`/legal/${activeLegalPageSlug}`);
+    }
+    if (isOmbudsmanPageActive && window.location.pathname !== "/ouvidoria") {
+      replaceCurrentUrl("/ouvidoria");
+    }
+    if (getSectionFromPath() === loggedSections.NEW_INTEREST) {
+      setIsInterestModalVisible(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -1587,7 +1836,7 @@ export default function App() {
 
     paymentReturnHandledRef.current = true;
     setIsPaymentReturnLoading(true);
-    navigateTo(loggedSections.CREDITS);
+    navigateTo(creditPurchasesEnabled ? loggedSections.CREDITS : loggedSections.EXPLORE);
     setPaymentStatus((current) => ({
       ...(current ?? {}),
       step: paymentResult === "failure" ? "FAILED" : "PAYMENT",
@@ -1619,23 +1868,7 @@ export default function App() {
         openFeedback("error", "Pagamento pendente", requestError.message || "Ainda não foi possível confirmar o pagamento.");
       })
       .finally(() => {
-        [
-          "payment",
-          "payment_id",
-          "collection_id",
-          "collection_status",
-          "status",
-          "external_reference",
-          "payment_type",
-          "merchant_order_id",
-          "preference_id",
-          "site_id",
-          "processing_mode",
-          "merchant_account_id"
-        ].forEach((param) => {
-          url.searchParams.delete(param);
-        });
-        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+        replaceCurrentUrl(currentSectionPath(creditPurchasesEnabled ? loggedSections.CREDITS : loggedSections.EXPLORE));
         setIsPaymentReturnLoading(false);
       });
   }, [session?.token]);
@@ -1682,7 +1915,7 @@ export default function App() {
       .then(setOffers)
       .catch((requestError) => {
         setOffers([]);
-        openFeedback("error", "Não foi possível carregar ofertas", requestError.message || "Tente novamente.");
+        openFeedback("error", "Não foi possível carregar propostas", requestError.message || "Tente novamente.");
       });
   }, [session, selectedInterest?.id, isSelectedInterestMine]);
 
@@ -1739,6 +1972,96 @@ export default function App() {
   }, [loggedSection, visibleHomeInterests]);
 
   useEffect(() => {
+    const origin = window.location.origin;
+
+    if (activeLegalPageSlug) {
+      const page = legalPages[activeLegalPageSlug];
+      applyPageMeta({
+        title: page?.title ? `${page.title} | Eu Procuro` : "Eu Procuro",
+        description: page?.summary || page?.label || "Documentos legais da plataforma Eu Procuro.",
+        url: `${origin}/legal/${activeLegalPageSlug}`
+      });
+      return;
+    }
+
+    if (isOmbudsmanPageActive) {
+      applyPageMeta({
+        title: "Ouvidoria | Eu Procuro",
+        description: "Canal formal da Ouvidoria Eu Procuro para reclamacoes, contestacoes, sugestoes e problemas com a plataforma.",
+        url: `${origin}/ouvidoria`,
+        robots: "index,follow"
+      });
+      return;
+    }
+
+    if (selectedInterest?.id && loggedSection === loggedSections.EXPLORE) {
+      const location = [selectedInterest.location?.city, selectedInterest.location?.state]
+        .filter(Boolean)
+        .join("/");
+      const description = [
+        selectedInterest.description,
+        location ? `Localidade: ${location}.` : "",
+        "Veja esta procura no Eu Procuro."
+      ].filter(Boolean).join(" ");
+      applyPageMeta({
+        title: `${selectedInterest.title} | Eu Procuro`,
+        description: limitText(description, 155),
+        url: `${origin}/interesses/${encodeURIComponent(selectedInterest.id)}`
+      });
+      return;
+    }
+
+    const routeMeta = {
+      [loggedSections.EXPLORE]: {
+        title: "Eu Procuro - Marketplace reverso",
+        description: "Publique o que você procura e receba propostas de quem pode atender.",
+        robots: "index,follow"
+      },
+      [loggedSections.NEW_INTEREST]: {
+        title: "Publicar procura | Eu Procuro",
+        description: "Publique uma procura para receber propostas na plataforma Eu Procuro.",
+        robots: "noindex,nofollow"
+      },
+      [loggedSections.MY_INTERESTS]: {
+        title: "Minhas procuras | Eu Procuro",
+        description: "Área privada de procuras publicadas no Eu Procuro.",
+        robots: "noindex,nofollow"
+      },
+      [loggedSections.SENT_OFFERS]: {
+        title: "Propostas enviadas | Eu Procuro",
+        description: "Área privada de propostas enviadas no Eu Procuro.",
+        robots: "noindex,nofollow"
+      },
+      [loggedSections.RECEIVED_OFFERS]: {
+        title: "Propostas recebidas | Eu Procuro",
+        description: "Área privada de propostas recebidas no Eu Procuro.",
+        robots: "noindex,nofollow"
+      },
+      [loggedSections.SELLER_ITEMS]: {
+        title: "Tenho para negociar | Eu Procuro",
+        description: "Área privada de itens disponíveis para negociação no Eu Procuro.",
+        robots: "noindex,nofollow"
+      },
+      [loggedSections.CREDITS]: {
+        title: "Créditos | Eu Procuro",
+        description: "Área privada de créditos e pagamentos no Eu Procuro.",
+        robots: "noindex,nofollow"
+      },
+      [loggedSections.ADMIN]: {
+        title: "Admin | Eu Procuro",
+        description: "Área administrativa do Eu Procuro.",
+        robots: "noindex,nofollow"
+      }
+    };
+
+    const meta = routeMeta[loggedSection] ?? routeMeta[loggedSections.EXPLORE];
+    applyPageMeta({
+      ...meta,
+      url: `${origin}${currentSectionPath(loggedSection)}`
+    });
+  }, [activeLegalPageSlug, isOmbudsmanPageActive, selectedInterest?.id, selectedInterest?.title, selectedInterest?.description, loggedSection]);
+
+  useEffect(() => {
     if (!session || !currentUser?.id) {
       setHasUnreadMessages(false);
       setNotifications([]);
@@ -1761,7 +2084,7 @@ export default function App() {
           type: "new-offer",
           offerId: offer.id,
           section: loggedSections.RECEIVED_OFFERS,
-          title: offer.interestTitle ?? "Nova oferta recebida",
+          title: offer.interestTitle ?? "Nova proposta recebida",
           message: `${offer.sellerName ?? "Um vendedor"} enviou uma proposta: ${offer.message ?? "sem descrição."}`,
           createdAt: offer.createdAt
         };
@@ -1857,10 +2180,10 @@ export default function App() {
           type: "interest-moderation",
           interestId: interest.id,
           section: loggedSections.MY_INTERESTS,
-          title: rejected ? "Anúncio rejeitado" : "Anúncio em análise",
+          title: rejected ? "Procura rejeitada" : "Procura em análise",
           message: rejected
-            ? "Seu anúncio foi rejeitado. Você pode editar e enviar novamente para análise ou excluir."
-            : (interest.moderation?.reason ?? "Seu anúncio está aguardando revisão."),
+            ? "Sua procura foi rejeitada. Você pode editar e enviar novamente para análise ou excluir."
+            : (interest.moderation?.reason ?? "Sua procura está aguardando revisão."),
           createdAt: interest.updatedAt ?? new Date().toISOString()
         };
       })
@@ -1881,7 +2204,7 @@ export default function App() {
             reportId: report.id,
             section: loggedSections.ADMIN,
             title: "Nova denúncia recebida",
-            message: report.reason ?? "Um usuário denunciou um anúncio para revisão.",
+            message: report.reason ?? "Um usuário denunciou uma procura para revisão.",
             createdAt: report.createdAt
           };
         })
@@ -1901,6 +2224,12 @@ export default function App() {
     setNotifications(unreadEntries);
     setHasUnreadMessages(unreadEntries.length > 0);
   }, [session, currentUser?.id, receivedOffers, sentOffers, sellerItems, activeMyInterests, isAdmin, adminModeration?.openReports, messageSyncKey]);
+
+  useEffect(() => {
+    if (isAdmin && loggedSection === loggedSections.ADMIN) {
+      refreshAdminOmbudsmanData().catch(() => {});
+    }
+  }, [isAdmin, loggedSection]);
 
   useEffect(() => {
     if (!session) {
@@ -1934,8 +2263,6 @@ export default function App() {
       setPasswordRecoveryPreview(null);
       setLoginForm(initialLoginForm);
       closeAuthModal();
-
-      openFeedback("success", t("auth.feedback.login.success.title"), t("auth.feedback.login.success.message"));
     } catch (requestError) {
       clearSession();
       setSession(null);
@@ -2030,9 +2357,12 @@ export default function App() {
       setAdminModeration(null);
       setIsAdmin(false);
       setLoggedSection(loggedSections.EXPLORE);
+      setSelectedInterest(null);
+      setActiveLegalPageSlug("");
+      sharedInterestIdRef.current = "";
+      replaceCurrentUrl(sectionRoutes[loggedSections.EXPLORE]);
       setOffers([]);
       setConversationModal((current) => ({ ...current, visible: false, data: null, draftMessage: "" }));
-      openFeedback("success", "Sessão encerrada", "Você saiu da área logada.");
     }
   }
 
@@ -2060,11 +2390,10 @@ export default function App() {
     }
 
     if (hasLink(interestForm.description)) {
-      openFeedback(
-        "error",
-        t("interest.feedback.linkNotAllowed.title"),
-        t("interest.feedback.linkNotAllowed.message")
-      );
+      return;
+    }
+
+    if (hasInvalidBudgetRange(interestForm)) {
       return;
     }
 
@@ -2134,7 +2463,7 @@ export default function App() {
       setOfferForm(initialOfferForm);
       await refreshPrivateData();
       navigateTo(loggedSections.SENT_OFFERS);
-      openFeedback("success", "Oferta enviada", "Sua oferta foi enviada para o anunciante.");
+      openFeedback("success", "Proposta enviada", "Sua proposta foi enviada para quem publicou a procura.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível enviar", requestError.message || "Tente novamente.");
     } finally {
@@ -2151,7 +2480,7 @@ export default function App() {
       await closeInterest(interestId);
       await Promise.all([refreshPrivateData(), refreshPublicData()]);
       setSelectedInterest(null);
-      openFeedback("success", "Anúncio desativado", "Seu anúncio não aparecerá mais para outros usuários.");
+      openFeedback("success", "Procura desativada", "Sua procura não aparecerá mais para outros usuários.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível desativar", requestError.message || "Tente novamente.");
     }
@@ -2165,14 +2494,14 @@ export default function App() {
     try {
       await activateInterest(interestId);
       await Promise.all([refreshPrivateData(), refreshPublicData()]);
-      openFeedback("success", "Anúncio enviado para análise", "Seu interesse foi reativado e será validado antes de voltar à vitrine.");
+      openFeedback("success", "Procura enviada para análise", "Sua procura foi reativada e será validada antes de voltar à vitrine.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível ativar", requestError.message || "Tente novamente.");
     }
   }
 
   async function handleDeleteInterest(interestId) {
-    if (!interestId || !window.confirm("Deseja excluir este anúncio definitivamente?")) {
+    if (!interestId || !window.confirm("Deseja excluir esta procura definitivamente?")) {
       return;
     }
 
@@ -2180,7 +2509,7 @@ export default function App() {
       await deleteInterest(interestId);
       await Promise.all([refreshPrivateData(), refreshPublicData()]);
       setSelectedInterest(null);
-      openFeedback("success", "Anúncio excluído", "O anúncio foi removido da plataforma.");
+      openFeedback("success", "Procura excluída", "A procura foi removida da plataforma.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível excluir", requestError.message || "Tente novamente.");
     }
@@ -2258,6 +2587,48 @@ export default function App() {
     }
   }
 
+  async function refreshAdminOmbudsmanData(status = "") {
+    setIsOmbudsmanAdminLoading(true);
+    try {
+      const data = await fetchAdminOmbudsman(status);
+      setAdminOmbudsmanRequests(data ?? []);
+    } catch (requestError) {
+      openFeedback("error", "Falha ao carregar ouvidoria", requestError.message || "Tente novamente.");
+    } finally {
+      setIsOmbudsmanAdminLoading(false);
+    }
+  }
+
+  async function handleOmbudsmanStatusChange(requestId, status) {
+    try {
+      const updated = await updateAdminOmbudsmanStatus(requestId, status);
+      setAdminOmbudsmanRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      openFeedback("success", "Status atualizado", `A manifestação ${updated.protocol} foi atualizada.`);
+    } catch (requestError) {
+      openFeedback("error", "Falha ao atualizar status", requestError.message || "Tente novamente.");
+    }
+  }
+
+  async function handleOmbudsmanResponseSubmit(requestItem) {
+    const responseText = ombudsmanResponses[requestItem.id]?.trim();
+    if (!responseText) {
+      openFeedback("error", "Resposta obrigatória", "Informe uma resposta antes de enviar.");
+      return;
+    }
+
+    try {
+      const updated = await respondAdminOmbudsmanRequest(requestItem.id, {
+        adminResponse: responseText,
+        status: "ANSWERED"
+      });
+      setAdminOmbudsmanRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setOmbudsmanResponses((current) => ({ ...current, [requestItem.id]: "" }));
+      openFeedback("success", "Resposta enviada", `A manifestação ${updated.protocol} foi respondida.`);
+    } catch (requestError) {
+      openFeedback("error", "Falha ao responder", requestError.message || "Tente novamente.");
+    }
+  }
+
   function startEditingModerationRule(rule) {
     setModerationRuleForm({
       id: rule.id,
@@ -2320,7 +2691,29 @@ export default function App() {
     }
   }
 
+  async function handleContentReportStatusChange(reportId, status) {
+    if (!reportId) {
+      return;
+    }
+
+    setIsModerationActionLoading(true);
+    try {
+      const updated = await updateContentReportStatus(reportId, status);
+      setSelectedAdminReportId(updated.id);
+      await refreshAdminModerationData();
+      openFeedback("success", t("admin.moderation.reports.statusUpdated.title"), t("admin.moderation.reports.statusUpdated.message"));
+    } catch (requestError) {
+      openFeedback("error", t("admin.moderation.reports.statusError.title"), requestError.message || t("errors.retry"));
+    } finally {
+      setIsModerationActionLoading(false);
+    }
+  }
+
   async function handlePurchaseProduct(productCode, paymentMethod = "MERCADO_PAGO") {
+    if (!creditPurchasesEnabled) {
+      openFeedback("error", "Compra indisponível", "A compra de créditos e planos está desabilitada no momento.");
+      return;
+    }
     if (!session) {
       openAuthModal("login");
       return;
@@ -2439,7 +2832,7 @@ export default function App() {
         editingSellerItemId ? "Item atualizado" : "Item cadastrado",
         editingSellerItemId
           ? "Seu item foi atualizado com sucesso."
-          : "Agora vamos monitorar interesses compatíveis com ele."
+          : "Agora vamos monitorar procuras compatíveis com ele."
       );
     } catch (requestError) {
       openFeedback(
@@ -2460,7 +2853,7 @@ export default function App() {
     try {
       await deactivateSellerItem(itemId);
       await refreshPrivateData();
-      openFeedback("success", "Item desativado", "Você pode cadastrar outro item quando quiser.");
+      openFeedback("success", "Item pausado", "Você pode reativar este item quando quiser.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível desativar", requestError.message || "Tente novamente.");
     }
@@ -2474,7 +2867,7 @@ export default function App() {
     try {
       await activateSellerItem(itemId);
       await refreshPrivateData();
-      openFeedback("success", "Item ativado", "Seu item voltou a participar dos cruzamentos com interesses.");
+      openFeedback("success", "Item ativado", "Seu item voltou a participar dos cruzamentos com procuras.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível ativar", requestError.message || "Tente novamente.");
     }
@@ -2501,7 +2894,7 @@ export default function App() {
       await refreshPrivateData();
       setSellerItemShareForm(initialSellerItemShareForm);
       navigateTo(loggedSections.SENT_OFFERS);
-      openFeedback("success", "Item compartilhado", "Sua oferta foi enviada usando o item cadastrado.");
+      openFeedback("success", "Proposta enviada", "Sua proposta foi enviada usando o item cadastrado.");
     } catch (requestError) {
       openFeedback("error", "Não foi possível compartilhar", requestError.message || "Tente novamente.");
     } finally {
@@ -2510,6 +2903,10 @@ export default function App() {
   }
 
   async function handleBoostInterest(boostCode, interestId = selectedInterest?.id, paymentMethod = "MERCADO_PAGO") {
+    if (!boostPurchasesEnabled) {
+      openFeedback("error", "Boost indisponível", "A compra de boosts está desabilitada no momento.");
+      return;
+    }
     if (!interestId) {
       return;
     }
@@ -2555,16 +2952,20 @@ export default function App() {
       openFeedback(
         "error",
         "Créditos insuficientes",
-        "Você precisa de 1 crédito para renovar o anúncio. Abra a página de créditos para comprar."
+        creditPurchasesEnabled
+          ? "Você precisa de 1 crédito para renovar a procura. Abra a página de créditos para comprar."
+          : "Você precisa de 1 crédito para renovar a procura."
       );
-      navigateTo(loggedSections.CREDITS);
+      if (creditPurchasesEnabled) {
+        navigateTo(loggedSections.CREDITS);
+      }
       return;
     }
 
     try {
       await renewInterest(interestId);
       await Promise.all([refreshPrivateData(), refreshPublicData(), loadInterestDetail(interestId, { updateUrl: false })]);
-      openFeedback("success", "Anúncio renovado", `Seu anúncio ganhou mais ${LISTING_EXPIRATION_DAYS} dias.`);
+      openFeedback("success", "Procura renovada", `Sua procura ganhou mais ${LISTING_EXPIRATION_DAYS} dias.`);
     } catch (requestError) {
       openFeedback("error", "Não foi possível renovar", requestError.message || "Tente novamente.");
     }
@@ -2733,7 +3134,7 @@ export default function App() {
   }
 
   function renderPublicHome(showHero = true) {
-    const canShowRestrictedInterestDetails = Boolean(session);
+    const canShowRestrictedInterestDetails = isSelectedInterestMine;
 
     return (
       <>
@@ -2743,6 +3144,9 @@ export default function App() {
               <h1>{t("home.hero.title")}</h1>
               <p>
                 {t("home.hero.description")}
+              </p>
+              <p className="hero__supporting">
+                {t("home.hero.complement")}
               </p>
               <div className="hero__actions">
                 <button type="button" className="primary-button" onClick={() => openAuthModal("register")}>
@@ -2758,12 +3162,49 @@ export default function App() {
               <div className="hero-card">
                 <strong>{t("home.hero.card1.title")}</strong>
                 <p>{t("home.hero.card1.description")}</p>
+                <button type="button" className="primary-button primary-button--compact" onClick={() => openAuthModal("register")}>
+                  {t("home.hero.card1.cta")}
+                </button>
               </div>
               <div className="hero-card">
                 <strong>{t("home.hero.card2.title")}</strong>
                 <p>{t("home.hero.card2.description")}</p>
+                <button type="button" className="ghost-button" onClick={() => openAuthModal("register")}>
+                  {t("home.hero.card2.cta")}
+                </button>
               </div>
             </div>
+          </section>
+        ) : null}
+
+        {showHero ? (
+          <section className="how-it-works-section">
+            <div className="panel__header">
+              <div>
+                <span className="eyebrow">{t("home.how.eyebrow")}</span>
+                <h2>{t("home.how.title")}</h2>
+              </div>
+            </div>
+
+            <div className="how-it-works-grid">
+              {[1, 2, 3].map((step) => (
+                <article key={step} className="how-it-works-card">
+                  <span className="how-it-works-card__number">{step}</span>
+                  <strong>{t(`home.how.step${step}.title`)}</strong>
+                  <p>{t(`home.how.step${step}.description`)}</p>
+                </article>
+              ))}
+            </div>
+
+            <article className="how-it-works-secondary">
+              <div>
+                <strong>{t("home.how.secondary.title")}</strong>
+                <p>{t("home.how.secondary.description")}</p>
+              </div>
+              <button type="button" className="ghost-button" onClick={() => openAuthModal("register")}>
+                {t("home.how.secondary.cta")}
+              </button>
+            </article>
           </section>
         ) : null}
 
@@ -2870,17 +3311,13 @@ export default function App() {
             )}
           </article>
 
-          <aside className="panel panel--sticky">
+          <aside ref={publicInterestDetailRef} className="panel panel--sticky">
             <div className="panel__header">
               <div className="panel-title-stack">
                 <span className="eyebrow detail-owner-line">
                   {selectedInterest ? (
                     canShowRestrictedInterestDetails ? (
-                      <>
-                        <span>{t("interest.detail.owner.before")}</span>
-                        <strong>{firstName(selectedInterest.ownerName, t)}</strong>
-                        <span>{t("interest.detail.owner.after")}</span>
-                      </>
+                      <span>{t("interest.detail.owner.line", { name: firstName(selectedInterest.ownerName, t) })}</span>
                     ) : (
                       <span>{t("interest.detail.publicEyebrow")}</span>
                     )
@@ -3010,6 +3447,7 @@ export default function App() {
                       <div className="form-heading">
                         <span className="eyebrow">{t("offer.form.eyebrow")}</span>
                         <h3>{t("offer.form.title")}</h3>
+                        <p>{t("offer.form.description")}</p>
                       </div>
                       <input
                         type="number"
@@ -3033,7 +3471,6 @@ export default function App() {
                             sellerPhone: event.target.value
                           }))
                         }
-                        required
                       />
                       <textarea
                         rows="4"
@@ -3256,8 +3693,8 @@ export default function App() {
     return (
       <div className="sent-offer-summary">
         <div className="form-heading">
-          <span className="eyebrow">Oferta enviada</span>
-          <h3>Você já respondeu este interesse</h3>
+          <span className="eyebrow">Proposta enviada</span>
+          <h3>Você já respondeu esta procura</h3>
         </div>
 
         {offer.offerImageUrl ? (
@@ -3272,7 +3709,7 @@ export default function App() {
 
         <div className="sent-offer-summary__grid">
           <div>
-            <span>Valor ofertado</span>
+            <span>Valor da proposta</span>
             <strong>{currency(offer.offeredPrice, t)}</strong>
           </div>
           <div>
@@ -3312,7 +3749,7 @@ export default function App() {
             className="ghost-button"
             onClick={() => navigateTo(loggedSections.SENT_OFFERS)}
           >
-            Ver ofertas enviadas
+            Ver propostas enviadas
           </button>
         </div>
       </div>
@@ -3424,6 +3861,24 @@ export default function App() {
   }
 
   function renderCreditsPage() {
+    if (!creditPurchasesEnabled) {
+      return (
+        <section className="panel panel--spaced credits-page">
+          <div className="panel__header">
+            <div>
+              <span className="eyebrow">Página</span>
+              <h2>Monetização indisponível</h2>
+            </div>
+            <button type="button" className="ghost-button" onClick={() => navigateTo(loggedSections.EXPLORE)}>
+              Voltar para home
+            </button>
+          </div>
+          {renderPaymentTracker()}
+          {renderPaymentHistory()}
+        </section>
+      );
+    }
+
     const sellerCredits = monetizationAccount?.sellerCredits ?? 0;
     const purchasedCreditsTotal = monetizationAccount?.purchasedCreditsTotal ?? 0;
     const hasPurchasedCredits = purchasedCreditsTotal > 0;
@@ -3480,7 +3935,7 @@ export default function App() {
                   const isSelected = selectedPurchaseProduct?.code === product.code;
                   const description = product.type === "SUBSCRIPTION"
                     ? `Plano ativo por ${product.durationDays} dias para vendedores frequentes.`
-                    : `${product.credits} propostas para responder interesses de compradores.`;
+                    : `${product.credits} propostas para responder procuras de compradores.`;
 
                   return (
                     <button
@@ -3676,7 +4131,7 @@ export default function App() {
           <div className="panel__header">
             <div>
               <span className="eyebrow">{t("interest.form.eyebrow")}</span>
-              <h2>{t("dashboard.nav.sellerItems")}</h2>
+              <h2>Itens que posso negociar</h2>
             </div>
           </div>
 
@@ -3702,8 +4157,8 @@ export default function App() {
         <aside className="panel panel--sticky">
           <div className="panel__header">
             <div>
-              <span className="eyebrow">Meus Itens</span>
-              <h2>{selectedItem?.title ?? "Cadastre um item"}</h2>
+              <span className="eyebrow">Tenho para negociar</span>
+              <h2>{selectedItem?.title ?? "Cadastre um item disponível"}</h2>
             </div>
           </div>
           <label className="seller-items-toggle">
@@ -3735,7 +4190,7 @@ export default function App() {
                     )}
                     <span className="seller-item-tab__title">
                       <strong>{group.item.title}</strong>
-                      {!group.item.active ? <em>Desativado</em> : null}
+                      {!group.item.active ? <em>Pausado</em> : null}
                     </span>
                     <small
                       className="seller-match-count"
@@ -3745,7 +4200,7 @@ export default function App() {
                       }}
                     >
                       <strong>{group.matchCount}</strong>
-                      <span>possíveis<br />interessados</span>
+                      <span>pessoas procurando<br />algo parecido</span>
                     </small>
                   </button>
                 ))}
@@ -3755,7 +4210,7 @@ export default function App() {
                 <div className="seller-item-summary">
                   <div className="seller-item-summary__content">
                     <strong>{currency(selectedItem.desiredPrice, t)}</strong>
-                    {!selectedItem.active ? <span className="seller-item-status-badge">Desativado</span> : null}
+                    {!selectedItem.active ? <span className="seller-item-status-badge">Pausado</span> : null}
                     {selectedItem.description ? (
                       <p title={selectedItem.description}>{selectedItem.description}</p>
                     ) : null}
@@ -3781,7 +4236,7 @@ export default function App() {
                         className="ghost-button ghost-button--small"
                         onClick={() => handleDeactivateSellerItem(selectedItem.id)}
                       >
-                        Desativar item
+                        Pausar item
                       </button>
                     ) : (
                       <button
@@ -3850,7 +4305,7 @@ export default function App() {
                         type="button"
                         className="primary-button primary-button--compact"
                         disabled={shareDisabled || sharingSellerItemInterestId === interest.id}
-                        title={!canSendOffer ? noCreditsTooltip : !sellerItemShareForm.sellerPhone.trim() ? "Informe um telefone para enviar a oferta." : undefined}
+                        title={!canSendOffer ? noCreditsTooltip : !sellerItemShareForm.sellerPhone.trim() ? "Informe um telefone para enviar a proposta." : undefined}
                         onClick={() => handleShareSellerItem(selectedItem.id, interest)}
                       >
                         {sharingSellerItemInterestId === interest.id ? "Enviando..." : "Compartilhar item"}
@@ -3860,15 +4315,15 @@ export default function App() {
                 </div>
               ) : (
                 <EmptyState
-                  title="Nenhum interesse compatível ainda"
-                  description="Quando alguém procurar algo parecido com este item, ele aparecerá aqui."
+                  title="Nenhuma procura compatível ainda"
+                  description="Quando alguém procurar algo parecido com este item, a procura aparecerá aqui."
                 />
               )}
             </>
           ) : (
             <EmptyState
-              title="Nenhum item cadastrado"
-              description="Cadastre um item ou serviço para descobrir usuários interessados em algo parecido."
+              title="Nenhum item disponível cadastrado"
+              description="Cadastre um item ou serviço para descobrir pessoas procurando algo parecido."
             />
           )}
         </aside>
@@ -3904,10 +4359,63 @@ export default function App() {
     );
   }
 
+  function toggleAdminSection(sectionKey) {
+    setCollapsedAdminSections((current) => ({
+      ...current,
+      [sectionKey]: !current[sectionKey]
+    }));
+  }
+
+  function renderAdminSection({ sectionKey, eyebrow, title, count = 0, priority = false, children }) {
+    const isCollapsed = Boolean(collapsedAdminSections[sectionKey]);
+
+    return (
+      <article className={`admin-card admin-collapsible ${priority ? "admin-card--priority" : ""} ${isCollapsed ? "admin-collapsible--collapsed" : ""}`}>
+        <button
+          type="button"
+          className="admin-collapsible__header"
+          onClick={() => toggleAdminSection(sectionKey)}
+          aria-expanded={!isCollapsed}
+        >
+          <span className="admin-collapsible__title">
+            <span className="eyebrow">{eyebrow}</span>
+            <strong>{title}</strong>
+          </span>
+          <span className="admin-collapsible__meta">
+            {isCollapsed && count > 0 ? <span className="admin-section-badge">{count}</span> : null}
+            <span aria-hidden="true">{isCollapsed ? "+" : "−"}</span>
+          </span>
+        </button>
+        {isCollapsed ? null : <div className="admin-collapsible__body">{children}</div>}
+      </article>
+    );
+  }
+
   function renderAdminModerationPage() {
     const pendingInterests = adminModeration?.pendingInterests ?? [];
     const rules = adminModeration?.rules ?? [];
     const openReports = adminModeration?.openReports ?? [];
+    const processedReports = adminModeration?.processedReports ?? [];
+    const allReports = [...openReports, ...processedReports];
+    const selectedAdminReport = allReports.find((report) => report.id === selectedAdminReportId) ?? openReports[0] ?? processedReports[0] ?? null;
+    const newOmbudsmanCount = adminOmbudsmanRequests.filter((requestItem) =>
+      requestItem.status === "OPEN" && !requestItem.adminResponse
+    ).length;
+
+    const renderReportItem = (report) => (
+      <button
+        key={report.id}
+        type="button"
+        className={`admin-list-item admin-list-item--button ${selectedAdminReport?.id === report.id ? "selected" : ""}`}
+        onClick={() => setSelectedAdminReportId(report.id)}
+      >
+        <div>
+          <strong>{report.reason}</strong>
+          <span>{report.contentTitle || t("admin.moderation.reportsContent", { id: report.contentId })}</span>
+          <small>{contentReportStatusLabel(report.status, t)} · {formatTimestamp(report.createdAt, t)}</small>
+        </div>
+      </button>
+    );
 
     return (
       <section className="admin-moderation panel panel--spaced">
@@ -3927,11 +4435,13 @@ export default function App() {
           </button>
         </div>
 
-        <article className="admin-card admin-card--priority">
-          <div className="form-heading">
-            <span className="eyebrow">{t("admin.moderation.queue")}</span>
-            <h3>{t("admin.moderation.queueCount", { count: pendingInterests.length })}</h3>
-          </div>
+        {renderAdminSection({
+          sectionKey: "moderationQueue",
+          eyebrow: t("admin.moderation.queue"),
+          title: t("admin.moderation.queueCount", { count: pendingInterests.length }),
+          count: pendingInterests.length,
+          priority: true,
+          children: (
           <div className="admin-list">
             {pendingInterests.length ? pendingInterests.map((interest) => (
               <article key={interest.id} className="admin-list-item admin-list-item--stacked">
@@ -3972,14 +4482,16 @@ export default function App() {
               <EmptyState title={t("admin.moderation.empty.title")} description={t("admin.moderation.empty.description")} />
             )}
           </div>
-        </article>
+          )
+        })}
 
         <div className="admin-grid">
-          <article className="admin-card">
-            <div className="form-heading">
-              <span className="eyebrow">{t("admin.moderation.rules")}</span>
-              <h3>{moderationRuleForm.id ? t("admin.moderation.editRule") : t("admin.moderation.newRule")}</h3>
-            </div>
+          {renderAdminSection({
+            sectionKey: "moderationRules",
+            eyebrow: t("admin.moderation.rules"),
+            title: moderationRuleForm.id ? t("admin.moderation.editRule") : t("admin.moderation.newRule"),
+            children: (
+              <>
             <form className="stacked-form" onSubmit={handleModerationRuleSubmit}>
               <input
                 placeholder={t("admin.moderation.rule.placeholder")}
@@ -4048,35 +4560,343 @@ export default function App() {
                 <EmptyState title={t("admin.moderation.rule.empty.title")} description={t("admin.moderation.rule.empty.description")} />
               )}
             </div>
-          </article>
+              </>
+            )
+          })}
 
-          <article className="admin-card">
-            <div className="form-heading">
-              <span className="eyebrow">{t("admin.moderation.reports")}</span>
-              <h3>{t("admin.moderation.reportsCount", { count: openReports.length })}</h3>
-            </div>
-            <div className="admin-list">
-              {openReports.length ? openReports.map((report) => (
-                <article key={report.id} className="admin-list-item">
-                  <div>
-                    <strong>{report.reason}</strong>
-                    <span>{t("admin.moderation.reportsContent", { id: report.contentId })}</span>
-                    {report.message ? <p>{report.message}</p> : null}
+          {renderAdminSection({
+            sectionKey: "reports",
+            eyebrow: t("admin.moderation.reports"),
+            title: t("admin.moderation.reportsCount", { count: openReports.length }),
+            count: openReports.length,
+            children: (
+            <div className="admin-reports">
+              <div className="admin-reports__lists">
+                <section className="admin-reports__group">
+                  <div className="admin-reports__group-header">
+                    <strong>{t("admin.moderation.reports.open.title")}</strong>
+                    <span className="admin-section-badge">{openReports.length}</span>
                   </div>
-                </article>
-              )) : (
-                <EmptyState title={t("admin.moderation.reports.empty.title")} description={t("admin.moderation.reports.empty.description")} />
-              )}
+                  <div className="admin-list">
+                    {openReports.length ? openReports.map(renderReportItem) : (
+                      <EmptyState title={t("admin.moderation.reports.empty.title")} description={t("admin.moderation.reports.empty.description")} />
+                    )}
+                  </div>
+                </section>
+                <section className="admin-reports__group">
+                  <div className="admin-reports__group-header">
+                    <strong>{t("admin.moderation.reports.processed.title")}</strong>
+                    <span className="admin-section-badge">{processedReports.length}</span>
+                  </div>
+                  <div className="admin-list">
+                    {processedReports.length ? processedReports.map(renderReportItem) : (
+                      <EmptyState title={t("admin.moderation.reports.processed.empty.title")} description={t("admin.moderation.reports.processed.empty.description")} />
+                    )}
+                  </div>
+                </section>
+              </div>
+              <aside className="admin-report-detail">
+                {selectedAdminReport ? (
+                  <>
+                    <div>
+                      <span className="eyebrow">{t("admin.moderation.reports.detail.eyebrow")}</span>
+                      <h3>{selectedAdminReport.reason}</h3>
+                      <p>{selectedAdminReport.message || t("admin.moderation.reports.detail.noMessage")}</p>
+                    </div>
+                    <dl>
+                      <div>
+                        <dt>{t("admin.moderation.reports.detail.content")}</dt>
+                        <dd>{selectedAdminReport.contentTitle || selectedAdminReport.contentId}</dd>
+                      </div>
+                      {selectedAdminReport.contentDescription ? (
+                        <div>
+                          <dt>{t("admin.moderation.reports.detail.description")}</dt>
+                          <dd>{selectedAdminReport.contentDescription}</dd>
+                        </div>
+                      ) : null}
+                      <div>
+                        <dt>{t("admin.moderation.reports.detail.status")}</dt>
+                        <dd>
+                          {contentReportStatusLabel(selectedAdminReport.status, t)}
+                          {selectedAdminReport.contentStatus ? ` · ${moderationStatusLabel(selectedAdminReport.contentStatus, t)}` : ""}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>{t("admin.moderation.reports.detail.reportedBy")}</dt>
+                        <dd>{selectedAdminReport.reportedBy || t("common.status.unavailable")}</dd>
+                      </div>
+                      <div>
+                        <dt>{t("admin.moderation.reports.detail.createdAt")}</dt>
+                        <dd>{formatTimestamp(selectedAdminReport.createdAt, t)}</dd>
+                      </div>
+                      {selectedAdminReport.reviewedAt ? (
+                        <div>
+                          <dt>{t("admin.moderation.reports.detail.reviewedAt")}</dt>
+                          <dd>{formatTimestamp(selectedAdminReport.reviewedAt, t)}</dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                    {selectedAdminReport.status === "OPEN" ? (
+                      <div className="inline-actions">
+                        <button
+                          type="button"
+                          className="primary-button primary-button--compact"
+                          disabled={isModerationActionLoading}
+                          onClick={() => handleContentReportStatusChange(selectedAdminReport.id, "RESOLVED")}
+                        >
+                          {t("admin.moderation.reports.resolve")}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-button ghost-button--small"
+                          disabled={isModerationActionLoading}
+                          onClick={() => handleContentReportStatusChange(selectedAdminReport.id, "DISMISSED")}
+                        >
+                          {t("admin.moderation.reports.dismiss")}
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <EmptyState title={t("admin.moderation.reports.detail.empty.title")} description={t("admin.moderation.reports.detail.empty.description")} />
+                )}
+              </aside>
             </div>
-          </article>
+            )
+          })}
         </div>
-        <ContentAdminPanel onFeedback={openFeedback} />
-        <OperationalCatalogAdminPanel onFeedback={openFeedback} />
+        {renderAdminSection({
+          sectionKey: "ombudsman",
+          eyebrow: "Ouvidoria",
+          title: "Manifestações recebidas",
+          count: newOmbudsmanCount,
+          children: renderAdminOmbudsmanPanel()
+        })}
+        {renderAdminSection({
+          sectionKey: "contentCrm",
+          eyebrow: "Conteúdo",
+          title: "CRM de conteúdo",
+          children: <ContentAdminPanel onFeedback={openFeedback} />
+        })}
+        {renderAdminSection({
+          sectionKey: "catalogCrm",
+          eyebrow: "Catálogo",
+          title: "CRM operacional",
+          children: <OperationalCatalogAdminPanel onFeedback={openFeedback} />
+        })}
       </section>
     );
   }
 
+  function renderOmbudsmanPage() {
+    return (
+      <section className="ombudsman-page panel panel--spaced">
+        <div className="panel__header">
+          <div>
+            <span className="eyebrow">Ouvidoria</span>
+            <h2>Fale com a Ouvidoria do Eu Procuro</h2>
+            <p className="panel__header-note">
+              Use este canal para reclamações formais, contestação de moderação, problemas com pagamento ou sugestões.
+            </p>
+          </div>
+        </div>
+
+        {ombudsmanProtocol ? (
+          <div className="success-callout">
+            <strong>Manifestação registrada</strong>
+            <span>Protocolo: {ombudsmanProtocol}</span>
+          </div>
+        ) : null}
+
+        <form className="stacked-form ombudsman-form" onSubmit={handleOmbudsmanSubmit}>
+          <div className="form-grid">
+            <input
+              placeholder="Nome"
+              value={ombudsmanForm.name}
+              onChange={(event) => updateOmbudsmanForm("name", event.target.value)}
+              maxLength={120}
+              required
+            />
+            <input
+              type="email"
+              placeholder="E-mail"
+              value={ombudsmanForm.email}
+              onChange={(event) => updateOmbudsmanForm("email", event.target.value)}
+              maxLength={120}
+              required
+            />
+            <select
+              value={ombudsmanForm.type}
+              onChange={(event) => updateOmbudsmanForm("type", event.target.value)}
+              required
+            >
+              {OMBUDSMAN_TYPES.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+            <input
+              placeholder="Assunto"
+              value={ombudsmanForm.subject}
+              onChange={(event) => updateOmbudsmanForm("subject", event.target.value)}
+              maxLength={140}
+              required
+            />
+            <input
+              placeholder="Tipo de referência (opcional)"
+              value={ombudsmanForm.relatedEntityType}
+              onChange={(event) => updateOmbudsmanForm("relatedEntityType", event.target.value)}
+              maxLength={120}
+            />
+            <input
+              placeholder="ID relacionado (opcional)"
+              value={ombudsmanForm.relatedEntityId}
+              onChange={(event) => updateOmbudsmanForm("relatedEntityId", event.target.value)}
+              maxLength={120}
+            />
+          </div>
+          <div className="field-with-counter">
+            <textarea
+              placeholder="Descreva sua manifestação"
+              value={ombudsmanForm.message}
+              onChange={(event) => updateOmbudsmanForm("message", event.target.value)}
+              maxLength={2000}
+              rows={8}
+              required
+            />
+            <FieldCounter value={ombudsmanForm.message} max={2000} />
+          </div>
+          <label className="checkbox-row checkbox-row--panel">
+            <input
+              type="checkbox"
+              checked={ombudsmanForm.truthDeclarationAccepted}
+              onChange={(event) => updateOmbudsmanForm("truthDeclarationAccepted", event.target.checked)}
+              required
+            />
+            <span>Declaro que as informações enviadas são verdadeiras.</span>
+          </label>
+          <button type="submit" className="primary-button primary-button--compact" disabled={isSubmittingOmbudsman}>
+            {isSubmittingOmbudsman ? "Enviando..." : "Enviar manifestação"}
+          </button>
+        </form>
+      </section>
+    );
+  }
+
+  function renderAdminOmbudsmanPanel() {
+    const newRequests = adminOmbudsmanRequests.filter((requestItem) =>
+      requestItem.status === "OPEN" && !requestItem.adminResponse
+    );
+    const inProgressRequests = adminOmbudsmanRequests.filter((requestItem) =>
+      requestItem.status !== "CLOSED" && (requestItem.status === "IN_REVIEW" || requestItem.status === "ANSWERED" || requestItem.adminResponse)
+    );
+    const closedRequests = adminOmbudsmanRequests.filter((requestItem) => requestItem.status === "CLOSED");
+
+    const renderOmbudsmanRequest = (requestItem) => (
+      <article key={requestItem.id} className="admin-list-item admin-list-item--stacked ombudsman-admin-item">
+        <div>
+          <strong>{requestItem.protocol} · {requestItem.subject}</strong>
+          <span>{requestItem.type} · {requestItem.status} · {formatTimestamp(requestItem.createdAt, t)}</span>
+          <p>{requestItem.message}</p>
+          <small>{requestItem.name} · {requestItem.email}</small>
+          {requestItem.relatedEntityId ? (
+            <small>Referência: {requestItem.relatedEntityType || "item"} · {requestItem.relatedEntityId}</small>
+          ) : null}
+          {requestItem.adminResponse ? (
+            <div className="admin-response-box">
+              <strong>Resposta enviada</strong>
+              <p>{requestItem.adminResponse}</p>
+            </div>
+          ) : null}
+        </div>
+        <div className="ombudsman-admin-actions">
+          <label className="compact-field-label">
+            <span>Status</span>
+            <select
+              value={requestItem.status}
+              onChange={(event) => handleOmbudsmanStatusChange(requestItem.id, event.target.value)}
+            >
+              <option value="OPEN">Aberta</option>
+              <option value="IN_REVIEW">Em atendimento</option>
+              <option value="ANSWERED">Respondida</option>
+              <option value="CLOSED">Fechada</option>
+            </select>
+          </label>
+          <textarea
+            placeholder="Resposta da Ouvidoria"
+            value={ombudsmanResponses[requestItem.id] ?? ""}
+            onChange={(event) => setOmbudsmanResponses((current) => ({
+              ...current,
+              [requestItem.id]: event.target.value
+            }))}
+            rows={4}
+          />
+          <button
+            type="button"
+            className="primary-button primary-button--compact"
+            onClick={() => handleOmbudsmanResponseSubmit(requestItem)}
+          >
+            Responder
+          </button>
+        </div>
+      </article>
+    );
+
+    const renderOmbudsmanGroup = (title, description, requests, emptyDescription) => (
+      <section className="ombudsman-admin-group">
+        <div className="ombudsman-admin-group__header">
+          <div>
+            <strong>{title}</strong>
+            <p>{description}</p>
+          </div>
+          <span className="admin-section-badge">{requests.length}</span>
+        </div>
+        <div className="admin-list admin-list--ombudsman">
+          {requests.length ? requests.map(renderOmbudsmanRequest) : (
+            <EmptyState title="Nada por aqui" description={emptyDescription} />
+          )}
+        </div>
+      </section>
+    );
+
+    return (
+      <div className="admin-card--ombudsman">
+        <div className="admin-section-toolbar">
+          <p>Acompanhe protocolos, responda usuários e atualize o status.</p>
+          <div className="inline-actions">
+            <button type="button" className="ghost-button ghost-button--small" onClick={() => refreshAdminOmbudsmanData()}>
+              {isOmbudsmanAdminLoading ? "Atualizando..." : "Atualizar"}
+            </button>
+          </div>
+        </div>
+
+        <div className="ombudsman-admin-groups">
+          {renderOmbudsmanGroup(
+            "Novas",
+            "Manifestações abertas que ainda não receberam resposta.",
+            newRequests,
+            "Novas manifestações da Ouvidoria aparecerão aqui."
+          )}
+          {renderOmbudsmanGroup(
+            "Em atendimento",
+            "Manifestações em análise ou já respondidas, mas ainda não fechadas.",
+            inProgressRequests,
+            "Manifestações em análise ou respondidas aparecerão aqui."
+          )}
+          {renderOmbudsmanGroup(
+            "Fechadas",
+            "Protocolos encerrados.",
+            closedRequests,
+            "Manifestações fechadas aparecerão aqui."
+          )}
+        </div>
+      </div>
+    );
+  }
+
   function renderLoggedArea() {
+    const isCreateInterestPage = isInterestModalVisible
+      && loggedSection === loggedSections.NEW_INTEREST
+      && !editingInterestId;
     const statCards = [
       {
         key: loggedSections.MY_INTERESTS,
@@ -4109,7 +4929,7 @@ export default function App() {
                 value={card.value}
                 accent={card.accent}
                 clickable
-                onClick={() => navigateTo(card.key)}
+                onClick={() => navigateFromDashboardControl(card.key)}
               />
             ))}
           </div>
@@ -4119,8 +4939,9 @@ export default function App() {
           <button
             type="button"
             className={loggedSection === loggedSections.EXPLORE ? "active" : ""}
-            onClick={() => navigateTo(loggedSections.EXPLORE)}
+            onClick={() => navigateFromDashboardControl(loggedSections.EXPLORE)}
           >
+            <span className="nav-icon" aria-hidden="true">⌂</span>
             {t("header.nav.home")}
           </button>
           <button
@@ -4128,56 +4949,49 @@ export default function App() {
               className={loggedSection === loggedSections.NEW_INTEREST ? "active" : ""}
               onClick={openNewInterestForm}
           >
+            <span className="nav-icon" aria-hidden="true">+</span>
             {t("dashboard.nav.newInterest")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.MY_INTERESTS ? "active" : ""}
-            onClick={() => navigateTo(loggedSections.MY_INTERESTS)}
+            onClick={() => navigateFromDashboardControl(loggedSections.MY_INTERESTS)}
           >
+            <span className="nav-icon" aria-hidden="true">●</span>
             {t("dashboard.nav.myInterests")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.SENT_OFFERS ? "active" : ""}
-            onClick={() => navigateTo(loggedSections.SENT_OFFERS)}
+            onClick={() => navigateFromDashboardControl(loggedSections.SENT_OFFERS)}
           >
+            <span className="nav-icon" aria-hidden="true">↗</span>
             {t("dashboard.nav.sentOffers")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.RECEIVED_OFFERS ? "active" : ""}
-            onClick={() => navigateTo(loggedSections.RECEIVED_OFFERS)}
+            onClick={() => navigateFromDashboardControl(loggedSections.RECEIVED_OFFERS)}
           >
+            <span className="nav-icon" aria-hidden="true">↙</span>
             {t("dashboard.nav.receivedOffers")}
           </button>
           <button
             type="button"
             className={loggedSection === loggedSections.SELLER_ITEMS ? "active" : ""}
-            onClick={() => navigateTo(loggedSections.SELLER_ITEMS)}
+            onClick={() => navigateFromDashboardControl(loggedSections.SELLER_ITEMS)}
           >
+            <span className="nav-icon" aria-hidden="true">▣</span>
             {t("dashboard.nav.sellerItems")}
           </button>
-          <button
-            type="button"
-            className={loggedSection === loggedSections.CREDITS ? "active" : ""}
-            onClick={() => navigateTo(loggedSections.CREDITS)}
-          >
-            {t("dashboard.nav.credits")}
-          </button>
-          {isAdmin ? (
+          {creditPurchasesEnabled ? (
             <button
               type="button"
-              className={`admin-nav-button ${loggedSection === loggedSections.ADMIN ? "active" : ""}`}
-              onClick={() => {
-                markAdminReportsSeen();
-                navigateTo(loggedSections.ADMIN);
-              }}
+              className={loggedSection === loggedSections.CREDITS ? "active" : ""}
+              onClick={() => navigateFromDashboardControl(loggedSections.CREDITS)}
             >
-              <span>{t("admin.moderation.nav")}</span>
-              {unreadAdminReportCount > 0 ? (
-                <strong className="admin-nav-badge">{unreadAdminReportCount}</strong>
-              ) : null}
+              <span className="nav-icon" aria-hidden="true">¤</span>
+              {t("dashboard.nav.credits")}
             </button>
           ) : null}
         </section>
@@ -4192,7 +5006,7 @@ export default function App() {
               <div className="panel__header">
                 <div>
                   <span className="eyebrow">Página</span>
-                  <h2>{showInactiveInterests ? "Meus interesses" : "Interesses ativos"}</h2>
+                  <h2>{showInactiveInterests ? "Minhas procuras" : "Procuras ativas"}</h2>
                 </div>
               </div>
               <label className="seller-items-toggle">
@@ -4201,15 +5015,15 @@ export default function App() {
                   checked={showInactiveInterests}
                   onChange={(event) => setShowInactiveInterests(event.target.checked)}
                 />
-                <span>Mostrar interesses desativados</span>
+                <span>Mostrar procuras desativadas</span>
               </label>
 
               {myInterests.length ? (
                 <div className="accordion-list">{myInterests.map(renderInterestListItem)}</div>
               ) : (
                 <EmptyState
-                  title="Nenhum interesse ativo"
-                  description="Cadastre um novo interesse para começar a receber ofertas."
+                  title="Nenhuma procura ativa"
+                  description="Publique uma nova procura para começar a receber propostas."
                 />
               )}
             </article>
@@ -4218,7 +5032,7 @@ export default function App() {
               <div className="panel__header">
                 <div>
                   <span className="eyebrow">Respostas</span>
-                  <h2>{selectedInterest?.title ?? "Escolha um interesse"}</h2>
+                  <h2>{selectedInterest?.title ?? "Escolha uma procura"}</h2>
                 </div>
               </div>
 
@@ -4239,10 +5053,10 @@ export default function App() {
                       <strong>{moderationStatusLabel(selectedInterest.status, t)}</strong>
                       <p>
                         {selectedInterest.status === "REJECTED"
-                          ? "Seu anúncio foi rejeitado. Edite para enviar novamente para análise ou exclua se preferir."
+                          ? "Sua procura foi rejeitada. Edite para enviar novamente para análise ou exclua se preferir."
                           : selectedInterest.status === "CLOSED"
-                            ? "Este anúncio está desativado e não aparece para outros usuários."
-                          : (selectedInterest.moderation?.reason ?? "Seu anúncio ainda não está disponível publicamente.")}
+                            ? "Esta procura está desativada e não aparece para outros usuários."
+                          : (selectedInterest.moderation?.reason ?? "Sua procura ainda não está disponível publicamente.")}
                       </p>
                     </div>
                   ) : null}
@@ -4256,7 +5070,7 @@ export default function App() {
                         type="button"
                         className="renewal-button"
                         onClick={() => handleRenewInterest(selectedInterest.id)}
-                        title="Usa 1 crédito para adicionar mais 30 dias ao anúncio"
+                        title="Usa 1 crédito para adicionar mais 30 dias à procura"
                       >
                         <span className="renewal-button__icon" aria-hidden="true">↻</span>
                         <span>Renovar por 1 crédito</span>
@@ -4272,7 +5086,7 @@ export default function App() {
                       className="ghost-button action-button--compact"
                       onClick={() => startEditingInterest(selectedInterest)}
                     >
-                      Editar anúncio
+                      Editar procura
                     </button>
                     {selectedInterest.status === "CLOSED" ? (
                       <button
@@ -4280,7 +5094,7 @@ export default function App() {
                         className="primary-button action-button--compact"
                         onClick={() => handleActivateInterest(selectedInterest.id)}
                       >
-                        Ativar anúncio
+                        Ativar procura
                       </button>
                     ) : (
                       <button
@@ -4288,7 +5102,7 @@ export default function App() {
                         className="ghost-button action-button--compact"
                         onClick={() => handleCloseInterest(selectedInterest.id)}
                       >
-                        Desativar anúncio
+                        Desativar procura
                       </button>
                     )}
                     <button
@@ -4296,14 +5110,14 @@ export default function App() {
                       className="danger-button action-button--compact"
                       onClick={() => handleDeleteInterest(selectedInterest.id)}
                     >
-                      Excluir anúncio
+                      Excluir procura
                     </button>
                   </div>
-                  {["APPROVED", "OPEN"].includes(selectedInterest?.status) && (
+                  {boostPurchasesEnabled && boostProducts.length > 0 && ["APPROVED", "OPEN"].includes(selectedInterest?.status) && (
                       <>
                         <div className="boost-box">
                           <div>
-                            <strong>Impulsionar interesse</strong>
+                            <strong>Impulsionar procura</strong>
                             <p>
                               {selectedInterest.boostedUntil
                                   ? t("boost.activeUntil", { date: formatTimestamp(selectedInterest.boostedUntil, t) })
@@ -4338,14 +5152,14 @@ export default function App() {
 
                         <div className="offers">
                           <div className="offers__header">
-                            <span className="eyebrow">Ofertas recebidas</span>
+                            <span className="eyebrow">Propostas recebidas</span>
                             <strong>{offers.length}</strong>
                           </div>
 
                           {offers.length === 0 ? (
                               <EmptyState
-                                  title="Ainda sem ofertas"
-                                  description="Quando alguém responder ao seu interesse, as mensagens aparecerão aqui."
+                                  title="Ainda sem propostas"
+                                  description="Quando alguém responder à sua procura, as mensagens aparecerão aqui."
                               />
                           ) : (
                               <div className="accordion-list">
@@ -4360,8 +5174,8 @@ export default function App() {
                 </>
               ) : (
                 <EmptyState
-                  title="Selecione um interesse seu"
-                  description="Clique em um interesse ativo para acompanhar as respostas."
+                  title="Selecione uma procura sua"
+                  description="Clique em uma procura ativa para acompanhar as propostas."
                 />
               )}
             </aside>
@@ -4373,7 +5187,7 @@ export default function App() {
             <div className="panel__header">
               <div>
                 <span className="eyebrow">Página</span>
-                <h2>Ofertas enviadas</h2>
+                <h2>Propostas enviadas</h2>
               </div>
             </div>
 
@@ -4383,8 +5197,8 @@ export default function App() {
               </div>
             ) : (
               <EmptyState
-                title="Nenhuma oferta enviada"
-                description="As ofertas que você enviar para outros interesses aparecerão aqui."
+                title="Nenhuma proposta enviada"
+                description="As propostas que você enviar para procuras de outras pessoas aparecerão aqui."
               />
             )}
           </section>
@@ -4395,7 +5209,7 @@ export default function App() {
             <div className="panel__header">
               <div>
                 <span className="eyebrow">Página</span>
-                <h2>Ofertas recebidas</h2>
+                <h2>Propostas recebidas</h2>
               </div>
             </div>
 
@@ -4405,8 +5219,8 @@ export default function App() {
               </div>
             ) : (
               <EmptyState
-                title="Nenhuma oferta recebida"
-                description="As respostas aos seus interesses ficarão listadas aqui."
+                title="Nenhuma proposta recebida"
+                description="As respostas às suas procuras ficarão listadas aqui."
               />
             )}
           </section>
@@ -4417,31 +5231,48 @@ export default function App() {
         {loggedSection === loggedSections.ADMIN && isAdmin ? renderAdminModerationPage() : null}
 
         {isInterestModalVisible ? (
-          <div className="modal-overlay" role="presentation" onClick={cancelInterestEditing}>
+          <div
+            className={isCreateInterestPage ? "interest-form-page-shell" : "modal-overlay"}
+            role="presentation"
+            onClick={isCreateInterestPage ? undefined : cancelInterestEditing}
+          >
             <section
               ref={newInterestSectionRef}
-              className="form-modal panel panel--form"
-              role="dialog"
-              aria-modal="true"
+              className={isCreateInterestPage ? "panel panel--form interest-form-page" : "form-modal panel panel--form"}
+              role={isCreateInterestPage ? undefined : "dialog"}
+              aria-modal={isCreateInterestPage ? undefined : "true"}
               aria-labelledby="interest-form-title"
-              onClick={(event) => event.stopPropagation()}
+              onClick={isCreateInterestPage ? undefined : (event) => event.stopPropagation()}
             >
             <div className="feedback-modal__header">
               <div>
                 <span className="eyebrow">{t("interest.form.eyebrow")}</span>
                 <h2 id="interest-form-title">{editingInterestId ? t("interest.form.editTitle") : t("interest.form.createTitle")}</h2>
               </div>
-              <button
-                type="button"
-                className="modal-close-button"
-                onClick={cancelInterestEditing}
-                aria-label={t("common.actions.closeModal")}
-              >
-                X
-              </button>
+              {isCreateInterestPage ? (
+                <button type="button" className="ghost-button" onClick={() => navigateTo(loggedSections.EXPLORE)}>
+                  {t("common.actions.backHome")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="modal-close-button"
+                  onClick={cancelInterestEditing}
+                  aria-label={t("common.actions.closeModal")}
+                >
+                  X
+                </button>
+              )}
             </div>
 
             <form className="stacked-form" onSubmit={handleInterestSubmit}>
+              {!editingInterestId ? (
+                <>
+                  <p className="form-intro">{t("interest.form.guidance")}</p>
+                  <div className="intent-notice">{t("interest.form.intentNotice")}</div>
+                </>
+              ) : null}
+
               <div className="expiry-note">
                 {t("interest.form.expiryNote", { count: LISTING_EXPIRATION_DAYS })}
               </div>
@@ -4479,7 +5310,10 @@ export default function App() {
                 maxLength={DESCRIPTION_MAX_LENGTH}
                 required
               />
-              <FieldCounter value={interestForm.description} max={DESCRIPTION_MAX_LENGTH} />
+              <div className="field-footer">
+                <p className="field-helper">{t("interest.form.description.helper")}</p>
+                <FieldCounter value={interestForm.description} max={DESCRIPTION_MAX_LENGTH} />
+              </div>
               {hasLink(interestForm.description) ? (
                 <p className="form-note form-note--compact">{t("interest.form.linksNotAllowed")}</p>
               ) : null}
@@ -4506,6 +5340,7 @@ export default function App() {
                 />
               </div>
 
+              <div className="field-group-label">Quanto pretende investir?</div>
               <div className="three-columns">
                 <input
                   type="number"
@@ -4539,6 +5374,9 @@ export default function App() {
                   }
                 />
               </div>
+              {hasInvalidBudgetRange(interestForm) ? (
+                <p className="form-note form-note--compact">{t("interest.feedback.invalidBudget.message")}</p>
+              ) : null}
 
               <div className="three-columns">
                 <input
@@ -4698,10 +5536,32 @@ export default function App() {
             isLoggedIn={false}
             hideActions
             onNavigate={() => {
-              window.location.hash = "";
+              setActiveLegalPageSlug("");
+              replaceCurrentUrl(sectionRoutes[loggedSections.EXPLORE]);
             }}
           />
           <LegalPage slug={activeLegalPageSlug} />
+        </main>
+
+        <Footer />
+      </div>
+    );
+  }
+
+  if (isOmbudsmanPageActive) {
+    return (
+      <div className="app-shell">
+        <div className="background-grid" />
+
+        <main className="page">
+          <Header
+            hideActions
+            onNavigate={() => {
+              setIsOmbudsmanPageActive(false);
+              replaceCurrentUrl(sectionRoutes[loggedSections.EXPLORE]);
+            }}
+          />
+          {renderOmbudsmanPage()}
         </main>
 
         <Footer />
@@ -4720,11 +5580,18 @@ export default function App() {
           hasNotifications={hasUnreadMessages}
           sellerCredits={monetizationAccount?.sellerCredits}
           subscriptionActive={monetizationAccount?.subscriptionActive}
+          creditPurchasesEnabled={creditPurchasesEnabled}
+          isAdmin={isAdmin}
+          unreadAdminReportCount={unreadAdminReportCount}
           isLoggedIn={Boolean(session)}
           notificationButtonRef={notificationButtonRef}
           onLoginClick={() => openAuthModal("login")}
           onRegisterClick={() => openAuthModal("register")}
-          onCreditsClick={() => navigateTo(loggedSections.CREDITS)}
+          onCreditsClick={() => creditPurchasesEnabled && navigateTo(loggedSections.CREDITS)}
+          onAdminClick={() => {
+            markAdminReportsSeen();
+            navigateFromDashboardControl(loggedSections.ADMIN);
+          }}
           onNotificationClick={openNotificationModal}
           onLogout={handleLogout}
           onNavigate={(section) => {
@@ -4811,7 +5678,7 @@ export default function App() {
             <div className="feedback-modal__header">
               <div>
                 <span className="eyebrow">Denúncia</span>
-                <h2 id="report-modal-title">Denunciar interesse</h2>
+                <h2 id="report-modal-title">Denunciar procura</h2>
               </div>
               <button type="button" className="modal-close-button" onClick={closeReportModal} aria-label="Fechar modal">
                 X

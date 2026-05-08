@@ -23,13 +23,13 @@ import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.usecase.MarketplaceUseCase;
-import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.InterestSearchGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
+import com.euprocuro.api.domain.gateway.SellerItemGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestSearchCriteria;
@@ -37,6 +37,7 @@ import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.OfferStatus;
+import com.euprocuro.api.domain.model.SellerItem;
 import com.euprocuro.api.domain.model.UserProfile;
 
 import lombok.RequiredArgsConstructor;
@@ -51,10 +52,12 @@ public class MarketplaceService implements MarketplaceUseCase {
     private final EventPublisherGateway eventPublisherGateway;
     private final EmailGateway emailGateway;
     private final RealtimeMessageGateway realtimeMessageGateway;
-    private final BlockedTermValidationGateway blockedTermValidationGateway;
     private final OperationalCatalogService operationalCatalogService;
     private final InterestSearchGateway interestSearchGateway;
     private final PublicCacheService publicCacheService;
+    private final AuditLogService auditLogService;
+    private final SellerItemGateway sellerItemGateway;
+    private final InterestDeliveryRankingService interestDeliveryRankingService;
 
     @Value("${application.listings.expiration-days:30}")
     private long listingExpirationDays = 30;
@@ -101,13 +104,9 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .expiresAt(expiresAt(now))
                 .build();
 
-        // Validate for blocked terms before saving
-        blockedTermValidationGateway.validateBlockedTerms(interestPost)
-                .ifPresent(validation -> {
-                    throw new BusinessException(validation.getReason());
-                });
-
         InterestPost saved = interestGateway.save(interestPost);
+        auditLogService.record("INTEREST_CREATED", owner.getId(), owner.getEmail(), "INTEREST", saved.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("category", saved.getCategory()));
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.created", Map.of(
                 "interestId", saved.getId(),
@@ -132,6 +131,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         InterestPost saved = interestGateway.save(closedInterest);
+        auditLogService.record("INTEREST_CLOSED", currentUserId, null, "INTEREST", saved.getId());
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.closed", Map.of(
                 "interestId", saved.getId(),
@@ -158,6 +158,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         InterestPost saved = interestGateway.save(activatedInterest);
+        auditLogService.record("INTEREST_ACTIVATED", currentUserId, null, "INTEREST", saved.getId());
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.activated", Map.of(
                 "interestId", saved.getId(),
@@ -175,6 +176,7 @@ public class MarketplaceService implements MarketplaceUseCase {
         }
 
         interestGateway.deleteById(interestId);
+        auditLogService.record("INTEREST_DELETED", currentUserId, null, "INTEREST", interestId);
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.deleted", Map.of(
                 "interestId", interestId,
@@ -218,13 +220,9 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .updatedAt(Instant.now())
                 .build();
 
-        // Validate for blocked terms before saving
-        blockedTermValidationGateway.validateBlockedTerms(updatedInterest)
-                .ifPresent(validation -> {
-                    throw new BusinessException(validation.getReason());
-                });
-
         InterestPost saved = interestGateway.save(updatedInterest);
+        auditLogService.record("INTEREST_UPDATED", currentUserId, null, "INTEREST", saved.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("category", saved.getCategory()));
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.updated", Map.of(
                 "interestId", saved.getId(),
@@ -264,6 +262,8 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         InterestPost saved = interestGateway.save(renewedInterest);
+        auditLogService.record("INTEREST_RENEWED", currentUserId, owner.getEmail(), "INTEREST", saved.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("creditsRemaining", availableCredits - 1));
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.renewed", Map.of(
                 "interestId", saved.getId(),
@@ -275,7 +275,7 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     @Override
     public List<InterestPost> listInterests(InterestSearchFilter filter) {
-        return interestGateway.findAll()
+        List<InterestPost> candidates = interestGateway.findAll()
                 .stream()
                 .filter(this::isNotExpired)
                 .filter(post -> filter.getCategory() == null || Objects.equals(post.getCategory(), filter.getCategory()))
@@ -286,10 +286,9 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .filter(post -> filter.getQuery() == null || filter.getQuery().isBlank()
                         || containsIgnoreCase(post, filter.getQuery()))
                 .filter(post -> !filter.isOpenOnly() || isPubliclyVisible(post))
-                .sorted(Comparator
-                        .comparing(this::isBoostActive).reversed()
-                        .thenComparing(InterestPost::getCreatedAt, Comparator.reverseOrder()))
                 .collect(Collectors.toList());
+
+        return rankForDelivery(candidates, filter.getCurrentUserId());
     }
 
     @Override
@@ -308,12 +307,42 @@ public class MarketplaceService implements MarketplaceUseCase {
             return searchInterests(criteria, safeOffset, safeLimit);
         }
 
+        if (StringUtils.hasText(filter.getCurrentUserId())) {
+            return searchPersonalizedInterests(criteria, safeOffset, safeLimit, filter.getCurrentUserId());
+        }
+
         return publicCacheService.getOrLoad(
                 PublicCacheService.MARKETPLACE,
                 interestSearchCacheKey(criteria, safeOffset, safeLimit),
                 marketplaceCacheTtlSeconds,
                 () -> searchInterests(criteria, safeOffset, safeLimit)
         );
+    }
+
+    private List<InterestPost> searchPersonalizedInterests(InterestSearchCriteria criteria, int offset, int limit, String currentUserId) {
+        int candidateLimit = offset + Math.max(100, limit * 8);
+        return rankForDelivery(searchInterests(criteria, 0, candidateLimit), currentUserId)
+                .stream()
+                .skip(offset)
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
+
+    private List<InterestPost> rankForDelivery(List<InterestPost> interests, String currentUserId) {
+        if (!StringUtils.hasText(currentUserId)) {
+            return interests.stream()
+                    .sorted(Comparator
+                            .comparing(this::isBoostActive).reversed()
+                            .thenComparing(InterestPost::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                    .collect(Collectors.toList());
+        }
+
+        Optional<UserProfile> user = userGateway.findById(currentUserId);
+        List<SellerItem> sellerItems = sellerItemGateway.findByOwnerIdOrderByCreatedAtDesc(currentUserId)
+                .stream()
+                .filter(SellerItem::isActive)
+                .collect(Collectors.toList());
+        return interestDeliveryRankingService.rank(interests, user, sellerItems);
     }
 
     private List<InterestPost> searchInterests(InterestSearchCriteria criteria, int offset, int limit) {
@@ -373,7 +402,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .sellerId(seller.getId())
                 .sellerName(seller.getName())
                 .sellerEmail(seller.getEmail())
-                .sellerPhone(command.getSellerPhone())
+                .sellerPhone(trimToNull(command.getSellerPhone()))
                 .offeredPrice(command.getOfferedPrice())
                 .message(command.getMessage())
                 .offerImageUrl(null)
@@ -384,6 +413,8 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .build();
 
         Offer saved = offerGateway.save(offer);
+        auditLogService.record("OFFER_CREATED", seller.getId(), seller.getEmail(), "OFFER", saved.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("interestId", interestId));
         String sellerName = seller.getName();
         userGateway.findById(interestPost.getOwnerId())
                 .ifPresent(owner -> emailGateway.sendOfferReceivedEmail(owner, interestPost.getTitle(), sellerName));
@@ -477,6 +508,10 @@ public class MarketplaceService implements MarketplaceUseCase {
         }
 
         return referenceImageUrl.trim();
+    }
+
+    private String trimToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private String normalizePostalCode(String value) {
