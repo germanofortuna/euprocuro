@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
@@ -48,6 +49,7 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class ContentService implements ContentUseCase, AdminContentUseCase {
+    private static final Logger LOGGER = Logger.getLogger(ContentService.class.getName());
 
     private static final String DEFAULT_LOCALE = "pt-BR";
     private static final int MAX_KEY_LENGTH = 160;
@@ -78,7 +80,16 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
         ensureDefaultContentSeeded();
         String resolvedLocale = resolveLocale(locale);
         Optional<List<String>> requestedKeys = publicRequestedKeys(keys);
-
+        // Auditoria: loga tentativas de acesso a chaves restritas
+        if (keys != null && !keys.isEmpty()) {
+            List<String> forbidden = keys.stream()
+                    .map(this::normalizeKey)
+                    .filter(k -> !isPubliclyExposableContentKey(k))
+                    .collect(Collectors.toList());
+            if (!forbidden.isEmpty()) {
+                LOGGER.warning("Tentativa de acesso a chaves restritas via API pública: " + forbidden);
+            }
+        }
         return publicCacheService.getOrLoad(
                 PublicCacheService.CONTENT,
                 publishedContentCacheKey(resolvedLocale, requestedKeys),
@@ -107,11 +118,12 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
         if (keys == null || keys.isEmpty()) {
             return Optional.empty();
         }
-
-        return Optional.of(sanitizeKeys(keys).stream()
+        // Remove todas as chaves restritas, mesmo se solicitadas explicitamente
+        List<String> sanitized = sanitizeKeys(keys).stream()
                 .filter(this::isPubliclyExposableContentKey)
                 .sorted()
-                .collect(Collectors.toList()));
+                .collect(Collectors.toList());
+        return sanitized.isEmpty() ? Optional.empty() : Optional.of(sanitized);
     }
 
     private List<ContentEntry> loadPublishedEntries(String locale, Optional<List<String>> requestedKeys) {
