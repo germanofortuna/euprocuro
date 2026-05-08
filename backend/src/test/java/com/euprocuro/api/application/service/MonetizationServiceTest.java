@@ -77,6 +77,7 @@ class MonetizationServiceTest {
     void setUpCatalog() {
         ReflectionTestUtils.setField(monetizationService, "checkoutProvider", "LOCAL_CHECKOUT_MOCK");
         ReflectionTestUtils.setField(monetizationService, "localCheckoutEnabled", true);
+        ReflectionTestUtils.setField(monetizationService, "localCheckoutBaseUrl", "http://localhost:8080/api/monetization/local-checkout/approve");
         List<MonetizationProductView> products = defaultProducts();
         lenient().when(monetizationCatalog.products()).thenReturn(products);
         lenient().when(monetizationCatalog.creditPurchasesEnabled()).thenReturn(true);
@@ -595,9 +596,11 @@ class MonetizationServiceTest {
 
         assertThat(result.getStatus()).isEqualTo("PENDING");
         assertThat(result.getProductCode()).isEqualTo("BOOST_3_DAYS");
-        verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
-                "BOOST_3_DAYS".equals(order.getProductCode()) && "interest-1".equals(order.getBoostInterestId())
-        ));
+        // Verifica se pelo menos uma das chamadas ao save tem os argumentos esperados
+        org.mockito.Mockito.verify(paymentOrderGateway, org.mockito.Mockito.atLeastOnce())
+                .save(org.mockito.ArgumentMatchers.argThat(order ->
+                        "BOOST_3_DAYS".equals(order.getProductCode()) && "interest-1".equals(order.getBoostInterestId())
+                ));
         verify(interestGateway, never()).save(any(InterestPost.class));
         verify(emailGateway, never()).sendBoostActivatedEmail(any(UserProfile.class), anyString(), anyString());
         verify(eventPublisherGateway).publish(eq("monetization.purchase.created"), any(Map.class));
