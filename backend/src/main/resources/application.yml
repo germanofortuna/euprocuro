@@ -79,8 +79,9 @@ application:
         purchase-confirmation: ${MAILERSEND_TEMPLATE_ID_PURCHASE_CONFIRMATION:}
         boost-activated: ${MAILERSEND_TEMPLATE_ID_BOOST_ACTIVATED:}
   monetization:
-    provider: ${APP_MONETIZATION_PROVIDER:LOCAL_MOCK}
+    provider: ${APP_MONETIZATION_PROVIDER:MERCADO_PAGO_CHECKOUT_PRO}
     local-checkout:
+      enabled: ${LOCAL_CHECKOUT_ENABLED:false}
       base-url: ${LOCAL_CHECKOUT_BASE_URL:http://localhost:8080/api/monetization/local-checkout/approve}
       success-url: ${LOCAL_CHECKOUT_SUCCESS_URL:http://localhost:5173?payment=success}
     mercado-pago:

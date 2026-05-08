@@ -52,10 +52,12 @@ public class MonetizationService implements MonetizationUseCase {
     private final PaymentStatusGateway paymentStatusGateway;
     private final PublicCacheService publicCacheService;
 
-    @Value("${application.monetization.provider:LOCAL_MOCK}")
-    private String checkoutProvider = "LOCAL_MOCK";
+    @Value("${application.monetization.provider:MERCADO_PAGO_CHECKOUT_PRO}")
+    private String checkoutProvider = "MERCADO_PAGO_CHECKOUT_PRO";
     @Value("${application.monetization.local-checkout.base-url:http://localhost:8080/api/monetization/local-checkout/approve}")
     private String localCheckoutBaseUrl;
+    @Value("${application.monetization.local-checkout.enabled:false}")
+    private boolean localCheckoutEnabled;
 
     @Override
     public List<MonetizationProductView> listProducts() {
@@ -85,36 +87,7 @@ public class MonetizationService implements MonetizationUseCase {
             throw new BusinessException("Boost deve ser ativado diretamente no interesse.");
         }
 
-        if (isCheckoutProviderWithPendingOrder()) {
-            return createPendingCheckout(user, product, normalizePaymentMethod(command.getPaymentMethod()));
-        }
-
-        UserProfile updatedUser = applyProductToUser(user, product);
-        updatedUser = userGateway.save(updatedUser);
-        PaymentOrder approvedOrder = saveApprovedLocalOrder(updatedUser, product, normalizePaymentMethod(command.getPaymentMethod()));
-        emailGateway.sendPurchaseConfirmationEmail(
-                updatedUser,
-                product.getName(),
-                normalizePaymentMethod(command.getPaymentMethod())
-        );
-
-        eventPublisherGateway.publish("monetization.purchase.completed", Map.of(
-                "userId", userId,
-                "productCode", product.getCode(),
-                "paymentMethod", normalizePaymentMethod(command.getPaymentMethod()),
-                "provider", checkoutProvider,
-                "paymentOrderId", approvedOrder.getId()
-        ));
-
-        return CheckoutView.builder()
-                .provider(checkoutProvider)
-                .paymentMethod(normalizePaymentMethod(command.getPaymentMethod()))
-                .productCode(product.getCode())
-                .status("APPROVED")
-                .paymentOrderId(approvedOrder.getId())
-                .checkoutUrl("local://checkout/" + approvedOrder.getId())
-                .message("Pagamento simulado aprovado. Em producao, este fluxo sera confirmado por webhook do gateway.")
-                .build();
+        return createPendingCheckout(user, product, normalizePaymentMethod(command.getPaymentMethod()));
     }
 
     @Override
@@ -194,6 +167,9 @@ public class MonetizationService implements MonetizationUseCase {
         if (!isLocalCheckoutProvider(paymentOrder.getProvider())) {
             throw new ForbiddenException("Este pedido nao pertence ao checkout local.");
         }
+        if (!localCheckoutEnabled) {
+            throw new ForbiddenException("Checkout local desabilitado.");
+        }
 
         approvePaymentOrder(paymentOrder, paymentOrder.getId());
     }
@@ -214,22 +190,7 @@ public class MonetizationService implements MonetizationUseCase {
         UserProfile owner = requireUser(userId);
         String paymentMethod = normalizePaymentMethod(command.getPaymentMethod());
 
-        if (isCheckoutProviderWithPendingOrder()) {
-            return createPendingCheckout(owner, product, paymentMethod, interestId);
-        }
-
-        PaymentOrder approvedOrder = saveApprovedLocalOrder(owner, product, paymentMethod, interestId);
-        activateBoost(userId, interestId, product, paymentMethod, approvedOrder.getId());
-
-        return CheckoutView.builder()
-                .provider(checkoutProvider)
-                .paymentMethod(paymentMethod)
-                .productCode(product.getCode())
-                .status("APPROVED")
-                .paymentOrderId(approvedOrder.getId())
-                .checkoutUrl("local://checkout/" + approvedOrder.getId())
-                .message("Pagamento simulado aprovado. Boost ativado no interesse.")
-                .build();
+        return createPendingCheckout(owner, product, paymentMethod, interestId);
     }
 
     private UserProfile applyProductToUser(UserProfile user, MonetizationProductView product) {
@@ -321,6 +282,10 @@ public class MonetizationService implements MonetizationUseCase {
     }
 
     private CheckoutView createLocalCheckout(MonetizationProductView product, PaymentOrder paymentOrder) {
+        if (!localCheckoutEnabled) {
+            throw new BusinessException("Checkout local desabilitado.");
+        }
+
         return CheckoutView.builder()
                 .provider(paymentOrder.getProvider())
                 .paymentMethod(paymentOrder.getPaymentMethod())
@@ -333,19 +298,13 @@ public class MonetizationService implements MonetizationUseCase {
                 .build();
     }
 
-    private boolean isCheckoutProviderWithPendingOrder() {
-        return isLocalCheckoutProvider()
-                || "MERCADO_PAGO_CHECKOUT_PRO".equalsIgnoreCase(checkoutProvider)
-                || "MERCADO_PAGO".equalsIgnoreCase(checkoutProvider)
-                || "MERCADOPAGO".equalsIgnoreCase(checkoutProvider);
-    }
-
     private boolean isLocalCheckoutProvider() {
         return isLocalCheckoutProvider(checkoutProvider);
     }
 
     private boolean isLocalCheckoutProvider(String provider) {
         return "LOCAL_CHECKOUT_MOCK".equalsIgnoreCase(provider)
+                || "LOCAL_MOCK".equalsIgnoreCase(provider)
                 || "MERCADO_PAGO_LOCAL_MOCK".equalsIgnoreCase(provider);
     }
 
@@ -481,37 +440,6 @@ public class MonetizationService implements MonetizationUseCase {
                 "paymentOrderId", paymentOrderId
         ));
         return saved;
-    }
-
-    private PaymentOrder saveApprovedLocalOrder(UserProfile user, MonetizationProductView product, String paymentMethod) {
-        return saveApprovedLocalOrder(user, product, paymentMethod, null);
-    }
-
-    private PaymentOrder saveApprovedLocalOrder(
-            UserProfile user,
-            MonetizationProductView product,
-            String paymentMethod,
-            String boostInterestId
-    ) {
-        Instant now = Instant.now();
-        String orderId = UUID.randomUUID().toString();
-        return paymentOrderGateway.save(PaymentOrder.builder()
-                .id(orderId)
-                .userId(user.getId())
-                .userEmail(user.getEmail())
-                .productCode(product.getCode())
-                .productName(product.getName())
-                .boostInterestId(boostInterestId)
-                .amount(product.getPrice())
-                .paymentMethod(paymentMethod)
-                .provider(checkoutProvider)
-                .status(PaymentOrderStatus.APPROVED)
-                .providerPaymentId(orderId)
-                .checkoutUrl("local://checkout/" + orderId)
-                .createdAt(now)
-                .updatedAt(now)
-                .approvedAt(now)
-                .build());
     }
 
     private String firstText(String... values) {
