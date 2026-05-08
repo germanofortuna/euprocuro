@@ -9,6 +9,7 @@ import lombok.Value;
 @Builder
 public class SaveOperationalCatalogCommand {
     MonetizationSettingsCommand monetizationSettings;
+    ModerationSettingsCommand moderationSettings;
     List<CatalogCategoryCommand> categories;
     List<CatalogProductCommand> products;
 }

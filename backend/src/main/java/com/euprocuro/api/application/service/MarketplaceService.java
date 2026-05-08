@@ -23,7 +23,6 @@ import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.usecase.MarketplaceUseCase;
-import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
@@ -53,7 +52,6 @@ public class MarketplaceService implements MarketplaceUseCase {
     private final EventPublisherGateway eventPublisherGateway;
     private final EmailGateway emailGateway;
     private final RealtimeMessageGateway realtimeMessageGateway;
-    private final BlockedTermValidationGateway blockedTermValidationGateway;
     private final OperationalCatalogService operationalCatalogService;
     private final InterestSearchGateway interestSearchGateway;
     private final PublicCacheService publicCacheService;
@@ -105,12 +103,6 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .updatedAt(now)
                 .expiresAt(expiresAt(now))
                 .build();
-
-        // Validate for blocked terms before saving
-        blockedTermValidationGateway.validateBlockedTerms(interestPost)
-                .ifPresent(validation -> {
-                    throw new BusinessException(validation.getReason());
-                });
 
         InterestPost saved = interestGateway.save(interestPost);
         auditLogService.record("INTEREST_CREATED", owner.getId(), owner.getEmail(), "INTEREST", saved.getId(),
@@ -227,12 +219,6 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .moderation(null)
                 .updatedAt(Instant.now())
                 .build();
-
-        // Validate for blocked terms before saving
-        blockedTermValidationGateway.validateBlockedTerms(updatedInterest)
-                .ifPresent(validation -> {
-                    throw new BusinessException(validation.getReason());
-                });
 
         InterestPost saved = interestGateway.save(updatedInterest);
         auditLogService.record("INTEREST_UPDATED", currentUserId, null, "INTEREST", saved.getId(),

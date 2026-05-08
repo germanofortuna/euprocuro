@@ -35,7 +35,6 @@ import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
-import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
@@ -69,8 +68,6 @@ class MarketplaceServiceTest {
     @Mock
     private RealtimeMessageGateway realtimeMessageGateway;
     @Mock
-    private BlockedTermValidationGateway blockedTermValidationGateway;
-    @Mock
     private OperationalCatalogService operationalCatalogService;
     @Mock
     private InterestSearchGateway interestSearchGateway;
@@ -90,7 +87,6 @@ class MarketplaceServiceTest {
     void setUpCache() {
         lenient().when(publicCacheService.getOrLoad(anyString(), anyString(), anyLong(), any()))
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
-        lenient().when(blockedTermValidationGateway.validateBlockedTerms(any(InterestPost.class))).thenReturn(Optional.empty());
     }
 
     @Test

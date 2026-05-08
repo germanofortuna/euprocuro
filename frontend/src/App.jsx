@@ -3163,7 +3163,7 @@ export default function App() {
                 <button type="button" className="primary-button" onClick={() => openAuthModal("register")}>
                   {t("home.hero.primary")}
                 </button>
-                <button type="button" className="ghost-button" onClick={() => openAuthModal("register")}>
+                <button type="button" className="ghost-button" onClick={() => openAuthModal("login")}>
                   {t("home.hero.secondary")}
                 </button>
               </div>

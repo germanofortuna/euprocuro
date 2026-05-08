@@ -41,6 +41,7 @@ O backend segue uma separacao clara entre camadas:
 - Busca publica por texto, categoria, cidade e teto de orcamento
 - Monetizacao MVP com creditos para vendedores, plano Pro e boost pago de interesses apos a publicacao
 - CRM administrativo para textos, politicas legais, categorias, precos, planos e promocoes em runtime
+- Block list automatica por CPF/CNPJ para usuarios com procuras rejeitadas pela moderacao
 - Cache publico server-side para conteudo, catalogo, CEP e vitrine de interesses, com invalidacao manual no admin
 - Indices Mongo para as consultas publicas mais frequentes e contrato de busca dedicado para evoluir para Atlas Search/OpenSearch
 - Checkout local simulado e Checkout Pro Mercado Pago com confirmacao por webhook
@@ -282,6 +283,27 @@ APP_ADMIN_ALLOWED_EMAILS=seu-email@dominio.com,outro-admin@dominio.com
 ```
 
 Depois reinicie o backend local ou faca redeploy no Render. Ao logar com um e-mail liberado, a opcao `Moderacao` aparece na area logada.
+
+### Block list por CPF/CNPJ
+
+A plataforma possui uma block list operacional em MongoDB para reduzir risco de reincidencia em conteudo rejeitado.
+
+Como funciona:
+
+1. Toda procura nasce como `PENDING` e passa pelo fluxo de moderacao.
+2. Se a moderacao automatica rejeitar a procura por regra local de alto risco ou pela IA, o CPF/CNPJ do dono da procura e usado para criar uma entrada em `user_block_list`.
+3. Em novas publicacoes, se o CPF/CNPJ estiver ativo na block list, a procura nao e publicada automaticamente. Ela fica como `REVIEW_REQUIRED` com provider `BLOCK_LIST`.
+4. O admin decide manualmente se aprova, rejeita ou arquiva a procura pelo painel de moderacao.
+
+Para reduzir exposicao de dado sensivel, a collection `user_block_list` nao duplica o CPF/CNPJ bruto: ela armazena `documentHash`, `documentLast4`, tipo do documento, origem da rejeicao e contadores de reincidencia. O frontend publico nao recebe a block list nem dados sensiveis de documento.
+
+Em producao, configure um segredo para fortalecer o hash deterministico:
+
+```bash
+APP_SECURITY_DOCUMENT_HASH_PEPPER=um-segredo-longo-e-randomico
+```
+
+A block list fica ativada por padrao. Para desativar temporariamente em local/HML/admin, acesse `Moderacao` > `CRM operacional` > `Politicas de moderacao` e desmarque `Ativar block list automatica por CPF/CNPJ`. Ao salvar, o backend para de consultar e de gravar entradas novas enquanto a opcao estiver desligada.
 
 ## CRM administrativo
 

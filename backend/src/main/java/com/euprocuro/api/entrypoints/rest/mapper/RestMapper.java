@@ -14,6 +14,7 @@ import com.euprocuro.api.application.command.CatalogProductCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.ModerationDecisionCommand;
+import com.euprocuro.api.application.command.ModerationSettingsCommand;
 import com.euprocuro.api.application.command.MonetizationSettingsCommand;
 import com.euprocuro.api.application.command.PurchaseProductCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
@@ -175,6 +176,10 @@ public final class RestMapper {
                                 && request.getMonetizationSettings().isCreditPurchasesEnabled())
                         .boostPurchasesEnabled(request.getMonetizationSettings() != null
                                 && request.getMonetizationSettings().isBoostPurchasesEnabled())
+                        .build())
+                .moderationSettings(ModerationSettingsCommand.builder()
+                        .userBlockListEnabled(request.getModerationSettings() == null
+                                || request.getModerationSettings().isUserBlockListEnabled())
                         .build())
                 .categories(Optional.ofNullable(request.getCategories()).orElse(List.of())
                         .stream()
@@ -445,6 +450,7 @@ public final class RestMapper {
     public static AdminOperationalCatalogResponse toResponse(AdminOperationalCatalogView view) {
         return AdminOperationalCatalogResponse.builder()
                 .monetizationSettings(toResponse(view.getMonetizationSettings()))
+                .moderationSettings(toResponse(view.getModerationSettings()))
                 .categories(Optional.ofNullable(view.getCategories()).orElse(List.of())
                         .stream()
                         .map(RestMapper::toResponse)
@@ -464,6 +470,17 @@ public final class RestMapper {
         return MonetizationSettingsResponse.builder()
                 .creditPurchasesEnabled(view.isCreditPurchasesEnabled())
                 .boostPurchasesEnabled(view.isBoostPurchasesEnabled())
+                .build();
+    }
+
+    public static ModerationSettingsResponse toResponse(com.euprocuro.api.application.view.ModerationSettingsView view) {
+        if (view == null) {
+            return ModerationSettingsResponse.builder()
+                    .userBlockListEnabled(true)
+                    .build();
+        }
+        return ModerationSettingsResponse.builder()
+                .userBlockListEnabled(view.isUserBlockListEnabled())
                 .build();
     }
 

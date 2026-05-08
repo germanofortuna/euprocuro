@@ -13,6 +13,7 @@ import lombok.Data;
 @Data
 public class SaveOperationalCatalogRequest {
     private MonetizationSettingsRequest monetizationSettings = new MonetizationSettingsRequest();
+    private ModerationSettingsRequest moderationSettings = new ModerationSettingsRequest();
 
     @Valid
     private List<CategoryRequest> categories = new ArrayList<>();
@@ -24,6 +25,11 @@ public class SaveOperationalCatalogRequest {
     public static class MonetizationSettingsRequest {
         private boolean creditPurchasesEnabled;
         private boolean boostPurchasesEnabled;
+    }
+
+    @Data
+    public static class ModerationSettingsRequest {
+        private boolean userBlockListEnabled = true;
     }
 
     @Data

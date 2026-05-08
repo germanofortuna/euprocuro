@@ -144,6 +144,7 @@ application:
       conversation-message-created-queue: ${APP_RABBIT_CONVERSATION_MESSAGE_CREATED_QUEUE:euprocuro.conversation.message.created}
       auth-queue: ${APP_RABBIT_AUTH_QUEUE:euprocuro.auth.events}
   security:
+    document-hash-pepper: ${APP_SECURITY_DOCUMENT_HASH_PEPPER:}
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
     rate-limit:
       enabled: ${APP_RATE_LIMIT_ENABLED:true}

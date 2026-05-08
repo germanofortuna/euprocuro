@@ -32,6 +32,10 @@ const defaultMonetizationSettings = {
   boostPurchasesEnabled: false
 };
 
+const defaultModerationSettings = {
+  userBlockListEnabled: true
+};
+
 function normalizeCategory(category, index) {
   return {
     ...emptyCategory,
@@ -61,6 +65,7 @@ export default function OperationalCatalogAdminPanel({ onFeedback }) {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [monetizationSettings, setMonetizationSettings] = useState(defaultMonetizationSettings);
+  const [moderationSettings, setModerationSettings] = useState(defaultModerationSettings);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [updatedAt, setUpdatedAt] = useState(null);
@@ -77,6 +82,10 @@ export default function OperationalCatalogAdminPanel({ onFeedback }) {
       setMonetizationSettings({
         ...defaultMonetizationSettings,
         ...(payload?.monetizationSettings ?? {})
+      });
+      setModerationSettings({
+        ...defaultModerationSettings,
+        ...(payload?.moderationSettings ?? {})
       });
       setCategories((payload?.categories ?? []).map((category, index) => normalizeCategory({
         code: category.value,
@@ -123,6 +132,7 @@ export default function OperationalCatalogAdminPanel({ onFeedback }) {
     try {
       const payload = await saveAdminCatalog({
         monetizationSettings,
+        moderationSettings,
         categories: categories.map((category, index) => ({
           code: category.code,
           label: category.label,
@@ -147,6 +157,10 @@ export default function OperationalCatalogAdminPanel({ onFeedback }) {
       setMonetizationSettings({
         ...defaultMonetizationSettings,
         ...(payload?.monetizationSettings ?? {})
+      });
+      setModerationSettings({
+        ...defaultModerationSettings,
+        ...(payload?.moderationSettings ?? {})
       });
       setCategories((payload?.categories ?? []).map((category, index) => normalizeCategory({
         code: category.value,
@@ -219,6 +233,29 @@ export default function OperationalCatalogAdminPanel({ onFeedback }) {
                   }))}
                 />
                 <span>{t("catalogAdmin.monetization.boostPurchasesEnabled")}</span>
+              </label>
+            </div>
+          </section>
+
+          <section className="catalog-admin__section catalog-admin__section--full">
+            <div className="catalog-admin__section-header">
+              <div>
+                <h4>{t("catalogAdmin.moderation.title")}</h4>
+                <p>{t("catalogAdmin.moderation.description")}</p>
+              </div>
+            </div>
+
+            <div className="catalog-admin__settings">
+              <label className="checkbox-row checkbox-row--panel">
+                <input
+                  type="checkbox"
+                  checked={moderationSettings.userBlockListEnabled}
+                  onChange={(event) => setModerationSettings((current) => ({
+                    ...current,
+                    userBlockListEnabled: event.target.checked
+                  }))}
+                />
+                <span>{t("catalogAdmin.moderation.userBlockListEnabled")}</span>
               </label>
             </div>
           </section>
