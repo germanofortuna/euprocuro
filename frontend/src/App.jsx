@@ -134,11 +134,11 @@ const initialOmbudsmanForm = {
 };
 
 const OMBUDSMAN_TYPES = [
-  "Reclamacao",
-  "Denuncia sobre atendimento",
+  "Reclamação",
+  "Denúncia sobre atendimento",
   "Problema com pagamento",
-  "Contestacao de moderacao",
-  "Sugestao",
+  "Contestação de moderação",
+  "Sugestão",
   "Outro"
 ];
 
@@ -698,6 +698,14 @@ function latestIncomingMessageTimestamp(conversation, currentUserId) {
     }, 0);
 }
 
+function sameEntityId(left, right) {
+  if (left == null || right == null) {
+    return false;
+  }
+
+  return String(left) === String(right);
+}
+
 function useDebouncedValue(value, delayMs) {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -841,11 +849,12 @@ export default function App() {
   const deferredQuery = useDeferredValue(debouncedQuery);
   const currentUser = session?.user ?? null;
   const allMyInterests = useMemo(
-    () => (dashboard?.myInterests ?? [])
-      .filter((interest) => interest.status !== "HIDDEN")
-      .slice()
-      .sort(byNewest),
-    [dashboard?.myInterests]
+      () => (dashboard?.myInterests ?? [])
+          .filter((interest) => sameEntityId(interest.ownerId, currentUser?.id))
+          .filter((interest) => interest.status !== "HIDDEN")
+          .slice()
+          .sort(byNewest),
+      [dashboard?.myInterests, currentUser?.id]
   );
   const activeMyInterests = useMemo(
     () => allMyInterests.filter((interest) => interest.status !== "CLOSED"),
@@ -888,7 +897,7 @@ export default function App() {
   const visibleHomeInterests = useMemo(
     () => {
       const source = homeMatchFilter?.matchingInterests ?? interests;
-      return source.filter((interest) => !currentUser?.id || interest.ownerId !== currentUser.id);
+      return source.filter((interest) => !sameEntityId(interest.ownerId, currentUser?.id));
     },
     [homeMatchFilter, interests, currentUser?.id]
   );
@@ -896,7 +905,7 @@ export default function App() {
     () => sellerItems.find((group) => group.item?.id === selectedSellerItemId) ?? sellerItems[0] ?? null,
     [sellerItems, selectedSellerItemId]
   );
-  const isSelectedInterestMine = selectedInterest?.ownerId === currentUser?.id;
+  const isSelectedInterestMine = sameEntityId(selectedInterest?.ownerId, currentUser?.id);
   const sentOfferForSelectedInterest = useMemo(
     () => sentOffers.find((offer) => offer.interestPostId === selectedInterest?.id) ?? null,
     [sentOffers, selectedInterest?.id]
@@ -1254,7 +1263,7 @@ export default function App() {
   function clearHomeMatchFilter() {
     setHomeMatchFilter(null);
     updateInterestUrl(null, true);
-    const nextVisibleInterests = interests.filter((interest) => !currentUser?.id || interest.ownerId !== currentUser.id);
+    const nextVisibleInterests = interests.filter((interest) => !sameEntityId(interest.ownerId, currentUser?.id));
     setSelectedInterest((current) =>
       nextVisibleInterests.find((interest) => interest.id === current?.id) ?? null
     );
@@ -1267,7 +1276,7 @@ export default function App() {
     }
 
     const matchingInterests = (group.matchingInterests ?? [])
-      .filter((interest) => !currentUser?.id || interest.ownerId !== currentUser.id);
+      .filter((interest) => !sameEntityId(interest.ownerId, currentUser?.id));
 
     setSelectedSellerItemId(item.id);
     setHomeMatchFilter({
@@ -3056,7 +3065,7 @@ export default function App() {
       }
       const matchedGroup = sellerItems.find((group) => group.item?.id === notification.sellerItemId);
       const matchingInterests = (matchedGroup?.matchingInterests ?? [])
-        .filter((interest) => !currentUser?.id || interest.ownerId !== currentUser.id);
+        .filter((interest) => !sameEntityId(interest.ownerId, currentUser?.id));
       setHomeMatchFilter({
         sellerItemId: notification.sellerItemId,
         sellerItemTitle: matchedGroup?.item?.title ?? notification.title ?? "item parecido",

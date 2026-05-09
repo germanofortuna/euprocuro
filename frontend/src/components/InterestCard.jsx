@@ -1,4 +1,4 @@
-import BoostRocket from "./BoostRocket";
+﻿import BoostRocket from "./BoostRocket";
 
 export default function InterestCard({ interest, selected, onClick }) {
   const isBoosted = Boolean(
@@ -27,7 +27,6 @@ export default function InterestCard({ interest, selected, onClick }) {
       )}
 
       <div className="interest-card__summary-copy">
-        <span>Procura publicada</span>
         <strong>
           {interest.title}
           {isBoosted ? <BoostRocket /> : null}

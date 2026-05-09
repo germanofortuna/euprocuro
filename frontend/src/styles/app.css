@@ -2176,10 +2176,6 @@ textarea:focus {
   margin-top: 22px;
 }
 
-.seller-item-form {
-  margin-top: 18px;
-}
-
 .seller-item-tabs {
   display: grid;
   gap: 10px;

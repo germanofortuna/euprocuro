@@ -324,6 +324,31 @@ class MarketplaceServiceTest {
     }
 
     @Test
+    void listInterestsShouldHideCurrentUserOwnInterestsBeforeRanking() {
+        InterestPost ownInterest = baseInterest().toBuilder()
+                .id("own")
+                .ownerId("seller-1")
+                .createdAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+        InterestPost otherInterest = baseInterest().toBuilder()
+                .id("other")
+                .ownerId("buyer-2")
+                .createdAt(Instant.now())
+                .build();
+
+        when(interestGateway.findAll()).thenReturn(List.of(ownInterest, otherInterest));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(UserProfile.builder().id("seller-1").build()));
+        when(sellerItemGateway.findByOwnerIdOrderByCreatedAtDesc("seller-1")).thenReturn(List.of());
+
+        List<InterestPost> results = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(true)
+                .currentUserId("seller-1")
+                .build());
+
+        assertThat(results).extracting(InterestPost::getId).containsExactly("other");
+    }
+
+    @Test
     void createInterestShouldNormalizePostalCodeWithDigitsOnly() {
         when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
         when(operationalCatalogService.requireActiveCategory("SERVICOS")).thenReturn("SERVICOS");
@@ -677,6 +702,44 @@ class MarketplaceServiceTest {
                 .build(), 0, 10);
 
         assertThat(result).extracting(InterestPost::getId).containsExactly("matching", "generic");
+    }
+
+    @Test
+    void listInterestsWithCurrentUserShouldHideOwnInterestsBeforePagination() {
+        UserProfile currentUser = UserProfile.builder()
+                .id("seller-1")
+                .city("Erechim")
+                .state("RS")
+                .country("Brasil")
+                .build();
+        InterestPost ownInterest = baseInterest().toBuilder()
+                .id("own")
+                .ownerId("seller-1")
+                .createdAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+        InterestPost firstVisible = baseInterest().toBuilder()
+                .id("first-visible")
+                .ownerId("buyer-2")
+                .createdAt(Instant.now())
+                .build();
+        InterestPost secondVisible = baseInterest().toBuilder()
+                .id("second-visible")
+                .ownerId("buyer-3")
+                .createdAt(Instant.now().minus(1, ChronoUnit.HOURS))
+                .build();
+
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(currentUser));
+        when(sellerItemGateway.findByOwnerIdOrderByCreatedAtDesc("seller-1")).thenReturn(List.of());
+        when(interestSearchGateway.search(any(InterestSearchCriteria.class), eq(0), eq(100)))
+                .thenReturn(List.of(ownInterest, firstVisible, secondVisible));
+
+        List<InterestPost> result = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(true)
+                .currentUserId("seller-1")
+                .build(), 0, 2);
+
+        assertThat(result).extracting(InterestPost::getId)
+                .containsExactly("first-visible", "second-visible");
     }
 
     @Test

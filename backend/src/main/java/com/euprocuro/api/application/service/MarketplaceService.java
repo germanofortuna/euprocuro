@@ -286,6 +286,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .filter(post -> filter.getQuery() == null || filter.getQuery().isBlank()
                         || containsIgnoreCase(post, filter.getQuery()))
                 .filter(post -> !filter.isOpenOnly() || isPubliclyVisible(post))
+                .filter(post -> isNotOwnedByCurrentUser(post, filter.getCurrentUserId()))
                 .collect(Collectors.toList());
 
         return rankForDelivery(candidates, filter.getCurrentUserId());
@@ -321,7 +322,12 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     private List<InterestPost> searchPersonalizedInterests(InterestSearchCriteria criteria, int offset, int limit, String currentUserId) {
         int candidateLimit = offset + Math.max(100, limit * 8);
-        return rankForDelivery(searchInterests(criteria, 0, candidateLimit), currentUserId)
+        List<InterestPost> candidateInterests = searchInterests(criteria, 0, candidateLimit)
+                .stream()
+                .filter(post -> isNotOwnedByCurrentUser(post, currentUserId))
+                .collect(Collectors.toList());
+
+        return rankForDelivery(candidateInterests, currentUserId)
                 .stream()
                 .skip(offset)
                 .limit(limit)
@@ -462,6 +468,10 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     private boolean isNotExpired(InterestPost post) {
         return !isExpired(post);
+    }
+
+    private boolean isNotOwnedByCurrentUser(InterestPost post, String currentUserId) {
+        return !StringUtils.hasText(currentUserId) || !Objects.equals(post.getOwnerId(), currentUserId);
     }
 
     private boolean isPubliclyVisible(InterestPost post) {
