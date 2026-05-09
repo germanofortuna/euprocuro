@@ -655,6 +655,26 @@ class MarketplaceServiceTest {
     }
 
     @Test
+    void listInterestsWithPaginationShouldForcePublicVisibilityWhenOpenOnlyIsFalse() {
+        InterestPost publicInterest = baseInterest();
+        publicInterest.setId("public");
+
+        InterestPost hiddenInterest = baseInterest();
+        hiddenInterest.setId("hidden");
+        hiddenInterest.setStatus(InterestStatus.HIDDEN);
+
+        when(interestSearchGateway.search(argThat(InterestSearchCriteria::isOpenOnly), eq(0), eq(10)))
+                .thenReturn(List.of(publicInterest, hiddenInterest));
+
+        List<InterestPost> result = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(false)
+                .build(), 0, 10);
+
+        assertThat(result).extracting(InterestPost::getId).containsExactly("public");
+        verify(interestSearchGateway).search(argThat(InterestSearchCriteria::isOpenOnly), eq(0), eq(10));
+    }
+
+    @Test
     void listInterestsWithCurrentUserShouldPrioritizeLocationAndSellerItemMatches() {
         UserProfile currentUser = UserProfile.builder()
                 .id("seller-1")

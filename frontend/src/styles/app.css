@@ -949,7 +949,7 @@ textarea:focus {
   padding: 18px;
   border: 1px solid rgba(27, 156, 87, 0.18);
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(232, 255, 242, 0.94), rgba(255, 255, 255, 0.92));
+  background: linear-gradient(135deg, rgb(122 240 173 / 94%), rgb(53 211 255));
 }
 
 .credits-summary span {
@@ -1023,7 +1023,7 @@ textarea:focus {
   padding: 14px 16px;
   border: 1px solid rgba(11, 79, 187, 0.14);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgb(46 46 49);
   color: var(--ink);
   text-align: left;
   box-shadow: 0 12px 28px rgba(15, 41, 84, 0.05);
@@ -1074,7 +1074,7 @@ textarea:focus {
   padding: 18px;
   border: 1px solid rgba(11, 79, 187, 0.14);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.88);
+  background: transparent;
 }
 
 .purchase-payment p {
@@ -1102,11 +1102,7 @@ textarea:focus {
   padding: 18px;
   border: 1px solid rgba(30, 111, 242, 0.16);
   border-radius: 22px;
-  background: rgba(237, 245, 255, 0.92);
-}
-
-.payment-tracker--empty {
-  background: rgba(255, 255, 255, 0.82);
+  background: transparent;
 }
 
 .payment-tracker--failed {
@@ -1132,7 +1128,7 @@ textarea:focus {
   padding: 18px;
   border: 1px solid rgba(15, 41, 84, 0.1);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.88);
+  background: transparent;
 }
 
 .payment-history__header,
@@ -1477,11 +1473,11 @@ textarea:focus {
   gap: 2px;
   padding: 12px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgb(75 169 255 / 60%);
 }
 
 .sent-offer-summary__grid span {
-  color: var(--muted);
+  color: #bbd3f1;
   font-size: 0.82rem;
   font-weight: 700;
 }
@@ -1572,7 +1568,7 @@ textarea:focus {
 .detail-description {
   padding: 10px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.9);
+  background: none !important;
 }
 
 .tag-cluster {
@@ -1683,7 +1679,7 @@ textarea:focus {
   padding: 12px;
   border: 1px solid rgba(11, 79, 187, 0.12);
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(235, 244, 255, 0.9));
+  background: rgb(15 31 53) !important;
 }
 
 .share-card .eyebrow {
@@ -3588,7 +3584,7 @@ textarea:focus {
 .purchase-option--selected,
 .product-chip--boost,
 .product-chip--large {
-  background: rgba(15, 23, 36, 0.92);
+  background: rgb(91 140 255 / 43%);
   border-color: rgba(103, 232, 249, 0.16);
 }
 
