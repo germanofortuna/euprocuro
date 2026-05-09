@@ -55,6 +55,7 @@ import mercadoPagoLogo from "./assets/mercado-pago.svg";
 import AuthModal from "./components/AuthModal";
 import BoostRocket from "./components/BoostRocket";
 import ContentAdminPanel from "./components/ContentAdminPanel";
+import DashboardNavigation from "./components/DashboardNavigation";
 import EmptyState from "./components/EmptyState";
 import FeedbackModal from "./components/FeedbackModal";
 import Footer from "./components/Footer";
@@ -396,6 +397,11 @@ function getActiveLegalPageSlug() {
 
 function isOmbudsmanRoute() {
   return window.location.pathname.replace(/\/+$/, "") === "/ouvidoria";
+}
+
+function getStoredTheme() {
+  const storedTheme = window.localStorage.getItem("euProcuroTheme");
+  return storedTheme === "light" ? "light" : "dark";
 }
 
 function getSectionFromPath() {
@@ -744,6 +750,7 @@ export default function App() {
   const sellerItemsSectionRef = useRef(null);
   const newInterestSectionRef = useRef(null);
   const [session, setSession] = useState(() => getStoredSession());
+  const [theme, setTheme] = useState(getStoredTheme);
   const [activeLegalPageSlug, setActiveLegalPageSlug] = useState(getActiveLegalPageSlug);
   const [isOmbudsmanPageActive, setIsOmbudsmanPageActive] = useState(isOmbudsmanRoute);
   const [dashboard, setDashboard] = useState(null);
@@ -894,6 +901,15 @@ export default function App() {
       : [],
     [boostPurchasesEnabled, monetizationAccount?.products]
   );
+
+  useEffect(() => {
+    window.localStorage.setItem("euProcuroTheme", theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
+  }
+
   const visibleHomeInterests = useMemo(
     () => {
       const source = homeMatchFilter?.matchingInterests ?? interests;
@@ -4926,6 +4942,50 @@ export default function App() {
         accent: loggedSection === loggedSections.RECEIVED_OFFERS
       },
     ];
+    const dashboardNavigationItems = [
+      {
+        key: loggedSections.EXPLORE,
+        icon: "⌂",
+        label: t("header.nav.home"),
+        active: loggedSection === loggedSections.EXPLORE,
+        onClick: () => navigateFromDashboardControl(loggedSections.EXPLORE)
+      },
+      {
+        key: loggedSections.NEW_INTEREST,
+        icon: "+",
+        label: t("dashboard.nav.newInterest"),
+        active: loggedSection === loggedSections.NEW_INTEREST,
+        onClick: openNewInterestForm
+      },
+      {
+        key: loggedSections.MY_INTERESTS,
+        icon: "●",
+        label: t("dashboard.nav.myInterests"),
+        active: loggedSection === loggedSections.MY_INTERESTS,
+        onClick: () => navigateFromDashboardControl(loggedSections.MY_INTERESTS)
+      },
+      {
+        key: loggedSections.SENT_OFFERS,
+        icon: "↗",
+        label: t("dashboard.nav.sentOffers"),
+        active: loggedSection === loggedSections.SENT_OFFERS,
+        onClick: () => navigateFromDashboardControl(loggedSections.SENT_OFFERS)
+      },
+      {
+        key: loggedSections.RECEIVED_OFFERS,
+        icon: "↙",
+        label: t("dashboard.nav.receivedOffers"),
+        active: loggedSection === loggedSections.RECEIVED_OFFERS,
+        onClick: () => navigateFromDashboardControl(loggedSections.RECEIVED_OFFERS)
+      },
+      {
+        key: loggedSections.SELLER_ITEMS,
+        icon: "▣",
+        label: t("dashboard.nav.sellerItems"),
+        active: loggedSection === loggedSections.SELLER_ITEMS,
+        onClick: () => navigateFromDashboardControl(loggedSections.SELLER_ITEMS)
+      }
+    ];
 
     return (
       <>
@@ -4944,66 +5004,7 @@ export default function App() {
           </div>
         </section>
 
-        <section className="section-nav">
-          <button
-            type="button"
-            className={loggedSection === loggedSections.EXPLORE ? "active" : ""}
-            onClick={() => navigateFromDashboardControl(loggedSections.EXPLORE)}
-          >
-            <span className="nav-icon" aria-hidden="true">⌂</span>
-            {t("header.nav.home")}
-          </button>
-          <button
-              type="button"
-              className={loggedSection === loggedSections.NEW_INTEREST ? "active" : ""}
-              onClick={openNewInterestForm}
-          >
-            <span className="nav-icon" aria-hidden="true">+</span>
-            {t("dashboard.nav.newInterest")}
-          </button>
-          <button
-            type="button"
-            className={loggedSection === loggedSections.MY_INTERESTS ? "active" : ""}
-            onClick={() => navigateFromDashboardControl(loggedSections.MY_INTERESTS)}
-          >
-            <span className="nav-icon" aria-hidden="true">●</span>
-            {t("dashboard.nav.myInterests")}
-          </button>
-          <button
-            type="button"
-            className={loggedSection === loggedSections.SENT_OFFERS ? "active" : ""}
-            onClick={() => navigateFromDashboardControl(loggedSections.SENT_OFFERS)}
-          >
-            <span className="nav-icon" aria-hidden="true">↗</span>
-            {t("dashboard.nav.sentOffers")}
-          </button>
-          <button
-            type="button"
-            className={loggedSection === loggedSections.RECEIVED_OFFERS ? "active" : ""}
-            onClick={() => navigateFromDashboardControl(loggedSections.RECEIVED_OFFERS)}
-          >
-            <span className="nav-icon" aria-hidden="true">↙</span>
-            {t("dashboard.nav.receivedOffers")}
-          </button>
-          <button
-            type="button"
-            className={loggedSection === loggedSections.SELLER_ITEMS ? "active" : ""}
-            onClick={() => navigateFromDashboardControl(loggedSections.SELLER_ITEMS)}
-          >
-            <span className="nav-icon" aria-hidden="true">▣</span>
-            {t("dashboard.nav.sellerItems")}
-          </button>
-          {creditPurchasesEnabled ? (
-            <button
-              type="button"
-              className={loggedSection === loggedSections.CREDITS ? "active" : ""}
-              onClick={() => navigateFromDashboardControl(loggedSections.CREDITS)}
-            >
-              <span className="nav-icon" aria-hidden="true">¤</span>
-              {t("dashboard.nav.credits")}
-            </button>
-          ) : null}
-        </section>
+        <DashboardNavigation items={dashboardNavigationItems} />
 
         {loggedSection === loggedSections.EXPLORE ? renderPublicHome(false) : null}
 
@@ -5537,13 +5538,15 @@ export default function App() {
 
   if (activeLegalPageSlug) {
     return (
-      <div className="app-shell">
+      <div className="app-shell" data-theme={theme}>
         <div className="background-grid" />
 
         <main className="page">
           <Header
             isLoggedIn={false}
             hideActions
+            theme={theme}
+            onThemeToggle={toggleTheme}
             onNavigate={() => {
               setActiveLegalPageSlug("");
               replaceCurrentUrl(sectionRoutes[loggedSections.EXPLORE]);
@@ -5559,12 +5562,14 @@ export default function App() {
 
   if (isOmbudsmanPageActive) {
     return (
-      <div className="app-shell">
+      <div className="app-shell" data-theme={theme}>
         <div className="background-grid" />
 
         <main className="page">
           <Header
             hideActions
+            theme={theme}
+            onThemeToggle={toggleTheme}
             onNavigate={() => {
               setIsOmbudsmanPageActive(false);
               replaceCurrentUrl(sectionRoutes[loggedSections.EXPLORE]);
@@ -5579,7 +5584,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={theme}>
       <div className="background-grid" />
 
       <main className="page">
@@ -5603,6 +5608,8 @@ export default function App() {
           }}
           onNotificationClick={openNotificationModal}
           onLogout={handleLogout}
+          theme={theme}
+          onThemeToggle={toggleTheme}
           onNavigate={(section) => {
             if (section === loggedSections.NEW_INTEREST) {
               openNewInterestForm();

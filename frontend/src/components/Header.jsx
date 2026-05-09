@@ -34,6 +34,37 @@ function BellIcon() {
   );
 }
 
+function ThemeIcon() {
+  return (
+    <svg
+      className="theme-toggle-button__icon"
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M9 18h6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M10 21h4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M8.8 14.8c-1.5-1.05-2.3-2.66-2.3-4.5A5.5 5.5 0 0 1 12 4.8a5.5 5.5 0 0 1 5.5 5.5c0 1.84-.8 3.45-2.3 4.5-.75.52-1.2 1.33-1.2 2.2h-4c0-.87-.45-1.68-1.2-2.2Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function Header({
   user,
   isLoggedIn,
@@ -52,6 +83,8 @@ export default function Header({
   onLoginClick,
   onRegisterClick,
   onLogout,
+  theme = "dark",
+  onThemeToggle,
   hideActions = false
 }) {
   const { t } = useContentText();
@@ -59,6 +92,7 @@ export default function Header({
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? "";
   const hasNoCredits = !subscriptionActive && (sellerCredits ?? 0) <= 0;
   const notificationLabel = hasNotifications ? t("header.notifications.unread") : t("header.notifications.default");
+  const nextThemeLabel = theme === "dark" ? "Usar tema claro" : "Usar tema escuro";
 
   return (
     <header className="topbar">
@@ -118,6 +152,16 @@ export default function Header({
           >
             <BellIcon />
             {hasNotifications ? <span className="notification-badge" /> : null}
+          </button>
+
+          <button
+            type="button"
+            className="theme-toggle-button"
+            onClick={onThemeToggle}
+            aria-label={nextThemeLabel}
+            title={nextThemeLabel}
+          >
+            <ThemeIcon />
           </button>
 
           <div className="profile-badge">
