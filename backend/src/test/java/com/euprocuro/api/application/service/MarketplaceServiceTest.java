@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -480,6 +481,26 @@ class MarketplaceServiceTest {
                 .build(), -5, 999);
 
         assertThat(result).extracting(InterestPost::getId).containsExactly("active");
+    }
+
+    @Test
+    void listInterestsWithPaginationShouldForcePublicVisibilityWhenOpenOnlyIsFalse() {
+        InterestPost publicInterest = baseInterest();
+        publicInterest.setId("public");
+
+        InterestPost hiddenInterest = baseInterest();
+        hiddenInterest.setId("hidden");
+        hiddenInterest.setStatus(InterestStatus.HIDDEN);
+
+        when(interestSearchGateway.search(argThat(InterestSearchCriteria::isOpenOnly), eq(0), eq(10)))
+                .thenReturn(List.of(publicInterest, hiddenInterest));
+
+        List<InterestPost> result = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(false)
+                .build(), 0, 10);
+
+        assertThat(result).extracting(InterestPost::getId).containsExactly("public");
+        verify(interestSearchGateway).search(argThat(InterestSearchCriteria::isOpenOnly), eq(0), eq(10));
     }
 
     @Test

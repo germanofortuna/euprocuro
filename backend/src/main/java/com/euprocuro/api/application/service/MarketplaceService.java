@@ -299,14 +299,10 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .city(filter.getCity())
                 .maxBudget(filter.getMaxBudget())
                 .query(filter.getQuery())
-                .openOnly(filter.isOpenOnly())
+                .openOnly(true)
                 .build();
         int safeOffset = Math.max(0, offset);
         int safeLimit = Math.max(1, Math.min(limit, 50));
-
-        if (!criteria.isOpenOnly()) {
-            return searchInterests(criteria, safeOffset, safeLimit);
-        }
 
         return publicCacheService.getOrLoad(
                 PublicCacheService.MARKETPLACE,
@@ -320,6 +316,7 @@ public class MarketplaceService implements MarketplaceUseCase {
         return interestSearchGateway.search(criteria, offset, limit)
                 .stream()
                 .filter(this::isNotExpired)
+                .filter(this::isPubliclyVisible)
                 .collect(Collectors.toList());
     }
 
