@@ -1002,7 +1002,7 @@ export default function App() {
       applyAddress(address);
       updateAddressLookupState(scope, {
         isLoading: false,
-        message: t("address.lookup.success")
+        message: "Endereço preenchido pelo CEP."
       });
     } catch (requestError) {
       updateAddressLookupState(scope, {
@@ -3134,11 +3134,14 @@ export default function App() {
     const button = notificationButtonRef.current;
     if (button) {
       const rect = button.getBoundingClientRect();
-      const modalWidth = Math.min(320, window.innerWidth - 32);
-      const left = Math.max(16, rect.right - modalWidth);
-      const top = rect.bottom + 12;
+      const modalWidth = Math.min(360, window.innerWidth - 24);
+      const left = Math.min(
+        window.scrollX + window.innerWidth - modalWidth - 12,
+        Math.max(12, window.scrollX + rect.left + (rect.width / 2) - (modalWidth / 2))
+      );
+      const top = window.scrollY + rect.bottom + 10;
       setNotificationAnchorStyle({
-        position: "fixed",
+        position: "absolute",
         top: `${top}px`,
         left: `${left}px`
       });
@@ -3147,6 +3150,7 @@ export default function App() {
     }
 
     setIsNotificationModalVisible(true);
+    markNotificationsSeen(notifications, { refresh: false, clear: true });
   }
 
   function handleMarkAllNotificationsRead() {

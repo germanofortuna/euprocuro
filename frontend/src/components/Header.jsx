@@ -1,4 +1,5 @@
 import logoDark from "../assets/eu-procuro-logo-dark.svg";
+import logoLight from "../assets/eu-procuro-logo-light.svg";
 import { useContentText } from "../content/ContentContext";
 
 const loggedSections = {
@@ -90,6 +91,7 @@ export default function Header({
   const { t } = useContentText();
   const authenticated = Boolean(isLoggedIn && user?.id);
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? "";
+  const brandLogo = theme === "light" ? logoLight : logoDark;
   const hasNoCredits = !subscriptionActive && (sellerCredits ?? 0) <= 0;
   const notificationLabel = hasNotifications ? t("header.notifications.unread") : t("header.notifications.default");
   const nextThemeLabel = theme === "dark" ? "Usar tema claro" : "Usar tema escuro";
@@ -101,7 +103,7 @@ export default function Header({
         className="topbar__brand topbar__brand-button"
         onClick={() => onNavigate(loggedSections.EXPLORE)}
       >
-        <img className="brand-logo" src={logoDark} alt={t("header.logo.alt")} />
+        <img className="brand-logo" src={brandLogo} alt={t("header.logo.alt")} />
       </button>
 
       {hideActions ? null : authenticated ? (
@@ -166,7 +168,6 @@ export default function Header({
 
           <div className="profile-badge">
             <strong>{firstName}</strong>
-            <span>{user?.city}/{user?.state}</span>
           </div>
 
           <button type="button" className="ghost-button" onClick={onLogout}>
@@ -174,9 +175,18 @@ export default function Header({
           </button>
         </div>
       ) : (
-        <div className="topbar__actions">
+        <div className="topbar__actions topbar__actions--guest">
           <button type="button" className="ghost-button" onClick={onLoginClick}>
             {t("header.auth.login")}
+          </button>
+          <button
+            type="button"
+            className="theme-toggle-button"
+            onClick={onThemeToggle}
+            aria-label={nextThemeLabel}
+            title={nextThemeLabel}
+          >
+            <ThemeIcon />
           </button>
           <button type="button" className="primary-button primary-button--compact" onClick={onRegisterClick}>
             {t("header.auth.register")}

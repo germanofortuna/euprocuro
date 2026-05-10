@@ -59,6 +59,9 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
             "contentadmin.",
             "catalogadmin."
     );
+    private static final List<String> PUBLIC_ADMIN_LABEL_KEYS = List.of(
+            "admin.moderation.nav"
+    );
 
     private final AdminAccessService adminAccessService;
     private final ContentEntryGateway contentEntryGateway;
@@ -480,6 +483,9 @@ public class ContentService implements ContentUseCase, AdminContentUseCase {
 
     private boolean isPubliclyExposableContentKey(String key) {
         String normalizedKey = normalizeKey(key);
+        if (PUBLIC_ADMIN_LABEL_KEYS.contains(normalizedKey)) {
+            return true;
+        }
         return NON_PUBLIC_CONTENT_PREFIXES.stream().noneMatch(normalizedKey::startsWith);
     }
 

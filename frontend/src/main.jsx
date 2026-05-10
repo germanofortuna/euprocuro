@@ -4,6 +4,9 @@ import App from "./App";
 import { initAnalytics } from "./analytics";
 import { ContentProvider } from "./content/ContentContext";
 import "./styles/app.css";
+import "./styles/radius.css";
+import "./styles/responsive.css";
+import "./styles/theme-light.css";
 
 initAnalytics();
 

@@ -1,0 +1,262 @@
+.topbar__brand {
+  flex-shrink: 0;
+}
+
+.profile-badge {
+  min-width: 0;
+  overflow: hidden;
+  justify-content: center;
+  text-align: center;
+}
+
+.profile-badge strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-badge strong::after {
+  content: "";
+  margin-left: 0;
+}
+
+.site-footer {
+  min-height: 0;
+  align-items: flex-start;
+  padding: 16px;
+}
+
+.site-footer__brand {
+  width: auto;
+  min-width: 0;
+  align-self: center;
+  flex: 0 1 auto;
+}
+
+.site-footer__links {
+  width: auto;
+  align-content: center;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(132px, 1fr));
+  gap: 8px;
+  flex: 1 1 auto;
+  justify-content: stretch;
+}
+
+.site-footer__links a {
+  width: 100%;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 600;
+  white-space: normal;
+}
+
+.credits-badge {
+  justify-content: center;
+  text-align: center;
+}
+
+.topbar__actions--guest .theme-toggle-button {
+  order: 3;
+  grid-column: 1 / -1;
+}
+
+.modal-overlay--topbar {
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
+}
+
+.intent-notice {
+  font-weight: 600;
+}
+
+@media (max-width: 1080px) {
+  .topbar {
+    justify-content: flex-start;
+  }
+
+  .topbar__brand {
+    flex: 0 0 auto;
+  }
+
+  .section-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .section-nav button {
+    min-width: 0;
+    width: 100%;
+    white-space: normal;
+  }
+
+  .site-footer {
+    align-items: stretch;
+    gap: 14px;
+    text-align: center;
+  }
+
+  .site-footer__brand {
+    justify-items: center;
+    max-width: 100%;
+  }
+
+  .site-footer__links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .auth-modal {
+    width: calc(100vw - 24px);
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .auth-modal--login {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .auth-modal .feedback-modal__header {
+    gap: 8px;
+  }
+
+  .auth-modal h2 {
+    font-size: 1.35rem;
+  }
+
+  .auth-modal .auth-tabs {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .auth-modal .stacked-form {
+    gap: 9px;
+  }
+
+  .auth-modal input,
+  .auth-modal .primary-button,
+  .auth-modal .auth-tabs button {
+    min-height: 40px;
+    padding-block: 9px;
+  }
+
+  .notification-modal {
+    width: calc(100vw - 24px);
+    max-width: 360px;
+    max-height: min(72vh, 520px);
+  }
+
+  .hero--private {
+    padding: 12px;
+  }
+
+  .hero--private .hero__stats {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .hero--private .stat-card {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    text-align: left;
+  }
+
+  .hero--private .stat-card span {
+    font-size: 0.95rem;
+    line-height: 1.2;
+  }
+
+  .hero--private .stat-card strong {
+    flex: 0 0 auto;
+    font-size: 1.35rem;
+  }
+
+  .topbar__actions .theme-toggle-button {
+    grid-column: auto;
+  }
+
+  .topbar__actions--guest .theme-toggle-button {
+    grid-column: 1 / -1;
+  }
+
+  .site-footer {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .site-footer__brand {
+    gap: 4px;
+  }
+
+  .site-footer__brand span {
+    max-width: 28rem;
+  }
+
+  .topbar__brand {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .brand-logo {
+    width: min(100%, 236px);
+    margin-right: auto;
+  }
+
+  .topbar__actions {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .profile-badge {
+    justify-content: center;
+    padding-inline: 12px;
+  }
+
+  .section-nav {
+    margin-inline: 0;
+    padding: 0;
+    grid-template-columns: 1fr;
+  }
+
+  .section-nav button {
+    min-width: 0;
+    scroll-snap-align: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .topbar__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .inline-actions--interest-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .inline-actions--interest-actions .action-button--compact {
+    white-space: normal;
+  }
+
+  .notification-button,
+  .theme-toggle-button,
+  .credits-badge,
+  .profile-badge {
+    max-width: 100%;
+  }
+
+  .site-footer__links {
+    grid-template-columns: 1fr;
+  }
+}
