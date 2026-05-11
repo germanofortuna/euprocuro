@@ -62,7 +62,7 @@
 
 .topbar__actions--guest .theme-toggle-button {
   order: 3;
-  grid-column: 1 / -1;
+  grid-column: auto;
 }
 
 .modal-overlay--topbar {
@@ -115,7 +115,7 @@
 
 @media (max-width: 720px) {
   .auth-modal {
-    width: calc(100vw - 24px);
+    width: min(100%, calc(100dvw - 24px));
     padding: 14px;
     gap: 10px;
   }
@@ -150,7 +150,7 @@
   }
 
   .notification-modal {
-    width: calc(100vw - 24px);
+    width: min(100%, calc(100dvw - 24px));
     max-width: 360px;
     max-height: min(72vh, 520px);
   }
@@ -189,7 +189,8 @@
   }
 
   .topbar__actions--guest .theme-toggle-button {
-    grid-column: 1 / -1;
+    grid-column: 4;
+    grid-row: 1;
   }
 
   .site-footer {
@@ -207,12 +208,14 @@
 
   .topbar__brand {
     justify-content: flex-start;
-    width: 100%;
+    justify-self: start;
+    width: auto;
   }
 
   .brand-logo {
     width: min(100%, 236px);
     margin-right: auto;
+    object-position: left center;
   }
 
   .topbar__actions {

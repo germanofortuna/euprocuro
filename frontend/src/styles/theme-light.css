@@ -16,6 +16,40 @@
   color: var(--ink);
 }
 
+.app-shell[data-theme="light"] .topbar,
+.app-shell[data-theme="light"] .hero,
+.app-shell[data-theme="light"] .panel,
+.app-shell[data-theme="light"] .site-footer,
+.app-shell[data-theme="light"] .legal-hero,
+.app-shell[data-theme="light"] .legal-nav,
+.app-shell[data-theme="light"] .legal-document,
+.app-shell[data-theme="light"] .auth-modal,
+.app-shell[data-theme="light"] .conversation-modal,
+.app-shell[data-theme="light"] .form-modal,
+.app-shell[data-theme="light"] .feedback-modal,
+.app-shell[data-theme="light"] .notification-modal,
+.app-shell[data-theme="light"] .legal-modal,
+.app-shell[data-theme="light"] .hero-card,
+.app-shell[data-theme="light"] .how-it-works-card,
+.app-shell[data-theme="light"] .how-it-works-secondary,
+.app-shell[data-theme="light"] .stat-card,
+.app-shell[data-theme="light"] .cta-card,
+.app-shell[data-theme="light"] .sent-offer-summary,
+.app-shell[data-theme="light"] .preview-card,
+.app-shell[data-theme="light"] .detail-block,
+.app-shell[data-theme="light"] .offers,
+.app-shell[data-theme="light"] .interest-card,
+.app-shell[data-theme="light"] .accordion-card,
+.app-shell[data-theme="light"] .offer-card,
+.app-shell[data-theme="light"] .product-chip,
+.app-shell[data-theme="light"] .payment-history__item,
+.app-shell[data-theme="light"] .admin-list-item,
+.app-shell[data-theme="light"] .admin-report-detail,
+.app-shell[data-theme="light"] .ombudsman-admin-group,
+.app-shell[data-theme="light"] .credits-badge {
+  box-shadow: none;
+}
+
 .app-shell[data-theme="light"] .admin-card--priority {
   background: #fff8d8;
   border-color: rgba(217, 119, 6, 0.2);
@@ -33,6 +67,16 @@
 
 .app-shell[data-theme="light"] .ombudsman-form .checkbox-row--panel {
   font-weight: 600;
+}
+
+.app-shell[data-theme="light"] .terms-acceptance {
+  background: #f2f7ff;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.app-shell[data-theme="light"] .how-it-works-card__number {
+  color: #ffffff;
 }
 
 .app-shell[data-theme="light"] .form-modal,

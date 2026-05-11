@@ -127,7 +127,7 @@ application:
     allowed-emails: ${APP_ADMIN_ALLOWED_EMAILS:gfortuna@outlook.com}
   moderation:
     local:
-      blocked-terms: ${APP_MODERATION_BLOCKED_TERMS:}
+      blocked-terms: ${APP_MODERATION_BLOCKED_TERMS:assassino de aluguel,documento falso,cartao clonado,cartao de credito,senha,credencial,pornografia,putaria,puta}
     ai:
       review-threshold: ${APP_MODERATION_REVIEW_THRESHOLD:0.20}
       reject-threshold: ${APP_MODERATION_REJECT_THRESHOLD:0.30}

@@ -1,5 +1,21 @@
 import { useContentText } from "../content/ContentContext";
 
+function ErrorIcon() {
+  return (
+    <svg
+      className="feedback-modal__status-icon"
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <path d="M12 7.5v5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 16.5h.01" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function FeedbackModal({ modal, onClose }) {
   const { t } = useContentText();
 
@@ -16,7 +32,10 @@ export default function FeedbackModal({ modal, onClose }) {
         onClick={(event) => event.stopPropagation()}
       >
         <div className="feedback-modal__header">
-          <strong>{modal.title}</strong>
+          <div className="feedback-modal__title">
+            {modal.type === "error" ? <ErrorIcon /> : null}
+            <strong>{modal.title}</strong>
+          </div>
           <button
             type="button"
             className="modal-close-button"

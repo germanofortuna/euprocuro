@@ -25,6 +25,7 @@ import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.usecase.MarketplaceUseCase;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
+import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.InterestSearchGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
@@ -58,6 +59,7 @@ public class MarketplaceService implements MarketplaceUseCase {
     private final AuditLogService auditLogService;
     private final SellerItemGateway sellerItemGateway;
     private final InterestDeliveryRankingService interestDeliveryRankingService;
+    private final BlockedTermValidationGateway blockedTermValidationGateway;
 
     @Value("${application.listings.expiration-days:30}")
     private long listingExpirationDays = 30;
@@ -472,9 +474,16 @@ public class MarketplaceService implements MarketplaceUseCase {
     }
 
     private boolean isPubliclyVisible(InterestPost post) {
-        return post.getStatus() == InterestStatus.OPEN
-                || post.getStatus() == InterestStatus.APPROVED
-                || post.getStatus() == InterestStatus.REPORTED;
+        if (post == null || (post.getStatus() != InterestStatus.OPEN && post.getStatus() != InterestStatus.APPROVED)) {
+            return false;
+        }
+
+        if (post.getModeration() != null
+                && (post.getModeration().isFlagged() || post.getModeration().isReviewRequired())) {
+            return false;
+        }
+
+        return blockedTermValidationGateway.validateBlockedTerms(post).isEmpty();
     }
 
     private void publishModerationRequest(InterestPost interestPost) {

@@ -274,8 +274,7 @@ public class ModerationService implements ModerationUseCase {
 
     private boolean isPubliclyVisible(InterestPost interest) {
         return interest.getStatus() == InterestStatus.OPEN
-                || interest.getStatus() == InterestStatus.APPROVED
-                || interest.getStatus() == InterestStatus.REPORTED;
+                || interest.getStatus() == InterestStatus.APPROVED;
     }
 
     private double highestScore(Map<String, Double> scores) {

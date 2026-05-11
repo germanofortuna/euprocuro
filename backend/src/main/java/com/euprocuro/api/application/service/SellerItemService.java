@@ -194,8 +194,7 @@ public class SellerItemService implements SellerItemUseCase {
 
     private boolean isPubliclyVisible(InterestPost interest) {
         return interest.getStatus() == InterestStatus.OPEN
-                || interest.getStatus() == InterestStatus.APPROVED
-                || interest.getStatus() == InterestStatus.REPORTED;
+                || interest.getStatus() == InterestStatus.APPROVED;
     }
 
     private List<String> tokens(String value) {

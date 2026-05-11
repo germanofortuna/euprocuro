@@ -214,7 +214,7 @@ const FALLBACK_CATEGORIES = [
   { value: "INSTRUMENTOS", labelKey: "categories.instrumentos" },
   { value: "OUTROS", labelKey: "categories.outros" }
 ];
-const AUTH_SESSION_MODE = import.meta.env.VITE_AUTH_SESSION_MODE ?? "bearer";
+const AUTH_SESSION_MODE = import.meta.env.VITE_AUTH_SESSION_MODE ?? "cookie";
 const SHOULD_RECOVER_SESSION_FROM_COOKIE = AUTH_SESSION_MODE === "cookie";
 
 function currency(value, t) {
@@ -871,6 +871,10 @@ export default function App() {
     () => showInactiveInterests ? allMyInterests : activeMyInterests,
     [activeMyInterests, allMyInterests, showInactiveInterests]
   );
+  const myInterestIds = useMemo(
+    () => new Set(allMyInterests.map((interest) => interest.id).filter(Boolean)),
+    [allMyInterests]
+  );
   const sentOffers = useMemo(() => (dashboard?.offersSent ?? []).slice().sort(byNewest), [dashboard?.offersSent]);
   const receivedOffers = useMemo(() => (dashboard?.offersReceived ?? []).slice().sort(byNewest), [dashboard?.offersReceived]);
   const creditPurchasesEnabled = Boolean(monetizationAccount?.creditPurchasesEnabled);
@@ -913,9 +917,11 @@ export default function App() {
   const visibleHomeInterests = useMemo(
     () => {
       const source = homeMatchFilter?.matchingInterests ?? interests;
-      return source.filter((interest) => !sameEntityId(interest.ownerId, currentUser?.id));
+      return source.filter((interest) =>
+        !sameEntityId(interest.ownerId, currentUser?.id) && !myInterestIds.has(interest.id)
+      );
     },
-    [homeMatchFilter, interests, currentUser?.id]
+    [homeMatchFilter, interests, currentUser?.id, myInterestIds]
   );
   const selectedSellerItemGroup = useMemo(
     () => sellerItems.find((group) => group.item?.id === selectedSellerItemId) ?? sellerItems[0] ?? null,
@@ -1140,9 +1146,11 @@ export default function App() {
     }
 
     window.requestAnimationFrame(() => {
-      publicInterestDetailRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
+      window.requestAnimationFrame(() => {
+        publicInterestDetailRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
       });
     });
   }
@@ -1279,7 +1287,9 @@ export default function App() {
   function clearHomeMatchFilter() {
     setHomeMatchFilter(null);
     updateInterestUrl(null, true);
-    const nextVisibleInterests = interests.filter((interest) => !sameEntityId(interest.ownerId, currentUser?.id));
+    const nextVisibleInterests = interests.filter((interest) =>
+      !sameEntityId(interest.ownerId, currentUser?.id) && !myInterestIds.has(interest.id)
+    );
     setSelectedInterest((current) =>
       nextVisibleInterests.find((interest) => interest.id === current?.id) ?? null
     );
@@ -1292,7 +1302,7 @@ export default function App() {
     }
 
     const matchingInterests = (group.matchingInterests ?? [])
-      .filter((interest) => !sameEntityId(interest.ownerId, currentUser?.id));
+      .filter((interest) => !sameEntityId(interest.ownerId, currentUser?.id) && !myInterestIds.has(interest.id));
 
     setSelectedSellerItemId(item.id);
     setHomeMatchFilter({
@@ -1955,6 +1965,16 @@ export default function App() {
       setSelectedInterest(myInterests[0]);
     }
   }, [loggedSection, myInterests, selectedInterest?.id]);
+
+  useEffect(() => {
+    if (loggedSection !== loggedSections.EXPLORE || !selectedInterest) {
+      return;
+    }
+
+    if (sameEntityId(selectedInterest.ownerId, currentUser?.id) || myInterestIds.has(selectedInterest.id)) {
+      setSelectedInterest(visibleHomeInterests[0] ?? null);
+    }
+  }, [loggedSection, selectedInterest?.id, selectedInterest?.ownerId, currentUser?.id, myInterestIds, visibleHomeInterests]);
 
   useEffect(() => {
     if (sellerItems.length === 0) {
@@ -3081,7 +3101,7 @@ export default function App() {
       }
       const matchedGroup = sellerItems.find((group) => group.item?.id === notification.sellerItemId);
       const matchingInterests = (matchedGroup?.matchingInterests ?? [])
-        .filter((interest) => !sameEntityId(interest.ownerId, currentUser?.id));
+        .filter((interest) => !sameEntityId(interest.ownerId, currentUser?.id) && !myInterestIds.has(interest.id));
       setHomeMatchFilter({
         sellerItemId: notification.sellerItemId,
         sellerItemTitle: matchedGroup?.item?.title ?? notification.title ?? "item parecido",
@@ -3135,9 +3155,9 @@ export default function App() {
     if (button) {
       const rect = button.getBoundingClientRect();
       const modalWidth = Math.min(360, window.innerWidth - 24);
-      const left = Math.min(
-        window.scrollX + window.innerWidth - modalWidth - 12,
-        Math.max(12, window.scrollX + rect.left + (rect.width / 2) - (modalWidth / 2))
+      const left = Math.max(
+        window.scrollX + 12,
+        Math.min(window.scrollX + rect.right - modalWidth, window.scrollX + window.innerWidth - modalWidth - 12)
       );
       const top = window.scrollY + rect.bottom + 10;
       setNotificationAnchorStyle({

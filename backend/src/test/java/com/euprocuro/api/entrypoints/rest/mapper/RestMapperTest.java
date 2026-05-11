@@ -26,6 +26,7 @@ class RestMapperTest {
                 .ownerId("buyer-1")
                 .ownerName("Ana Buyer")
                 .title("Procuro violao")
+                .referenceImageUrl("data:image/png;base64,abc")
                 .location(LocationInfo.builder()
                         .postalCode("13010-111")
                         .city("Campinas")
@@ -49,6 +50,7 @@ class RestMapperTest {
 
         assertThat(response.getOwnerId()).isNull();
         assertThat(response.getOwnerName()).isNull();
+        assertThat(response.getReferenceImageUrl()).isNull();
         assertThat(response.getWhatsappContact()).isNull();
         assertThat(response.isAllowsWhatsappContact()).isFalse();
         assertThat(response.getModeration()).isNull();

@@ -35,6 +35,7 @@ import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
+import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
@@ -79,6 +80,8 @@ class MarketplaceServiceTest {
     private SellerItemGateway sellerItemGateway;
     @Spy
     private InterestDeliveryRankingService interestDeliveryRankingService;
+    @Mock
+    private BlockedTermValidationGateway blockedTermValidationGateway;
 
     @InjectMocks
     private MarketplaceService marketplaceService;
@@ -87,6 +90,8 @@ class MarketplaceServiceTest {
     void setUpCache() {
         lenient().when(publicCacheService.getOrLoad(anyString(), anyString(), anyLong(), any()))
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
+        lenient().when(blockedTermValidationGateway.validateBlockedTerms(any(InterestPost.class)))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -246,6 +251,30 @@ class MarketplaceServiceTest {
                 .build());
 
         assertThat(results).extracting(InterestPost::getId).containsExactly("1", "2");
+    }
+
+    @Test
+    void listInterestsShouldHideBlockedTermsFromPublicResults() {
+        InterestPost safe = baseInterest();
+        safe.setId("safe");
+
+        InterestPost blocked = baseInterest();
+        blocked.setId("blocked");
+        blocked.setTitle("Conteudo proibido");
+
+        when(interestGateway.findAll()).thenReturn(List.of(safe, blocked));
+        when(blockedTermValidationGateway.validateBlockedTerms(safe)).thenReturn(Optional.empty());
+        when(blockedTermValidationGateway.validateBlockedTerms(blocked))
+                .thenReturn(Optional.of(new BlockedTermValidationGateway.BlockedTermValidationResult(
+                        "termo",
+                        "O anuncio contem um termo bloqueado pela plataforma."
+                )));
+
+        List<InterestPost> results = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(true)
+                .build());
+
+        assertThat(results).extracting(InterestPost::getId).containsExactly("safe");
     }
 
     @Test

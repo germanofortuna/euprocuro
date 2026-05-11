@@ -2,8 +2,16 @@ import defaultContent from "./content/default-content.json";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080/api";
 const SESSION_STORAGE_KEY = "eu-procuro-session";
+const AUTH_SESSION_MODE = import.meta.env.VITE_AUTH_SESSION_MODE ?? "cookie";
 const GENERIC_REQUEST_ERROR = defaultContent.entries["errors.request.generic"];
 const inFlightGetRequests = new Map();
+const PUBLIC_GET_PATHS = [
+  /^\/addresses\/postal-code\/[^/]+$/,
+  /^\/categories$/,
+  /^\/content\/public(?:\?|$)/,
+  /^\/interests(?:\?|$)/,
+  /^\/interests\/[^/]+$/
+];
 
 function buildWebSocketUrl() {
   const configuredBase = import.meta.env.VITE_WS_BASE;
@@ -51,20 +59,22 @@ export function isAuthError(error) {
 async function request(path, options = {}) {
   const session = getStoredSession();
   const headers = new Headers(options.headers ?? {});
+  const method = options.method ?? "GET";
+  const publicRead = isPublicGetRequest(path, method, session);
+  const sendAuth = AUTH_SESSION_MODE === "bearer" && !publicRead;
 
   if (!headers.has("Content-Type") && options.body !== undefined) {
     headers.set("Content-Type", "application/json");
   }
 
-  if (session?.token && !headers.has("Authorization")) {
+  if (sendAuth && session?.token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${session.token}`);
   }
 
   const url = `${API_BASE}${path}`;
-  const method = options.method ?? "GET";
   const requestOptions = {
     ...options,
-    credentials: "include",
+    credentials: publicRead ? "omit" : "include",
     headers
   };
   const shouldDeduplicate = method.toUpperCase() === "GET" && options.body === undefined;
@@ -110,6 +120,22 @@ function buildInFlightGetKey(url, headers) {
   ].join("|");
 }
 
+function isPublicGetRequest(path, method, session) {
+  if (method.toUpperCase() !== "GET") {
+    return false;
+  }
+
+  if (session?.user?.id && isPersonalizedPublicGetRequest(path)) {
+    return false;
+  }
+
+  return PUBLIC_GET_PATHS.some((pattern) => pattern.test(path));
+}
+
+function isPersonalizedPublicGetRequest(path) {
+  return /^\/interests(?:\?|$)/.test(path) || /^\/interests\/[^/]+$/.test(path);
+}
+
 export function getStoredSession() {
   const rawValue = window.localStorage.getItem(SESSION_STORAGE_KEY);
 
@@ -119,16 +145,23 @@ export function getStoredSession() {
 
   try {
     const session = JSON.parse(rawValue);
+    const normalizedSession = AUTH_SESSION_MODE === "bearer"
+      ? session
+      : { ...session, token: null };
 
-    const hasToken = Boolean(session?.token);
-    const hasUser = Boolean(session?.user?.id);
+    const hasToken = Boolean(normalizedSession?.token);
+    const hasUser = Boolean(normalizedSession?.user?.id);
 
     if (!hasToken && !hasUser) {
       window.localStorage.removeItem(SESSION_STORAGE_KEY);
       return null;
     }
 
-    return session;
+    if (normalizedSession.token !== session?.token) {
+      window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(normalizedSession));
+    }
+
+    return normalizedSession;
   } catch (error) {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
     return null;
@@ -143,7 +176,7 @@ export function storeSession(session) {
 
   const sanitizedSession = {
     expiresAt: session.expiresAt ?? null,
-    token: session.token ?? null,
+    token: AUTH_SESSION_MODE === "bearer" ? session.token ?? null : null,
     user: session.user ?? null
   };
 

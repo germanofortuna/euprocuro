@@ -500,7 +500,7 @@ public final class RestMapper {
                 .ownerName(exposeRestrictedDetails ? domain.getOwnerName() : null)
                 .title(domain.getTitle())
                 .description(domain.getDescription())
-                .referenceImageUrl(domain.getReferenceImageUrl())
+                .referenceImageUrl(exposeRestrictedDetails ? domain.getReferenceImageUrl() : publicReferenceImageUrl(domain.getReferenceImageUrl()))
                 .category(domain.getCategory())
                 .budgetMin(exposeRestrictedDetails ? domain.getBudgetMin() : null)
                 .budgetMax(exposeRestrictedDetails ? domain.getBudgetMax() : null)
@@ -525,6 +525,20 @@ public final class RestMapper {
             return InterestStatus.OPEN;
         }
         return null;
+    }
+
+    private static String publicReferenceImageUrl(String referenceImageUrl) {
+        if (referenceImageUrl == null) {
+            return null;
+        }
+
+        String value = referenceImageUrl.trim();
+        String normalized = value.toLowerCase();
+        if (normalized.startsWith("data:") || normalized.startsWith("javascript:")) {
+            return null;
+        }
+
+        return value;
     }
 
     public static InterestModerationResponse toResponse(InterestModeration domain) {

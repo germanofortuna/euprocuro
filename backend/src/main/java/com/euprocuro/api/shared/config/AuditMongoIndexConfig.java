@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
+import org.springframework.data.mongodb.core.index.IndexInfo;
+import org.springframework.data.mongodb.core.index.IndexOperations;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
@@ -38,9 +40,23 @@ public class AuditMongoIndexConfig {
     }
 
     private void ensureTtlIndex(String collection, String name, String field, long ttlSeconds) {
-        mongoTemplate.indexOps(collection).ensureIndex(new Index()
+        IndexOperations indexOperations = mongoTemplate.indexOps(collection);
+        indexOperations.getIndexInfo()
+                .stream()
+                .filter(index -> name.equals(index.getName()))
+                .filter(index -> !hasField(index, field))
+                .findFirst()
+                .ifPresent(index -> indexOperations.dropIndex(name));
+
+        indexOperations.ensureIndex(new Index()
                 .on(field, Direction.ASC)
                 .expire(Math.max(60, ttlSeconds), TimeUnit.SECONDS)
                 .named(name));
+    }
+
+    private boolean hasField(IndexInfo index, String field) {
+        return index.getIndexFields()
+                .stream()
+                .anyMatch(indexField -> field.equals(indexField.getKey()));
     }
 }

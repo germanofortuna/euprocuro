@@ -35,7 +35,27 @@ function BellIcon() {
   );
 }
 
-function ThemeIcon() {
+function SunIcon() {
+  return (
+    <svg
+      className="theme-toggle-button__icon"
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle cx="12" cy="12" r="4.2" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M12 2.8v2.4M12 18.8v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.8 12h2.4M18.8 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function MoonIcon() {
   return (
     <svg
       className="theme-toggle-button__icon"
@@ -45,21 +65,9 @@ function ThemeIcon() {
       xmlns="http://www.w3.org/2000/svg"
     >
       <path
-        d="M9 18h6"
+        d="M20.2 15.3A8 8 0 0 1 8.7 3.8 8.2 8.2 0 1 0 20.2 15.3Z"
         stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M10 21h4"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M8.8 14.8c-1.5-1.05-2.3-2.66-2.3-4.5A5.5 5.5 0 0 1 12 4.8a5.5 5.5 0 0 1 5.5 5.5c0 1.84-.8 3.45-2.3 4.5-.75.52-1.2 1.33-1.2 2.2h-4c0-.87-.45-1.68-1.2-2.2Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
+        strokeWidth="1.9"
         strokeLinejoin="round"
       />
     </svg>
@@ -95,9 +103,10 @@ export default function Header({
   const hasNoCredits = !subscriptionActive && (sellerCredits ?? 0) <= 0;
   const notificationLabel = hasNotifications ? t("header.notifications.unread") : t("header.notifications.default");
   const nextThemeLabel = theme === "dark" ? "Usar tema claro" : "Usar tema escuro";
+  const themeIcon = theme === "dark" ? <MoonIcon /> : <SunIcon />;
 
   return (
-    <header className="topbar">
+    <header className={`topbar ${authenticated ? "topbar--authenticated" : "topbar--guest"}`}>
       <button
         type="button"
         className="topbar__brand topbar__brand-button"
@@ -163,20 +172,20 @@ export default function Header({
             aria-label={nextThemeLabel}
             title={nextThemeLabel}
           >
-            <ThemeIcon />
+            {themeIcon}
           </button>
 
           <div className="profile-badge">
             <strong>{firstName}</strong>
           </div>
 
-          <button type="button" className="ghost-button" onClick={onLogout}>
+          <button type="button" className="ghost-button topbar__logout-button" onClick={onLogout}>
             {t("header.auth.logout")}
           </button>
         </div>
       ) : (
         <div className="topbar__actions topbar__actions--guest">
-          <button type="button" className="ghost-button" onClick={onLoginClick}>
+          <button type="button" className="ghost-button topbar__login-button" onClick={onLoginClick}>
             {t("header.auth.login")}
           </button>
           <button
@@ -186,9 +195,9 @@ export default function Header({
             aria-label={nextThemeLabel}
             title={nextThemeLabel}
           >
-            <ThemeIcon />
+            {themeIcon}
           </button>
-          <button type="button" className="primary-button primary-button--compact" onClick={onRegisterClick}>
+          <button type="button" className="primary-button primary-button--compact topbar__register-button" onClick={onRegisterClick}>
             {t("header.auth.register")}
           </button>
         </div>
