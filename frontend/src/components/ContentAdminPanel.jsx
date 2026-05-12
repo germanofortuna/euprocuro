@@ -12,6 +12,8 @@ import {
 import { useContentText } from "../content/ContentContext";
 import EmptyState from "./EmptyState";
 
+const HOME_HERO_SLIDES_KEY = "home.hero.slides";
+
 const CONTENT_TYPES = [
   "TEXT",
   "RICH_TEXT",
@@ -36,6 +38,32 @@ const emptyForm = {
   requiresUserAcceptance: false,
   draftValue: ""
 };
+
+const homeHeroSlidesTemplate = JSON.stringify([
+  {
+    eyebrow: "Marketplace reverso",
+    title: "O que você procura hoje?",
+    description: "Descreva aqui a mensagem principal do primeiro slide.",
+    complement: "Use o complemento para reforçar a chamada para ação.",
+    primaryLabel: "Cadastre o que você procura"
+  },
+  {
+    eyebrow: "Como funciona",
+    title: "Como funciona?",
+    cards: [
+      {
+        title: "Publique sua procura",
+        description: "Explique o passo a passo do primeiro card."
+      }
+    ]
+  },
+  {
+    eyebrow: "Venda melhor",
+    title: "Tem algo para negociar?",
+    description: "Use este slide para o CTA final da home.",
+    primaryLabel: "Cadastre seu item disponível"
+  }
+], null, 2);
 
 function toForm(entry) {
   if (!entry) {
@@ -70,6 +98,10 @@ export default function ContentAdminPanel({ onFeedback }) {
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isInvalidatingCache, setIsInvalidatingCache] = useState(false);
+  const homeHeroSlidesEntry = useMemo(
+    () => entries.find((entry) => entry.key === HOME_HERO_SLIDES_KEY) ?? null,
+    [entries]
+  );
 
   const selectedEntry = useMemo(
     () => entries.find((entry) => entry.id === selectedId) ?? null,
@@ -126,6 +158,28 @@ export default function ContentAdminPanel({ onFeedback }) {
   function startNewEntry() {
     setSelectedId("");
     setForm(emptyForm);
+  }
+
+  function openHomeHeroSlides() {
+    if (homeHeroSlidesEntry) {
+      setSelectedId(homeHeroSlidesEntry.id);
+      setSearch(HOME_HERO_SLIDES_KEY);
+      setStatusFilter("ALL");
+      return;
+    }
+
+    setSelectedId("");
+    setSearch(HOME_HERO_SLIDES_KEY);
+    setStatusFilter("ALL");
+    setForm({
+      ...emptyForm,
+      key: HOME_HERO_SLIDES_KEY,
+      type: "TEXT",
+      locale: "pt-BR",
+      screen: "home",
+      description: "Carrossel principal da home pública. Use JSON para configurar os slides.",
+      draftValue: homeHeroSlidesTemplate
+    });
   }
 
   async function handleSave(event) {
@@ -231,6 +285,18 @@ export default function ContentAdminPanel({ onFeedback }) {
     }
   }
 
+  function applyHomeHeroTemplate() {
+    setForm((current) => ({
+      ...current,
+      key: HOME_HERO_SLIDES_KEY,
+      type: "TEXT",
+      screen: "home",
+      description: "Carrossel principal da home pública. Valor em JSON com slides configuráveis.",
+      draftValue: homeHeroSlidesTemplate
+    }));
+    setSelectedId("");
+  }
+
   async function handleInvalidateCache() {
     setIsInvalidatingCache(true);
     try {
@@ -252,6 +318,9 @@ export default function ContentAdminPanel({ onFeedback }) {
           <p>{t("contentAdmin.subtitle")}</p>
         </div>
         <div className="inline-actions">
+          <button type="button" className="ghost-button ghost-button--small" onClick={openHomeHeroSlides}>
+            Slides da home
+          </button>
           <button type="button" className="ghost-button ghost-button--small" onClick={handleInvalidateCache} disabled={isInvalidatingCache}>
             {isInvalidatingCache ? t("common.actions.loading") : t("contentAdmin.cache.invalidate")}
           </button>
@@ -267,6 +336,17 @@ export default function ContentAdminPanel({ onFeedback }) {
       <div className="content-admin__safety">
         {t("contentAdmin.help.publicSafety")}
       </div>
+
+      <section className="content-admin__shortcut">
+        <div>
+          <span className="eyebrow">Home pública</span>
+          <strong>Slides configuráveis do hero</strong>
+          <p>Abra o conteúdo `home.hero.slides` para editar os textos, a ordem e a quantidade de slides do topo da home pública.</p>
+        </div>
+        <button type="button" className="ghost-button ghost-button--small" onClick={openHomeHeroSlides}>
+          Editar slides da home
+        </button>
+      </section>
 
       <div className="content-admin">
         <aside className="content-admin__list">
@@ -316,6 +396,22 @@ export default function ContentAdminPanel({ onFeedback }) {
             <div className="content-admin__empty-note">
               <strong>{t("contentAdmin.form.emptyTitle")}</strong>
               <p>{t("contentAdmin.form.emptyDescription")}</p>
+            </div>
+          ) : null}
+
+          {(form.key || "").trim() === HOME_HERO_SLIDES_KEY ? (
+            <div className="content-admin__default-update">
+              <div>
+                <span className="eyebrow">Home Hero</span>
+                <strong>Slides configuráveis da home pública</strong>
+                <p>Salve o conteúdo como JSON. Cada item do array vira um slide, e o campo `cards` pode ser usado no slide “Como funciona”.</p>
+              </div>
+              <textarea rows="10" value={homeHeroSlidesTemplate} readOnly aria-label="Template de slides da home" />
+              <div className="inline-actions">
+                <button type="button" className="ghost-button ghost-button--small" onClick={applyHomeHeroTemplate}>
+                  Usar template dos slides
+                </button>
+              </div>
             </div>
           ) : null}
 

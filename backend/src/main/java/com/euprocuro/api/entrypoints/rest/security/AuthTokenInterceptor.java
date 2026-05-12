@@ -1,5 +1,7 @@
 package com.euprocuro.api.entrypoints.rest.security;
 
+import java.util.Map;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -8,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import com.euprocuro.api.application.exception.UnauthorizedException;
+import com.euprocuro.api.application.service.AuditLogService;
 import com.euprocuro.api.application.usecase.AuthUseCase;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
 
@@ -20,6 +23,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor {
     private final AuthUseCase authUseCase;
     private final AuthTokenResolver authTokenResolver;
     private final AuthCookieManager authCookieManager;
+    private final AuditLogService auditLogService;
 
     @Override
     public boolean preHandle(
@@ -38,7 +42,10 @@ public class AuthTokenInterceptor implements HandlerInterceptor {
         }
 
         String token = authTokenResolver.resolve(request)
-                .orElseThrow(() -> new UnauthorizedException("Token de acesso nao informado."));
+                .orElseThrow(() -> {
+                    recordMissingToken(request);
+                    return new UnauthorizedException("Sessao encerrada.");
+                });
 
         AuthenticatedSessionView session = authUseCase.requireAuthenticatedSession(token);
 
@@ -94,5 +101,21 @@ public class AuthTokenInterceptor implements HandlerInterceptor {
 
         String uri = request.getRequestURI();
         return "/api/interests".equals(uri) || uri.matches("^/api/interests/[^/]+$");
+    }
+
+    private void recordMissingToken(HttpServletRequest request) {
+        auditLogService.record(
+                "AUTH_MISSING_TOKEN",
+                null,
+                null,
+                "AUTH_SESSION",
+                "missing-token",
+                AuditLogService.OUTCOME_FAILURE,
+                Map.of(
+                        "method", request.getMethod(),
+                        "path", request.getRequestURI(),
+                        "reason", "MISSING_TOKEN"
+                )
+        );
     }
 }

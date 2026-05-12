@@ -64,12 +64,14 @@ function MoonIcon() {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path
-        d="M20.2 15.3A8 8 0 0 1 8.7 3.8 8.2 8.2 0 1 0 20.2 15.3Z"
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinejoin="round"
-      />
+      <defs>
+        <mask id="themeMoonCutout">
+          <rect width="24" height="24" fill="white" />
+          <circle cx="15.4" cy="8.5" r="7.5" fill="black" />
+        </mask>
+      </defs>
+      <circle cx="11.3" cy="12" r="8.4" fill="currentColor" mask="url(#themeMoonCutout)" />
+      <circle cx="6.9" cy="8.7" r="1.1" fill="currentColor" opacity="0.6" />
     </svg>
   );
 }
@@ -94,7 +96,8 @@ export default function Header({
   onLogout,
   theme = "dark",
   onThemeToggle,
-  hideActions = false
+  hideActions = false,
+  isScrolled = false
 }) {
   const { t } = useContentText();
   const authenticated = Boolean(isLoggedIn && user?.id);
@@ -106,7 +109,7 @@ export default function Header({
   const themeIcon = theme === "dark" ? <MoonIcon /> : <SunIcon />;
 
   return (
-    <header className={`topbar ${authenticated ? "topbar--authenticated" : "topbar--guest"}`}>
+    <header className={`topbar ${authenticated ? "topbar--authenticated" : "topbar--guest"} ${!authenticated && isScrolled ? "topbar--scrolled" : ""}`}>
       <button
         type="button"
         className="topbar__brand topbar__brand-button"

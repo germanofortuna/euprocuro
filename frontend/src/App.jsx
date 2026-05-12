@@ -1,4 +1,6 @@
-﻿import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+﻿import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 import {
   activateInterest,
@@ -731,8 +733,246 @@ function FieldCounter({ value, max }) {
   );
 }
 
+const DEFAULT_PUBLIC_HERO_SLIDES = [
+  {
+    eyebrow: "Olá!",
+    title: "O que você procura hoje?",
+    description:
+      "No Eu Procuro, as pessoas cadastram produtos, serviços ou oportunidades que desejam encontrar. Quem tiver algo compatível pode enviar uma proposta e negociar diretamente.",
+    complement:
+      "Publique seu interesse ou cadastre um item disponível para encontrar pessoas procurando algo parecido.",
+    primaryLabel: "Cadastre o que você procura"
+  },
+  {
+    eyebrow: "Como funciona",
+    title: "Como funciona?",
+    cards: [
+      {
+        title: "Publique sua procura",
+        description: "Descreva o produto, serviço ou oportunidade que deseja encontrar."
+      },
+      {
+        title: "Receba propostas de quem pode atender",
+        description: "Descreva o produto, serviço ou oportunidade que deseja encontrar."
+      },
+      {
+        title: "Negocie direto",
+        description: "Combine valores, detalhes e condições diretamente com a outra pessoa."
+      }
+    ]
+  },
+  {
+    eyebrow: "Venda melhor",
+    title: "Tem algo para negociar?",
+    description: "Cadastre um item disponível e veja pessoas procurando algo parecido.",
+    primaryLabel: "Cadastre seu item disponível"
+  }
+];
+
+function normalizeHeroSlide(slide) {
+  if (!slide || typeof slide !== "object") {
+    return null;
+  }
+
+  const cards = Array.isArray(slide.cards)
+    ? slide.cards
+        .map((card) => ({
+          title: String(card?.title ?? "").trim(),
+          description: String(card?.description ?? "").trim()
+        }))
+        .filter((card) => card.title || card.description)
+    : [];
+
+  const normalized = {
+    eyebrow: String(slide.eyebrow ?? "").trim(),
+    title: String(slide.title ?? slide.hero ?? slide.titleBefore ?? "").trim(),
+    titleBefore: String(slide.titleBefore ?? "").trim(),
+    titleHighlight: String(slide.titleHighlight ?? "").trim(),
+    titleAfter: String(slide.titleAfter ?? "").trim(),
+    description: String(slide.description ?? "").trim(),
+    complement: String(slide.complement ?? "").trim(),
+    primaryLabel: String(slide.primaryLabel ?? "").trim(),
+    secondaryLabel: String(slide.secondaryLabel ?? "").trim(),
+    cards
+  };
+
+  if (!normalized.title && normalized.titleHighlight) {
+    normalized.title = [normalized.titleBefore, normalized.titleHighlight, normalized.titleAfter]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return normalized.title || normalized.description || normalized.cards.length ? normalized : null;
+}
+
+function parsePublicHeroSlides(entry) {
+  const rawValue = entry?.value;
+  const candidate = Array.isArray(rawValue) ? rawValue : (() => {
+    if (typeof rawValue !== "string" || !rawValue.trim()) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(rawValue);
+    } catch {
+      return null;
+    }
+  })();
+
+  if (!Array.isArray(candidate)) {
+    return DEFAULT_PUBLIC_HERO_SLIDES;
+  }
+
+  const slides = candidate.map(normalizeHeroSlide).filter(Boolean);
+  return slides.length ? slides : DEFAULT_PUBLIC_HERO_SLIDES;
+}
+
+const PublicHomeHero = memo(function PublicHomeHero({ slides, onPrimaryClick, onSecondaryClick }) {
+  const [activeSlide, setActiveSlide] = useState({ index: 0, direction: 1 });
+  const shouldReduceMotion = useReducedMotion();
+  const currentSlide = slides[activeSlide.index] ?? slides[0] ?? DEFAULT_PUBLIC_HERO_SLIDES[0];
+  const canAdvance = slides.length > 1;
+
+  useEffect(() => {
+    if (!canAdvance) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setActiveSlide((current) => ({
+        index: (current.index + 1) % slides.length,
+        direction: 1
+      }));
+    }, 8200);
+
+    return () => window.clearInterval(intervalId);
+  }, [canAdvance, slides.length]);
+
+  useEffect(() => {
+    if (activeSlide.index >= slides.length) {
+      setActiveSlide({ index: 0, direction: 1 });
+    }
+  }, [activeSlide.index, slides.length]);
+
+  function goToSlide(nextIndex) {
+    if (nextIndex === activeSlide.index) {
+      return;
+    }
+
+    setActiveSlide({
+      index: nextIndex,
+      direction: nextIndex > activeSlide.index ? 1 : -1
+    });
+  }
+
+  const slideVariants = shouldReduceMotion
+    ? {
+        enter: { opacity: 0 },
+        center: { opacity: 1 },
+        exit: { opacity: 0 }
+      }
+    : {
+        enter: (direction) => ({ opacity: 0, x: direction > 0 ? 24 : -24, scale: 0.994 }),
+        center: { opacity: 1, x: 0, scale: 1 },
+        exit: (direction) => ({ opacity: 0, x: direction > 0 ? -24 : 24, scale: 0.994 })
+      };
+
+  const cardVariants = shouldReduceMotion
+    ? {}
+    : {
+        hidden: { opacity: 0, y: 10 },
+        visible: {
+          opacity: 1,
+          y: 0,
+          transition: { duration: 0.18, ease: "easeOut" }
+        }
+      };
+
+  return (
+    <section className="public-hero-carousel" aria-label="Destaques da home">
+      <div className="public-hero-carousel__stage">
+        <AnimatePresence initial={false} custom={activeSlide.direction} mode="wait">
+          <motion.article
+            key={`${activeSlide.index}-${currentSlide.title}`}
+            className={`public-hero-slide ${currentSlide.cards?.length ? "public-hero-slide--cards" : ""}`}
+            custom={activeSlide.direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: shouldReduceMotion ? 0.08 : 0.28, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="public-hero-slide__copy">
+              {currentSlide.eyebrow ? <span className="eyebrow">{currentSlide.eyebrow}</span> : null}
+              <h1>
+                {currentSlide.titleHighlight ? (
+                  <>
+                    {currentSlide.titleBefore ? `${currentSlide.titleBefore} ` : ""}
+                    <span>{currentSlide.titleHighlight}</span>
+                    {currentSlide.titleAfter ? ` ${currentSlide.titleAfter}` : ""}
+                  </>
+                ) : (
+                  currentSlide.title
+                )}
+              </h1>
+              {currentSlide.description ? <p>{currentSlide.description}</p> : null}
+              {currentSlide.complement ? <p className="public-hero-slide__support">{currentSlide.complement}</p> : null}
+              {currentSlide.primaryLabel || currentSlide.secondaryLabel ? (
+                <div className="public-hero-slide__actions">
+                  {currentSlide.primaryLabel ? (
+                    <button type="button" className="primary-button" onClick={onPrimaryClick}>
+                      {currentSlide.primaryLabel}
+                    </button>
+                  ) : null}
+                  {currentSlide.secondaryLabel ? (
+                    <button type="button" className="ghost-button" onClick={onSecondaryClick}>
+                      {currentSlide.secondaryLabel}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            {currentSlide.cards?.length ? (
+              <motion.div
+                className="public-hero-slide__cards"
+                initial="hidden"
+                animate="visible"
+                variants={shouldReduceMotion ? {} : { visible: { transition: { staggerChildren: 0.05 } } }}
+              >
+                {currentSlide.cards.map((card, index) => (
+                  <motion.article className="public-hero-card" key={`${card.title}-${index}`} variants={cardVariants}>
+                    <span>{index + 1}</span>
+                    <strong>{card.title}</strong>
+                    {card.description ? <p>{card.description}</p> : null}
+                  </motion.article>
+                ))}
+              </motion.div>
+            ) : null}
+          </motion.article>
+        </AnimatePresence>
+
+        {canAdvance ? (
+          <div className="public-hero-carousel__controls" aria-label="Selecionar slide">
+            {slides.map((slide, index) => (
+              <button
+                type="button"
+                key={`${slide.title}-${index}`}
+                className={index === activeSlide.index ? "active" : ""}
+                onClick={() => goToSlide(index)}
+                aria-label={`Ir para slide ${index + 1}`}
+                aria-current={index === activeSlide.index ? "true" : undefined}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+});
+
 export default function App() {
-  const { t } = useContentText();
+  const { t, getEntry } = useContentText();
   const { termsVersion } = useLegalContent();
   const initialResetState = useMemo(() => createResetStateFromLocation(), []);
   const initialSharedInterestId = useMemo(() => createInitialSharedInterestId(), []);
@@ -743,6 +983,9 @@ export default function App() {
   const publicRequestSeq = useRef(0);
   const detailRequestSeq = useRef(0);
   const realtimeHandlerRef = useRef(null);
+  const logoutInProgressRef = useRef(false);
+  const publicHeaderScrolledRef = useRef(false);
+  const publicHeaderScrollFrameRef = useRef(0);
   const publicInterestDetailRef = useRef(null);
   const myInterestsSectionRef = useRef(null);
   const sentOffersSectionRef = useRef(null);
@@ -751,6 +994,7 @@ export default function App() {
   const newInterestSectionRef = useRef(null);
   const [session, setSession] = useState(() => getStoredSession());
   const [theme, setTheme] = useState(getStoredTheme);
+  const [isPublicHeaderScrolled, setIsPublicHeaderScrolled] = useState(false);
   const [activeLegalPageSlug, setActiveLegalPageSlug] = useState(getActiveLegalPageSlug);
   const [isOmbudsmanPageActive, setIsOmbudsmanPageActive] = useState(isOmbudsmanRoute);
   const [dashboard, setDashboard] = useState(null);
@@ -855,6 +1099,10 @@ export default function App() {
   const debouncedQuery = useDebouncedValue(filters.query, 350);
   const deferredQuery = useDeferredValue(debouncedQuery);
   const currentUser = session?.user ?? null;
+  const publicHeroSlides = useMemo(
+    () => parsePublicHeroSlides(getEntry("home.hero.slides")),
+    [getEntry]
+  );
   const allMyInterests = useMemo(
       () => (dashboard?.myInterests ?? [])
           .filter((interest) => sameEntityId(interest.ownerId, currentUser?.id))
@@ -909,6 +1157,36 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem("euProcuroTheme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    function syncScrolledState() {
+      publicHeaderScrollFrameRef.current = 0;
+      const nextScrolled = window.scrollY > 12;
+      if (publicHeaderScrolledRef.current === nextScrolled) {
+        return;
+      }
+
+      publicHeaderScrolledRef.current = nextScrolled;
+      setIsPublicHeaderScrolled(nextScrolled);
+    }
+
+    function handleScroll() {
+      if (publicHeaderScrollFrameRef.current) {
+        return;
+      }
+
+      publicHeaderScrollFrameRef.current = window.requestAnimationFrame(syncScrolledState);
+    }
+
+    syncScrolledState();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (publicHeaderScrollFrameRef.current) {
+        window.cancelAnimationFrame(publicHeaderScrollFrameRef.current);
+      }
+    };
+  }, []);
 
   function toggleTheme() {
     setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
@@ -1605,7 +1883,9 @@ export default function App() {
         setAdminModeration(null);
         setIsAdmin(false);
         setLoggedSection(loggedSections.EXPLORE);
-        openFeedback("error", "Sessão encerrada", requestError.message || "Entre novamente para continuar.");
+        if (!silent && !logoutInProgressRef.current) {
+          openFeedback("error", "Sessão encerrada", "Entre novamente para continuar.");
+        }
         return;
       }
 
@@ -2389,6 +2669,7 @@ export default function App() {
   }
 
   async function handleLogout() {
+    logoutInProgressRef.current = true;
     try {
       await logout();
     } catch (requestError) {
@@ -2408,6 +2689,9 @@ export default function App() {
       replaceCurrentUrl(sectionRoutes[loggedSections.EXPLORE]);
       setOffers([]);
       setConversationModal((current) => ({ ...current, visible: false, data: null, draftMessage: "" }));
+      window.setTimeout(() => {
+        logoutInProgressRef.current = false;
+      }, 1000);
     }
   }
 
@@ -3188,73 +3472,11 @@ export default function App() {
     return (
       <>
         {showHero ? (
-          <section className="hero hero--public">
-            <div className="hero__copy">
-              <h1>{t("home.hero.title")}</h1>
-              <p>
-                {t("home.hero.description")}
-              </p>
-              <p className="hero__supporting">
-                {t("home.hero.complement")}
-              </p>
-              <div className="hero__actions">
-                <button type="button" className="primary-button" onClick={() => openAuthModal("register")}>
-                  {t("home.hero.primary")}
-                </button>
-                <button type="button" className="ghost-button" onClick={() => openAuthModal("login")}>
-                  {t("home.hero.secondary")}
-                </button>
-              </div>
-            </div>
-
-            <div className="hero__aside">
-              <div className="hero-card">
-                <strong>{t("home.hero.card1.title")}</strong>
-                <p>{t("home.hero.card1.description")}</p>
-                <button type="button" className="primary-button primary-button--compact" onClick={() => openAuthModal("register")}>
-                  {t("home.hero.card1.cta")}
-                </button>
-              </div>
-              <div className="hero-card">
-                <strong>{t("home.hero.card2.title")}</strong>
-                <p>{t("home.hero.card2.description")}</p>
-                <button type="button" className="ghost-button" onClick={() => openAuthModal("register")}>
-                  {t("home.hero.card2.cta")}
-                </button>
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        {showHero ? (
-          <section className="how-it-works-section">
-            <div className="panel__header">
-              <div>
-                <span className="eyebrow">{t("home.how.eyebrow")}</span>
-                <h2>{t("home.how.title")}</h2>
-              </div>
-            </div>
-
-            <div className="how-it-works-grid">
-              {[1, 2, 3].map((step) => (
-                <article key={step} className="how-it-works-card">
-                  <span className="how-it-works-card__number">{step}</span>
-                  <strong>{t(`home.how.step${step}.title`)}</strong>
-                  <p>{t(`home.how.step${step}.description`)}</p>
-                </article>
-              ))}
-            </div>
-
-            <article className="how-it-works-secondary">
-              <div>
-                <strong>{t("home.how.secondary.title")}</strong>
-                <p>{t("home.how.secondary.description")}</p>
-              </div>
-              <button type="button" className="ghost-button" onClick={() => openAuthModal("register")}>
-                {t("home.how.secondary.cta")}
-              </button>
-            </article>
-          </section>
+          <PublicHomeHero
+            slides={publicHeroSlides}
+            onPrimaryClick={() => openAuthModal("register")}
+            onSecondaryClick={() => openAuthModal("login")}
+          />
         ) : null}
 
         <section className="workspace-grid">
@@ -5576,7 +5798,23 @@ export default function App() {
               replaceCurrentUrl(sectionRoutes[loggedSections.EXPLORE]);
             }}
           />
-          <LegalPage slug={activeLegalPageSlug} />
+          <LegalPage
+            slug={activeLegalPageSlug}
+            onNavigate={(nextUrl) => {
+              const normalizedUrl = String(nextUrl ?? "/");
+              if (normalizedUrl === "/") {
+                setActiveLegalPageSlug("");
+                replaceCurrentUrl(sectionRoutes[loggedSections.EXPLORE]);
+                return;
+              }
+
+              const legalSlug = normalizedUrl.match(/^\/legal\/([^/]+)\/?$/)?.[1] ?? "";
+              if (legalSlug && legalPages[legalSlug]) {
+                setActiveLegalPageSlug(legalSlug);
+                replaceCurrentUrl(`/legal/${legalSlug}`);
+              }
+            }}
+          />
         </main>
 
         <Footer />
@@ -5611,7 +5849,7 @@ export default function App() {
     <div className="app-shell" data-theme={theme}>
       <div className="background-grid" />
 
-      <main className="page">
+      <main className={`page ${!session ? "page--public-home" : ""}`}>
         <Header
           user={currentUser}
           currentSection={loggedSection}
@@ -5634,6 +5872,7 @@ export default function App() {
           onLogout={handleLogout}
           theme={theme}
           onThemeToggle={toggleTheme}
+          isScrolled={!session && isPublicHeaderScrolled}
           onNavigate={(section) => {
             if (section === loggedSections.NEW_INTEREST) {
               openNewInterestForm();
