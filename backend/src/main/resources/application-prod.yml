@@ -1,3 +1,7 @@
+spring:
+  rabbitmq:
+    virtual-host: ${RABBITMQ_VIRTUAL_HOST:/}
+
 application:
   monetization:
     provider: ${APP_MONETIZATION_PROVIDER:MERCADO_PAGO_CHECKOUT_PRO}
