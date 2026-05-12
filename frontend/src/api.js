@@ -2,7 +2,6 @@ import defaultContent from "./content/default-content.json";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080/api";
 const SESSION_STORAGE_KEY = "eu-procuro-session";
-const AUTH_SESSION_MODE = import.meta.env.VITE_AUTH_SESSION_MODE ?? "cookie";
 const GENERIC_REQUEST_ERROR = defaultContent.entries["errors.request.generic"];
 const inFlightGetRequests = new Map();
 const PUBLIC_GET_PATHS = [
@@ -61,7 +60,7 @@ async function request(path, options = {}) {
   const headers = new Headers(options.headers ?? {});
   const method = options.method ?? "GET";
   const publicRead = isPublicGetRequest(path, method, session);
-  const sendAuth = AUTH_SESSION_MODE === "bearer" && !publicRead;
+  const sendAuth = Boolean(session?.token) && !publicRead;
 
   if (!headers.has("Content-Type") && options.body !== undefined) {
     headers.set("Content-Type", "application/json");
@@ -145,9 +144,10 @@ export function getStoredSession() {
 
   try {
     const session = JSON.parse(rawValue);
-    const normalizedSession = AUTH_SESSION_MODE === "bearer"
-      ? session
-      : { ...session, token: null };
+    const normalizedSession = {
+      ...session,
+      token: session?.token ?? null
+    };
 
     const hasToken = Boolean(normalizedSession?.token);
     const hasUser = Boolean(normalizedSession?.user?.id);
@@ -176,7 +176,7 @@ export function storeSession(session) {
 
   const sanitizedSession = {
     expiresAt: session.expiresAt ?? null,
-    token: AUTH_SESSION_MODE === "bearer" ? session.token ?? null : null,
+    token: session.token ?? null,
     user: session.user ?? null
   };
 

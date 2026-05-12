@@ -149,7 +149,7 @@
     "sellerItem.form.price.placeholder": "Valor que você analisaria negociar",
     "sellerItem.form.image.label": "Foto do item",
     "sellerItem.form.image.previewAlt": "Prévia do item",
-    "sellerItem.form.submit": "Salvar item disponível",
+    "sellerItem.form.submit": "Cadastrar item disponível",
     "sellerItem.createCard.title": "Tenho um item para negociar",
     "sellerItem.createCard.description": "Cadastre produtos, veículos ou serviços que você possui e aceitaria negociar. A plataforma encontra pessoas que estão procurando algo parecido.",
     "report.feedback.success.title": "Denúncia enviada",

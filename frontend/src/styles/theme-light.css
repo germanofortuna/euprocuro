@@ -16,6 +16,20 @@
   color: var(--ink);
 }
 
+.app-shell[data-theme="light"] .catalog-admin__section {
+  background: #f8fbff;
+  border-color: rgba(30, 111, 242, 0.18);
+  color: var(--ink);
+}
+
+.app-shell[data-theme="light"] .catalog-admin__section-header h4 {
+  color: var(--ink);
+}
+
+.app-shell[data-theme="light"] .catalog-admin__section-header p {
+  color: var(--muted);
+}
+
 .app-shell[data-theme="light"] .topbar,
 .app-shell[data-theme="light"] .hero,
 .app-shell[data-theme="light"] .panel,

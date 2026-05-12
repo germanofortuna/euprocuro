@@ -492,8 +492,8 @@ function mapInterestToForm(interest) {
     neighborhood: interest?.location?.neighborhood ?? "",
     country: interest?.location?.country ?? "Brasil",
     desiredRadiusKm: interest?.desiredRadiusKm ?? "30",
-    allowsWhatsappContact: Boolean(interest?.allowsWhatsappContact),
-    whatsappContact: interest?.whatsappContact ?? "",
+    allowsWhatsappContact: false,
+    whatsappContact: "",
     preferredCondition: interest?.preferredCondition ?? "",
     preferredContactMode: interest?.preferredContactMode ?? "Chat",
     tags: interest?.tags?.join(", ") ?? ""
@@ -513,9 +513,9 @@ function buildInterestPayload(interestForm) {
     state: interestForm.state,
     neighborhood: interestForm.neighborhood,
     country: interestForm.country,
-    desiredRadiusKm: Number(interestForm.desiredRadiusKm || 0),
-    allowsWhatsappContact: interestForm.allowsWhatsappContact,
-    whatsappContact: interestForm.allowsWhatsappContact ? interestForm.whatsappContact : null,
+    desiredRadiusKm: Number(interestForm.desiredRadiusKm || initialInterestForm.desiredRadiusKm),
+    allowsWhatsappContact: false,
+    whatsappContact: null,
     preferredCondition: interestForm.preferredCondition,
     preferredContactMode: interestForm.preferredContactMode,
     tags: interestForm.tags
@@ -2582,8 +2582,16 @@ export default function App() {
         user: authResponse.user
       };
 
-      storeSession(nextSession);
-      setSession(nextSession);
+      if (AUTH_SESSION_MODE === "cookie") {
+        storeSession(nextSession);
+        const me = await fetchMe();
+        const verifiedSession = buildSessionFromMeResponse(me, nextSession);
+        storeSession(verifiedSession);
+        setSession(verifiedSession);
+      } else {
+        storeSession(nextSession);
+        setSession(nextSession);
+      }
 
       setPasswordRecoveryPreview(null);
       setLoginForm(initialLoginForm);
@@ -2592,7 +2600,9 @@ export default function App() {
       clearSession();
       setSession(null);
 
-      const message = requestError.message || t("auth.feedback.login.error.message");
+      const message = isAuthError(requestError)
+        ? "Nao foi possivel manter sua sessao. Tente novamente em instantes."
+        : requestError.message || t("auth.feedback.login.error.message");
       if (message.toLowerCase().includes("confirme seu e-mail")) {
         setLoginInlineError(message);
       } else {
@@ -2782,11 +2792,8 @@ export default function App() {
         offeredPrice: offerForm.offeredPrice,
         sellerPhone: offerForm.sellerPhone,
         message: offerForm.message,
-        includesDelivery: offerForm.includesDelivery,
-        highlights: offerForm.highlights
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean)
+        includesDelivery: false,
+        highlights: []
       });
 
       setOfferForm(initialOfferForm);
@@ -3218,7 +3225,7 @@ export default function App() {
         offeredPrice: selectedSellerItemGroup?.item?.desiredPrice,
         sellerPhone: sellerItemShareForm.sellerPhone,
         message: sellerItemShareForm.message,
-        includesDelivery: sellerItemShareForm.includesDelivery
+        includesDelivery: false
       });
       await refreshPrivateData();
       setSellerItemShareForm(initialSellerItemShareForm);
@@ -3757,29 +3764,6 @@ export default function App() {
                         required
                       />
                       <FieldCounter value={offerForm.message} max={DESCRIPTION_MAX_LENGTH} />
-                      <input
-                        placeholder={t("offer.form.highlights")}
-                        value={offerForm.highlights}
-                        onChange={(event) =>
-                          setOfferForm((current) => ({
-                            ...current,
-                            highlights: event.target.value
-                          }))
-                        }
-                      />
-                      <label className="checkbox-row">
-                        <input
-                          type="checkbox"
-                          checked={offerForm.includesDelivery}
-                          onChange={(event) =>
-                            setOfferForm((current) => ({
-                              ...current,
-                              includesDelivery: event.target.checked
-                            }))
-                          }
-                        />
-                        <span>{t("offer.form.delivery")}</span>
-                      </label>
                       <button
                         type="submit"
                         className="primary-button"
@@ -4544,16 +4528,6 @@ export default function App() {
                   maxLength={DESCRIPTION_MAX_LENGTH}
                 />
                 <FieldCounter value={sellerItemShareForm.message} max={DESCRIPTION_MAX_LENGTH} />
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={sellerItemShareForm.includesDelivery}
-                    onChange={(event) =>
-                      setSellerItemShareForm((current) => ({ ...current, includesDelivery: event.target.checked }))
-                    }
-                  />
-                  <span>Inclui entrega ou deslocamento</span>
-                </label>
                 {!canSendOffer ? <p className="form-note">{noCreditsTooltip}</p> : null}
               </div>
 
@@ -5525,7 +5499,6 @@ export default function App() {
               {!editingInterestId ? (
                 <>
                   <p className="form-intro">{t("interest.form.guidance")}</p>
-                  <div className="intent-notice">{t("interest.form.intentNotice")}</div>
                 </>
               ) : null}
 
@@ -5597,7 +5570,7 @@ export default function App() {
               </div>
 
               <div className="field-group-label">Quanto pretende investir?</div>
-              <div className="three-columns">
+              <div className="two-columns">
                 <input
                   type="number"
                   min="0"
@@ -5616,18 +5589,6 @@ export default function App() {
                     setInterestForm((current) => ({ ...current, budgetMax: event.target.value }))
                   }
                   required
-                />
-                <input
-                  type="number"
-                  min="0"
-                  placeholder={t("interest.form.radius.placeholder")}
-                  value={interestForm.desiredRadiusKm}
-                  onChange={(event) =>
-                    setInterestForm((current) => ({
-                      ...current,
-                      desiredRadiusKm: event.target.value
-                    }))
-                  }
                 />
               </div>
               {hasInvalidBudgetRange(interestForm) ? (
@@ -5733,34 +5694,6 @@ export default function App() {
                   />
                 ) : null}
               </div>
-
-              <div className="two-columns">
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={interestForm.allowsWhatsappContact}
-                    onChange={(event) =>
-                      setInterestForm((current) => ({
-                        ...current,
-                        allowsWhatsappContact: event.target.checked,
-                        whatsappContact: event.target.checked ? current.whatsappContact : ""
-                      }))
-                    }
-                  />
-                  <span>{t("interest.form.whatsappAllowed")}</span>
-                </label>
-              </div>
-
-              {interestForm.allowsWhatsappContact ? (
-                <input
-                  placeholder={t("interest.form.whatsapp.placeholder")}
-                  value={interestForm.whatsappContact}
-                  onChange={(event) =>
-                    setInterestForm((current) => ({ ...current, whatsappContact: event.target.value }))
-                  }
-                  required
-                />
-              ) : null}
 
               <div className="form-actions">
                 {editingInterestId ? (

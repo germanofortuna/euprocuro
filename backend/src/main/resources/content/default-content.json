@@ -149,7 +149,7 @@
     "sellerItem.form.price.placeholder": "Valor que você analisaria",
     "sellerItem.form.image.label": "Foto do item",
     "sellerItem.form.image.previewAlt": "Prévia do item",
-    "sellerItem.form.submit": "Cadastrar item",
+    "sellerItem.form.submit": "Cadastrar item disponível",
     "sellerItem.createCard.title": "Cadastre itens que você aceitaria negociar",
     "sellerItem.createCard.description": "Ao cadastrar um item, a plataforma mostra interesses parecidos de outros usuários.",
     "report.feedback.success.title": "Denúncia enviada",

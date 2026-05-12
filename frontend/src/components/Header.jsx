@@ -76,6 +76,33 @@ function MoonIcon() {
   );
 }
 
+function LogoutIcon() {
+  return (
+    <svg
+      className="topbar__logout-icon"
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M10.5 5H6.8A2.8 2.8 0 0 0 4 7.8v8.4A2.8 2.8 0 0 0 6.8 19h3.7"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15 8l4 4-4 4M19 12H9.5"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function Header({
   user,
   isLoggedIn,
@@ -182,8 +209,14 @@ export default function Header({
             <strong>{firstName}</strong>
           </div>
 
-          <button type="button" className="ghost-button topbar__logout-button" onClick={onLogout}>
-            {t("header.auth.logout")}
+          <button
+            type="button"
+            className="ghost-button topbar__logout-button"
+            onClick={onLogout}
+            aria-label={t("header.auth.logout")}
+            title={t("header.auth.logout")}
+          >
+            <LogoutIcon />
           </button>
         </div>
       ) : (

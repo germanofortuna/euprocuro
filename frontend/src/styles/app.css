@@ -304,6 +304,17 @@ img {
   height: 20px;
 }
 
+.topbar__actions .topbar__logout-button {
+  width: var(--topbar-control-height);
+  justify-content: center;
+  padding: 0;
+}
+
+.topbar__logout-icon {
+  width: 20px;
+  height: 20px;
+}
+
 .topbar__nav button,
 .section-nav button,
 .auth-tabs button {

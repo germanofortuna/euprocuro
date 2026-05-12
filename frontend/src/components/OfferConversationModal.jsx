@@ -68,7 +68,6 @@ export default function OfferConversationModal({ modal, currentUserId, onClose, 
   const whatsappLink = counterpartyPhone
     ? `https://wa.me/${counterpartyPhone.replace(/\D/g, "")}`
     : null;
-  const mailtoLink = counterpartyEmail ? `mailto:${counterpartyEmail}` : null;
   const conversationMessages = modal.data?.messages ?? [];
 
   return (
@@ -100,17 +99,12 @@ export default function OfferConversationModal({ modal, currentUserId, onClose, 
                 {counterpartyEmail ? <p>{counterpartyEmail}</p> : null}
                 {counterpartyPhone ? <p>{counterpartyPhone}</p> : null}
                 <div className="contact-actions">
-                  {mailtoLink ? (
-                    <a className="ghost-button" href={mailtoLink} target="_blank" rel="noreferrer">
-                      {t("conversation.contact.email")}
-                    </a>
-                  ) : null}
                   {whatsappLink ? (
                     <a className="ghost-button" href={whatsappLink} target="_blank" rel="noreferrer">
                       WhatsApp
                     </a>
                   ) : null}
-                  {!mailtoLink && !whatsappLink ? (
+                  {!whatsappLink ? (
                     <span className="muted-inline">
                       {t("conversation.contact.chatOnly")}
                     </span>
