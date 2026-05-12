@@ -8,4 +8,4 @@ Disallow: /ofertas-recebidas
 Disallow: /meus-itens
 Disallow: /comprar-creditos
 
-Sitemap: https://euprocuro.com.br/sitemap.xml
+Sitemap: https://euprocuro.com/sitemap.xml
