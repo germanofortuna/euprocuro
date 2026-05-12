@@ -23,6 +23,9 @@ public class WebConfig implements WebMvcConfigurer {
     @Value("${application.security.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}")
     private String allowedOrigins;
 
+    @Value("${application.security.default-allowed-origins:http://localhost:5173,http://127.0.0.1:5173}")
+    private String defaultAllowedOrigins;
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
@@ -54,7 +57,11 @@ public class WebConfig implements WebMvcConfigurer {
     }
 
     private String[] parseAllowedOrigins() {
-        return Arrays.stream(allowedOrigins.split(","))
+        String configuredOrigins = allowedOrigins == null || allowedOrigins.trim().isEmpty()
+                ? defaultAllowedOrigins
+                : allowedOrigins;
+
+        return Arrays.stream(configuredOrigins.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
                 .toArray(String[]::new);
