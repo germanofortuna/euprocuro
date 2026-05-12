@@ -10,6 +10,8 @@ spring:
     virtual-host: ${RABBITMQ_VIRTUAL_HOST:guest}
 
 application:
+  security:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:https://hml.euprocuro.com}
   monetization:
     provider: ${APP_MONETIZATION_PROVIDER:MERCADO_PAGO_CHECKOUT_PRO}
     mercado-pago:
