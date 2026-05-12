@@ -798,7 +798,7 @@ O workflow esta em [.github/workflows/ci.yml](/C:/projetos/euprocuro/.github/wor
 - backend: `mvn -B clean verify`
 - frontend: `npm ci` + `npm run build`
 
-Ele roda em `push` e `pull_request`.
+Ele roda em `push` para `main`, `hml`, `master` e `codex/**`, em `pull_request` para `main` e `hml`, e tambem pode ser disparado manualmente.
 
 ## Deploy
 
@@ -806,6 +806,7 @@ Ele roda em `push` e `pull_request`.
 - Exemplo de blueprint do Render em [render.yaml](/C:/projetos/euprocuro/render.yaml)
 - Exemplo de variaveis em [.env.example](/C:/projetos/euprocuro/.env.example)
 - Guia de HML em [docs/hml-deploy.md](/C:/projetos/euprocuro/docs/hml-deploy.md)
+- Guia de PRD com Render Starter, Cloudflare e Vercel em [docs/prd-deploy.md](/C:/projetos/euprocuro/docs/prd-deploy.md)
 
 ## IntelliJ
 

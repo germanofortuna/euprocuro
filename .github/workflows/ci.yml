@@ -5,8 +5,13 @@ on:
     branches:
       - main
       - master
+      - hml
       - "codex/**"
   pull_request:
+    branches:
+      - main
+      - hml
+  workflow_dispatch:
 
 jobs:
   backend:

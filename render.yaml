@@ -2,6 +2,8 @@ services:
   - type: web
     name: eu-procuro-api-hml
     runtime: docker
+    repo: https://github.com/germanofortuna/euprocuro
+    branch: hml
     rootDir: backend
     plan: free
     autoDeploy: true
@@ -38,4 +40,106 @@ services:
       - key: RABBITMQ_PASSWORD
         sync: false
       - key: RABBITMQ_VIRTUAL_HOST
+        sync: false
+  - type: web
+    name: eu-procuro-api-prd
+    runtime: docker
+    repo: https://github.com/germanofortuna/euprocuro
+    branch: main
+    rootDir: backend
+    plan: starter
+    autoDeploy: true
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: MONGO_URI
+        sync: false
+      - key: APP_CORS_ALLOWED_ORIGINS
+        value: https://euprocuro.com,https://www.euprocuro.com
+      - key: APP_RESET_BASE_URL
+        value: https://euprocuro.com
+      - key: APP_AUTH_COOKIE_DOMAIN
+        value: .euprocuro.com
+      - key: APP_AUTH_COOKIE_SECURE
+        value: "true"
+      - key: APP_AUTH_COOKIE_SAME_SITE
+        value: Lax
+      - key: APP_AUTH_EXPOSE_RESET_PREVIEW
+        value: "false"
+      - key: APP_AUTH_EXPOSE_SESSION_TOKEN
+        value: "false"
+      - key: APP_AUTH_SESSION_HOURS
+        value: "168"
+      - key: APP_AUTH_SESSION_RENEWAL_THRESHOLD_HOURS
+        value: "24"
+      - key: APP_ADMIN_ALLOWED_EMAILS
+        sync: false
+      - key: APP_SECURITY_DOCUMENT_HASH_PEPPER
+        sync: false
+      - key: APP_MONETIZATION_PROVIDER
+        value: MERCADO_PAGO_CHECKOUT_PRO
+      - key: MERCADO_PAGO_ACCESS_TOKEN
+        sync: false
+      - key: MERCADO_PAGO_SANDBOX
+        value: "false"
+      - key: MERCADO_PAGO_SUCCESS_URL
+        value: https://euprocuro.com?payment=success
+      - key: MERCADO_PAGO_FAILURE_URL
+        value: https://euprocuro.com?payment=failure
+      - key: MERCADO_PAGO_PENDING_URL
+        value: https://euprocuro.com?payment=pending
+      - key: MERCADO_PAGO_NOTIFICATION_URL
+        value: https://api.euprocuro.com/api/monetization/mercado-pago/webhook
+      - key: MERCADO_PAGO_WEBHOOK_SECRET
+        sync: false
+      - key: MERCADO_PAGO_WEBHOOK_SIGNATURE_REQUIRED
+        value: "true"
+      - key: APP_EMAIL_PROVIDER
+        value: MAILERSEND_API
+      - key: APP_EMAIL_FROM
+        value: no-reply@euprocuro.com
+      - key: APP_EMAIL_FROM_NAME
+        value: Eu Procuro
+      - key: APP_EMAIL_APP_URL
+        value: https://euprocuro.com
+      - key: APP_EMAIL_TERMS_URL
+        value: https://euprocuro.com/legal/termos-de-uso
+      - key: APP_EMAIL_PRIVACY_URL
+        value: https://euprocuro.com/legal/politica-de-privacidade
+      - key: APP_EMAIL_SUPPORT_URL
+        value: mailto:suporte@euprocuro.com
+      - key: MAILERSEND_API_KEY
+        sync: false
+      - key: MAILERSEND_TEMPLATE_ID_DEFAULT
+        sync: false
+      - key: MAILERSEND_TEMPLATE_ID_EMAIL_VERIFICATION
+        sync: false
+      - key: MAILERSEND_TEMPLATE_ID_PASSWORD_RESET
+        sync: false
+      - key: MAILERSEND_TEMPLATE_ID_OFFER_RECEIVED
+        sync: false
+      - key: MAILERSEND_TEMPLATE_ID_CONVERSATION_MESSAGE
+        sync: false
+      - key: MAILERSEND_TEMPLATE_ID_PURCHASE_CONFIRMATION
+        sync: false
+      - key: MAILERSEND_TEMPLATE_ID_BOOST_ACTIVATED
+        sync: false
+      - key: APP_OPENAI_MODERATION_ENABLED
+        value: "true"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: APP_OPENAI_MODERATION_MODEL
+        value: omni-moderation-latest
+      - key: RABBITMQ_HOST
+        sync: false
+      - key: RABBITMQ_PORT
+        sync: false
+      - key: RABBITMQ_USERNAME
+        sync: false
+      - key: RABBITMQ_PASSWORD
+        sync: false
+      - key: RABBITMQ_VIRTUAL_HOST
+        sync: false
+      - key: APP_TRUSTED_PROXIES
         sync: false
