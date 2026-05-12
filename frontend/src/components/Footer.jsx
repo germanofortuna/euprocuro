@@ -17,8 +17,11 @@ export default function Footer() {
       </div>
 
       <nav className="site-footer__links" aria-label={t("footer.legal.aria")}>
+        <a href="/ouvidoria">
+          Fale Conosco
+        </a>
         {legalNavigation.map((item) => (
-          <a key={item.slug} href={`#${item.slug}`}>
+          <a key={item.slug} href={`/legal/${item.slug}`}>
             {item.label}
           </a>
         ))}

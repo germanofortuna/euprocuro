@@ -113,7 +113,7 @@ export default function AuthModal({
   return (
     <>
       <div className="modal-overlay" role="presentation" onClick={onClose}>
-        <div className="auth-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <div className={`auth-modal auth-modal--${mode}`} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
           <div className="feedback-modal__header">
             <div>
               <span className="eyebrow">{t("auth.eyebrow")}</span>

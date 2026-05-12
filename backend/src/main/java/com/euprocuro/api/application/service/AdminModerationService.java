@@ -63,7 +63,14 @@ public class AdminModerationService implements AdminModerationUseCase {
         return AdminModerationView.builder()
                 .pendingInterests(pending)
                 .rules(moderationRuleGateway.findAll().stream().map(this::toView).collect(Collectors.toList()))
-                .openReports(contentReportGateway.findByStatusOrderByCreatedAtDesc(ContentReportStatus.OPEN)
+                .openReports(Optional.ofNullable(contentReportGateway.findByStatusOrderByCreatedAtDesc(ContentReportStatus.OPEN)).orElse(List.of())
+                        .stream()
+                        .map(this::toView)
+                        .collect(Collectors.toList()))
+                .processedReports(Optional.ofNullable(contentReportGateway.findByStatusInOrderByCreatedAtDesc(List.of(
+                                ContentReportStatus.RESOLVED,
+                                ContentReportStatus.DISMISSED
+                        ))).orElse(List.of())
                         .stream()
                         .map(this::toView)
                         .collect(Collectors.toList()))
@@ -125,7 +132,34 @@ public class AdminModerationService implements AdminModerationUseCase {
                 "adminId", admin.getId()
         ));
         realtimeMessageGateway.publishInterestModerationUpdated(saved.getOwnerId(), saved.getId(), saved.getStatus().name(), reason);
+        markOpenReportsForContentAsReviewed(saved.getId(), admin.getId(), ContentReportStatus.RESOLVED);
         return saved;
+    }
+
+    @Override
+    public ContentReportView updateReportStatus(String currentUserId, String reportId, ContentReportStatus status) {
+        UserProfile admin = adminAccessService.requireAdmin(currentUserId);
+        if (status == ContentReportStatus.OPEN) {
+            throw new BusinessException("Status de denuncia invalido para processamento.");
+        }
+
+        ContentReport report = contentReportGateway.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Denuncia nao encontrada."));
+        ContentReport saved = contentReportGateway.save(report.toBuilder()
+                .status(status)
+                .reviewedBy(admin.getId())
+                .reviewedAt(Instant.now())
+                .build());
+        return toView(saved);
+    }
+
+    private void markOpenReportsForContentAsReviewed(String contentId, String adminId, ContentReportStatus status) {
+        Optional.ofNullable(contentReportGateway.findByContentIdAndStatusOrderByCreatedAtDesc(contentId, ContentReportStatus.OPEN)).orElse(List.of())
+                .forEach(report -> contentReportGateway.save(report.toBuilder()
+                        .status(status)
+                        .reviewedBy(adminId)
+                        .reviewedAt(Instant.now())
+                        .build()));
     }
 
     private boolean requiresReview(InterestPost interest) {
@@ -173,10 +207,14 @@ public class AdminModerationService implements AdminModerationUseCase {
     }
 
     private ContentReportView toView(ContentReport report) {
+        Optional<InterestPost> reportedContent = findReportedContent(report);
         return ContentReportView.builder()
                 .id(report.getId())
                 .contentType(report.getContentType())
                 .contentId(report.getContentId())
+                .contentTitle(reportedContent.map(InterestPost::getTitle).orElse(null))
+                .contentDescription(reportedContent.map(InterestPost::getDescription).orElse(null))
+                .contentStatus(reportedContent.map(interest -> interest.getStatus().name()).orElse(null))
                 .reportedBy(report.getReportedBy())
                 .reason(report.getReason())
                 .message(report.getMessage())
@@ -185,5 +223,12 @@ public class AdminModerationService implements AdminModerationUseCase {
                 .reviewedBy(report.getReviewedBy())
                 .reviewedAt(report.getReviewedAt())
                 .build();
+    }
+
+    private Optional<InterestPost> findReportedContent(ContentReport report) {
+        if (report == null || !StringUtils.hasText(report.getContentId())) {
+            return Optional.empty();
+        }
+        return interestGateway.findById(report.getContentId());
     }
 }

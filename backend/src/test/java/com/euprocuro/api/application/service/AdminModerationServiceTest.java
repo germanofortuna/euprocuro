@@ -80,6 +80,15 @@ class AdminModerationServiceTest {
                         .status(ContentReportStatus.OPEN)
                         .createdAt(Instant.now())
                         .build()));
+        when(contentReportGateway.findByStatusInOrderByCreatedAtDesc(List.of(ContentReportStatus.RESOLVED, ContentReportStatus.DISMISSED)))
+                .thenReturn(List.of(ContentReport.builder()
+                        .id("report-2")
+                        .contentId("approved")
+                        .reason("Resolvida")
+                        .status(ContentReportStatus.RESOLVED)
+                        .createdAt(Instant.now())
+                        .reviewedAt(Instant.now())
+                        .build()));
 
         var result = adminModerationService.getModerationQueue("admin-1");
 
@@ -87,6 +96,7 @@ class AdminModerationServiceTest {
                 .containsExactly("pending", "review", "reported");
         assertThat(result.getRules()).hasSize(1);
         assertThat(result.getOpenReports()).hasSize(1);
+        assertThat(result.getProcessedReports()).hasSize(1);
     }
 
     @Test
@@ -174,6 +184,58 @@ class AdminModerationServiceTest {
                 eq("APPROVED"),
                 eq("Tudo certo")
         );
+    }
+
+    @Test
+    void decideInterestShouldResolveOpenReportsForContent() {
+        when(adminAccessService.requireAdmin("admin-1")).thenReturn(admin());
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest("interest-1", InterestStatus.REPORTED)));
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(contentReportGateway.findByContentIdAndStatusOrderByCreatedAtDesc("interest-1", ContentReportStatus.OPEN))
+                .thenReturn(List.of(ContentReport.builder()
+                        .id("report-1")
+                        .contentId("interest-1")
+                        .status(ContentReportStatus.OPEN)
+                        .createdAt(Instant.now())
+                        .build()));
+        when(contentReportGateway.save(any(ContentReport.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        adminModerationService.decideInterest("admin-1", "interest-1", ModerationDecisionCommand.builder()
+                .status(InterestStatus.HIDDEN)
+                .build());
+
+        ArgumentCaptor<ContentReport> captor = ArgumentCaptor.forClass(ContentReport.class);
+        verify(contentReportGateway).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ContentReportStatus.RESOLVED);
+        assertThat(captor.getValue().getReviewedBy()).isEqualTo("admin-1");
+        assertThat(captor.getValue().getReviewedAt()).isNotNull();
+    }
+
+    @Test
+    void updateReportStatusShouldMarkReportAsReviewed() {
+        when(adminAccessService.requireAdmin("admin-1")).thenReturn(admin());
+        when(contentReportGateway.findById("report-1")).thenReturn(Optional.of(ContentReport.builder()
+                .id("report-1")
+                .contentId("interest-1")
+                .status(ContentReportStatus.OPEN)
+                .createdAt(Instant.now())
+                .build()));
+        when(contentReportGateway.save(any(ContentReport.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = adminModerationService.updateReportStatus("admin-1", "report-1", ContentReportStatus.DISMISSED);
+
+        assertThat(result.getStatus()).isEqualTo(ContentReportStatus.DISMISSED);
+        assertThat(result.getReviewedBy()).isEqualTo("admin-1");
+        assertThat(result.getReviewedAt()).isNotNull();
+    }
+
+    @Test
+    void updateReportStatusShouldRejectOpenStatus() {
+        when(adminAccessService.requireAdmin("admin-1")).thenReturn(admin());
+
+        assertThatThrownBy(() -> adminModerationService.updateReportStatus("admin-1", "report-1", ContentReportStatus.OPEN))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("invalido");
     }
 
     @Test

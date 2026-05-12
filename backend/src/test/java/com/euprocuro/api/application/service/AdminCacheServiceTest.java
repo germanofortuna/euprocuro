@@ -21,11 +21,13 @@ class AdminCacheServiceTest {
     private AdminAccessService adminAccessService;
     @Mock
     private PublicCacheService publicCacheService;
+    @Mock
+    private AuditLogService auditLogService;
 
     @Test
     void getStatusAndInvalidateShouldRequireAdminAndDelegateToPublicCache() {
-        AdminCacheService service = new AdminCacheService(adminAccessService, publicCacheService);
-        when(adminAccessService.requireAdmin("admin-1")).thenReturn(UserProfile.builder().id("admin-1").build());
+        AdminCacheService service = new AdminCacheService(adminAccessService, publicCacheService, auditLogService);
+        when(adminAccessService.requireAdmin("admin-1")).thenReturn(UserProfile.builder().id("admin-1").email("admin@teste.com").build());
         when(publicCacheService.snapshot()).thenReturn(CacheInvalidationView.builder()
                 .scope(PublicCacheService.ALL)
                 .versions(Map.of())

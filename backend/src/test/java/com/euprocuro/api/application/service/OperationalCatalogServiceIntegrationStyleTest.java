@@ -25,6 +25,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.euprocuro.api.application.command.CatalogCategoryCommand;
 import com.euprocuro.api.application.command.CatalogProductCommand;
+import com.euprocuro.api.application.command.ModerationSettingsCommand;
+import com.euprocuro.api.application.command.MonetizationSettingsCommand;
 import com.euprocuro.api.application.command.SaveOperationalCatalogCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.domain.gateway.ContentEntryGateway;
@@ -63,16 +65,18 @@ class OperationalCatalogServiceIntegrationStyleTest {
     }
 
     @Test
-    void listActiveCategoriesAndProductsShouldSeedDefaultsAndReadPublishedJson() {
+    void listActiveCategoriesAndProductsShouldSeedDefaultsWithMonetizationDisabled() {
         var categories = service.listActiveCategories();
         var products = service.listActiveProducts();
 
         assertThat(categories).extracting("code")
                 .containsExactly("AUTOMOVEIS", "IMOVEIS", "SERVICOS", "ELETRONICOS", "INSTRUMENTOS", "OUTROS");
-        assertThat(products).extracting("code")
-                .contains("CREDITS_10", "CREDITS_30", "SELLER_PRO", "BOOST_3_DAYS", "BOOST_7_DAYS");
-        assertThat(contentEntryGateway.findAll()).hasSize(2);
-        assertThat(contentRevisionGateway.revisions).hasSize(2);
+        assertThat(products).isEmpty();
+        assertThat(service.getMonetizationSettings().isCreditPurchasesEnabled()).isFalse();
+        assertThat(service.getMonetizationSettings().isBoostPurchasesEnabled()).isFalse();
+        assertThat(service.getModerationSettings().isUserBlockListEnabled()).isTrue();
+        assertThat(contentEntryGateway.findAll()).hasSize(4);
+        assertThat(contentRevisionGateway.revisions).hasSize(4);
     }
 
     @Test
@@ -90,6 +94,13 @@ class OperationalCatalogServiceIntegrationStyleTest {
                 .thenReturn(UserProfile.builder().id("admin-1").email("admin@test.com").build());
 
         SaveOperationalCatalogCommand command = SaveOperationalCatalogCommand.builder()
+                .monetizationSettings(MonetizationSettingsCommand.builder()
+                        .creditPurchasesEnabled(true)
+                        .boostPurchasesEnabled(false)
+                        .build())
+                .moderationSettings(ModerationSettingsCommand.builder()
+                        .userBlockListEnabled(false)
+                        .build())
                 .categories(List.of(
                         CatalogCategoryCommand.builder()
                                 .code(" auto ")
@@ -134,6 +145,7 @@ class OperationalCatalogServiceIntegrationStyleTest {
         assertThat(service.listActiveProducts()).extracting("code").containsExactly("CREDITS_10");
         assertThat(service.listActiveProducts().get(0).getOriginalPrice()).isEqualByComparingTo("12.90");
         assertThat(service.listActiveProducts().get(0).getPromotionLabel()).isEqualTo("Oferta");
+        assertThat(service.getModerationSettings().isUserBlockListEnabled()).isFalse();
         verify(publicCacheService).invalidate(PublicCacheService.CATALOG);
     }
 

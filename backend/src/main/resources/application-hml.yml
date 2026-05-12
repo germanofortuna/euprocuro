@@ -11,6 +11,7 @@ spring:
 
 application:
   monetization:
+    provider: ${APP_MONETIZATION_PROVIDER:MERCADO_PAGO_CHECKOUT_PRO}
     mercado-pago:
       sandbox: ${MERCADO_PAGO_SANDBOX:true}
   auth:

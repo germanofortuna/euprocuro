@@ -11,5 +11,9 @@ public interface ContentReportGateway {
 
     List<ContentReport> findByStatusOrderByCreatedAtDesc(ContentReportStatus status);
 
+    List<ContentReport> findByStatusInOrderByCreatedAtDesc(List<ContentReportStatus> statuses);
+
+    List<ContentReport> findByContentIdAndStatusOrderByCreatedAtDesc(String contentId, ContentReportStatus status);
+
     Optional<ContentReport> findById(String id);
 }

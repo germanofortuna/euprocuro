@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /meus-interesses
+Disallow: /ofertas-enviadas
+Disallow: /ofertas-recebidas
+Disallow: /meus-itens
+Disallow: /comprar-creditos
+
+Sitemap: https://euprocuro.com.br/sitemap.xml

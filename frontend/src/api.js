@@ -3,6 +3,14 @@ import defaultContent from "./content/default-content.json";
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080/api";
 const SESSION_STORAGE_KEY = "eu-procuro-session";
 const GENERIC_REQUEST_ERROR = defaultContent.entries["errors.request.generic"];
+const inFlightGetRequests = new Map();
+const PUBLIC_GET_PATHS = [
+  /^\/addresses\/postal-code\/[^/]+$/,
+  /^\/categories$/,
+  /^\/content\/public(?:\?|$)/,
+  /^\/interests(?:\?|$)/,
+  /^\/interests\/[^/]+$/
+];
 
 function buildWebSocketUrl() {
   const configuredBase = import.meta.env.VITE_WS_BASE;
@@ -50,36 +58,81 @@ export function isAuthError(error) {
 async function request(path, options = {}) {
   const session = getStoredSession();
   const headers = new Headers(options.headers ?? {});
+  const method = options.method ?? "GET";
+  const publicRead = isPublicGetRequest(path, method, session);
+  const sendAuth = Boolean(session?.token) && !publicRead;
 
   if (!headers.has("Content-Type") && options.body !== undefined) {
     headers.set("Content-Type", "application/json");
   }
 
-  if (session?.token && !headers.has("Authorization")) {
+  if (sendAuth && session?.token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${session.token}`);
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const url = `${API_BASE}${path}`;
+  const requestOptions = {
     ...options,
-    credentials: "include",
+    credentials: publicRead ? "omit" : "include",
     headers
-  });
+  };
+  const shouldDeduplicate = method.toUpperCase() === "GET" && options.body === undefined;
+  const requestKey = shouldDeduplicate ? buildInFlightGetKey(url, headers) : null;
 
-  if (!response.ok) {
-    let payload = null;
-    try {
-      payload = await response.clone().json();
-    } catch (error) {
-      payload = await response.text().catch(() => null);
+  if (requestKey && inFlightGetRequests.has(requestKey)) {
+    return inFlightGetRequests.get(requestKey);
+  }
+
+  const requestPromise = fetch(url, requestOptions).then(async (response) => {
+    if (!response.ok) {
+      let payload = null;
+      try {
+        payload = await response.clone().json();
+      } catch (error) {
+        payload = await response.text().catch(() => null);
+      }
+
+      throw new ApiError(
+        buildErrorMessage(payload, GENERIC_REQUEST_ERROR),
+        { status: response.status, payload }
+      );
     }
 
-    throw new ApiError(
-      buildErrorMessage(payload, GENERIC_REQUEST_ERROR),
-      { status: response.status, payload }
+    return response.status === 204 ? null : response.json();
+  });
+
+  if (requestKey) {
+    inFlightGetRequests.set(requestKey, requestPromise);
+    requestPromise.then(
+      () => inFlightGetRequests.delete(requestKey),
+      () => inFlightGetRequests.delete(requestKey)
     );
   }
 
-  return response.status === 204 ? null : response.json();
+  return requestPromise;
+}
+
+function buildInFlightGetKey(url, headers) {
+  return [
+    url,
+    headers.get("Authorization") ?? ""
+  ].join("|");
+}
+
+function isPublicGetRequest(path, method, session) {
+  if (method.toUpperCase() !== "GET") {
+    return false;
+  }
+
+  if (session?.user?.id && isPersonalizedPublicGetRequest(path)) {
+    return false;
+  }
+
+  return PUBLIC_GET_PATHS.some((pattern) => pattern.test(path));
+}
+
+function isPersonalizedPublicGetRequest(path) {
+  return /^\/interests(?:\?|$)/.test(path) || /^\/interests\/[^/]+$/.test(path);
 }
 
 export function getStoredSession() {
@@ -91,16 +144,24 @@ export function getStoredSession() {
 
   try {
     const session = JSON.parse(rawValue);
+    const normalizedSession = {
+      ...session,
+      token: session?.token ?? null
+    };
 
-    const hasToken = Boolean(session?.token);
-    const hasUser = Boolean(session?.user?.id);
+    const hasToken = Boolean(normalizedSession?.token);
+    const hasUser = Boolean(normalizedSession?.user?.id);
 
     if (!hasToken && !hasUser) {
       window.localStorage.removeItem(SESSION_STORAGE_KEY);
       return null;
     }
 
-    return session;
+    if (normalizedSession.token !== session?.token) {
+      window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(normalizedSession));
+    }
+
+    return normalizedSession;
   } catch (error) {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
     return null;
@@ -332,6 +393,13 @@ export async function reportInterest(interestId, payload) {
   });
 }
 
+export async function createOmbudsmanRequest(payload) {
+  return request("/ouvidoria", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function fetchOfferConversation(offerId) {
   return request(`/offers/${offerId}/conversation`);
 }
@@ -385,6 +453,25 @@ export async function fetchAdminModeration() {
   return request("/admin/moderation");
 }
 
+export async function fetchAdminOmbudsman(status = "") {
+  const query = status ? `?${new URLSearchParams({ status }).toString()}` : "";
+  return request(`/admin/ouvidoria${query}`);
+}
+
+export async function respondAdminOmbudsmanRequest(requestId, payload) {
+  return request(`/admin/ouvidoria/${requestId}/response`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateAdminOmbudsmanStatus(requestId, status) {
+  return request(`/admin/ouvidoria/${requestId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status })
+  });
+}
+
 export async function fetchAdminContent() {
   return request("/admin/content");
 }
@@ -405,6 +492,18 @@ export async function publishContentEntry(entryId) {
 
 export async function archiveContentEntry(entryId) {
   return request(`/admin/content/${entryId}/archive`, {
+    method: "POST"
+  });
+}
+
+export async function applyDefaultContentEntry(entryId) {
+  return request(`/admin/content/${entryId}/apply-default`, {
+    method: "POST"
+  });
+}
+
+export async function dismissDefaultContentEntry(entryId) {
+  return request(`/admin/content/${entryId}/dismiss-default`, {
     method: "POST"
   });
 }
@@ -445,5 +544,12 @@ export async function decideInterestModeration(interestId, payload) {
   return request(`/admin/moderation/interests/${interestId}/decision`, {
     method: "POST",
     body: JSON.stringify(payload)
+  });
+}
+
+export async function updateContentReportStatus(reportId, status) {
+  return request(`/admin/moderation/reports/${reportId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status })
   });
 }

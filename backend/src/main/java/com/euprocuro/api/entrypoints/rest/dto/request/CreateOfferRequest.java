@@ -17,7 +17,7 @@ public class CreateOfferRequest {
     @DecimalMin("0.00")
     private BigDecimal offeredPrice;
 
-    @NotBlank
+    @Size(max = 40)
     private String sellerPhone;
 
     @NotBlank

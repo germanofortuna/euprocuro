@@ -1,0 +1,20 @@
+<svg width="520" height="128" viewBox="0 0 520 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Eu Procuro</title>
+  <desc id="desc">Logo Eu Procuro com lupa e texto Marketplace Reverso.</desc>
+  <defs>
+    <linearGradient id="lightLens" x1="20" y1="18" x2="132" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1B4F8F"/>
+      <stop offset="1" stop-color="#35D3FF"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#lightLens)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 111L54 78" stroke-width="12"/>
+    <circle cx="84" cy="54" r="42" stroke-width="7"/>
+    <circle cx="84" cy="54" r="30" stroke-width="4"/>
+    <path d="M54 54a30 30 0 0 1 60 0" stroke-width="4"/>
+    <path d="M54 54a30 30 0 0 0 60 0" stroke-width="4"/>
+  </g>
+  <text x="50" y="70" font-family="Sora, Arial, sans-serif" font-size="39" font-weight="900" fill="#1B4F8F" letter-spacing="-1.5">EU</text>
+  <text x="135" y="70" font-family="Sora, Arial, sans-serif" font-size="43" font-weight="500" fill="#191D23" letter-spacing="-1">PROCURO</text>
+  <text x="138" y="103" font-family="Sora, Arial, sans-serif" font-size="18" font-weight="900" fill="#1B4F8F" letter-spacing="1.8">MARKETPLACE REVERSO</text>
+</svg>

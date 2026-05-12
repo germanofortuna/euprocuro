@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.time.Instant;
 import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import com.euprocuro.api.application.service.ExternalIntegrationLogService;
 import com.euprocuro.api.domain.gateway.AiModerationGateway;
 import com.euprocuro.api.domain.model.ModerationContent;
 import com.euprocuro.api.domain.model.ModerationResult;
@@ -26,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 public class OpenAiModerationGatewayAdapter implements AiModerationGateway {
 
     private final OpenAiModerationClient openAiModerationClient;
+    private final ExternalIntegrationLogService externalIntegrationLogService;
 
     @Value("${application.moderation.openai.enabled:false}")
     private boolean enabled;
@@ -40,11 +43,23 @@ public class OpenAiModerationGatewayAdapter implements AiModerationGateway {
             return Optional.empty();
         }
 
+        OpenAiModerationRequest request = requestBody(content);
+        Instant startedAt = externalIntegrationLogService.startedAt();
         try {
-            log.info("AI moraderation request: {}", content.toString());
             OpenAiModerationResponse response = openAiModerationClient.moderate(
                     "Bearer " + apiKey,
-                    requestBody(content)
+                    request
+            );
+            externalIntegrationLogService.recordSuccess(
+                    "OPEN_AI_MODERATION",
+                    null,
+                    "POST",
+                    "/v1/moderations",
+                    Map.of("Authorization", "Bearer " + apiKey),
+                    request,
+                    200,
+                    response,
+                    startedAt
             );
             if (response == null || response.getResults() == null || response.getResults().isEmpty()) {
                 return Optional.of(unavailableResult());
@@ -68,6 +83,18 @@ public class OpenAiModerationGatewayAdapter implements AiModerationGateway {
                     .provider("OPENAI")
                     .build());
         } catch (Exception exception) {
+            externalIntegrationLogService.recordFailure(
+                    "OPEN_AI_MODERATION",
+                    null,
+                    "POST",
+                    "/v1/moderations",
+                    Map.of("Authorization", "Bearer " + apiKey),
+                    request,
+                    null,
+                    null,
+                    startedAt,
+                    exception
+            );
             log.error("Falha ao chamar OpenAI Moderation via Feign. Aplicando fallback local. {}", exception.getMessage());
             return Optional.of(unavailableResult());
         }

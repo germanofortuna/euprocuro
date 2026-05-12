@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -18,12 +19,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-import com.euprocuro.api.domain.gateway.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -34,12 +35,22 @@ import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
+import com.euprocuro.api.domain.gateway.BlockedTermValidationGateway;
+import com.euprocuro.api.domain.gateway.EmailGateway;
+import com.euprocuro.api.domain.gateway.EventPublisherGateway;
+import com.euprocuro.api.domain.gateway.InterestGateway;
+import com.euprocuro.api.domain.gateway.InterestSearchGateway;
+import com.euprocuro.api.domain.gateway.OfferGateway;
+import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
+import com.euprocuro.api.domain.gateway.SellerItemGateway;
+import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.InterestSearchCriteria;
 import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.OfferStatus;
+import com.euprocuro.api.domain.model.SellerItem;
 import com.euprocuro.api.domain.model.UserProfile;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,13 +69,19 @@ class MarketplaceServiceTest {
     @Mock
     private RealtimeMessageGateway realtimeMessageGateway;
     @Mock
-    private BlockedTermValidationGateway blockedTermValidationGateway;
-    @Mock
     private OperationalCatalogService operationalCatalogService;
     @Mock
     private InterestSearchGateway interestSearchGateway;
     @Mock
     private PublicCacheService publicCacheService;
+    @Mock
+    private AuditLogService auditLogService;
+    @Mock
+    private SellerItemGateway sellerItemGateway;
+    @Spy
+    private InterestDeliveryRankingService interestDeliveryRankingService;
+    @Mock
+    private BlockedTermValidationGateway blockedTermValidationGateway;
 
     @InjectMocks
     private MarketplaceService marketplaceService;
@@ -73,6 +90,8 @@ class MarketplaceServiceTest {
     void setUpCache() {
         lenient().when(publicCacheService.getOrLoad(anyString(), anyString(), anyLong(), any()))
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
+        lenient().when(blockedTermValidationGateway.validateBlockedTerms(any(InterestPost.class)))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -235,6 +254,30 @@ class MarketplaceServiceTest {
     }
 
     @Test
+    void listInterestsShouldHideBlockedTermsFromPublicResults() {
+        InterestPost safe = baseInterest();
+        safe.setId("safe");
+
+        InterestPost blocked = baseInterest();
+        blocked.setId("blocked");
+        blocked.setTitle("Conteudo proibido");
+
+        when(interestGateway.findAll()).thenReturn(List.of(safe, blocked));
+        when(blockedTermValidationGateway.validateBlockedTerms(safe)).thenReturn(Optional.empty());
+        when(blockedTermValidationGateway.validateBlockedTerms(blocked))
+                .thenReturn(Optional.of(new BlockedTermValidationGateway.BlockedTermValidationResult(
+                        "termo",
+                        "O anuncio contem um termo bloqueado pela plataforma."
+                )));
+
+        List<InterestPost> results = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(true)
+                .build());
+
+        assertThat(results).extracting(InterestPost::getId).containsExactly("safe");
+    }
+
+    @Test
     void getInterestShouldDeleteAndRejectExpiredInterest() {
         InterestPost expired = baseInterest();
         expired.setExpiresAt(Instant.now().minus(1, ChronoUnit.MINUTES));
@@ -244,6 +287,134 @@ class MarketplaceServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("expirado");
         verify(interestGateway).deleteById("interest-1");
+    }
+
+    @Test
+    void getInterestShouldReturnPubliclyVisibleInterest() {
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+
+        InterestPost result = marketplaceService.getInterest("interest-1");
+
+        assertThat(result.getId()).isEqualTo("interest-1");
+        assertThat(result.getStatus()).isEqualTo(InterestStatus.OPEN);
+    }
+
+    @Test
+    void getInterestShouldRejectNonPublicInterest() {
+        InterestPost pending = baseInterest();
+        pending.setStatus(InterestStatus.PENDING);
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(pending));
+
+        assertThatThrownBy(() -> marketplaceService.getInterest("interest-1"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Interesse nao encontrado");
+    }
+
+    @Test
+    void listInterestsShouldMatchQueryByDescriptionOwnerNameAndCity() {
+        InterestPost byDescription = baseInterest();
+        byDescription.setId("description");
+        byDescription.setTitle("Titulo sem termo");
+        byDescription.setDescription("Procuro teclado mecanico");
+        byDescription.setOwnerName("Ana");
+        byDescription.setLocation(LocationInfo.builder().city("Campinas").state("SP").build());
+
+        InterestPost byOwner = baseInterest();
+        byOwner.setId("owner");
+        byOwner.setTitle("Titulo generico");
+        byOwner.setDescription("Descricao generica");
+        byOwner.setOwnerName("Carlos Mecanico");
+        byOwner.setLocation(LocationInfo.builder().city("Valinhos").state("SP").build());
+
+        InterestPost byCity = baseInterest();
+        byCity.setId("city");
+        byCity.setTitle("Outro titulo");
+        byCity.setDescription("Outra descricao");
+        byCity.setOwnerName("Maria");
+        byCity.setLocation(LocationInfo.builder().city("Mecanico").state("SP").build());
+
+        InterestPost noMatch = baseInterest();
+        noMatch.setId("no-match");
+        noMatch.setTitle("Violao");
+        noMatch.setDescription("Instrumento musical");
+        noMatch.setOwnerName("Joao");
+        noMatch.setLocation(null);
+        noMatch.setTags(null);
+
+        when(interestGateway.findAll()).thenReturn(List.of(byDescription, byOwner, byCity, noMatch));
+
+        List<InterestPost> results = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .query("mecanico")
+                .openOnly(true)
+                .build());
+
+        assertThat(results).extracting(InterestPost::getId)
+                .containsExactlyInAnyOrder("city", "owner", "description");
+    }
+
+    @Test
+    void listInterestsShouldHideCurrentUserOwnInterestsBeforeRanking() {
+        InterestPost ownInterest = baseInterest().toBuilder()
+                .id("own")
+                .ownerId("seller-1")
+                .createdAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+        InterestPost otherInterest = baseInterest().toBuilder()
+                .id("other")
+                .ownerId("buyer-2")
+                .createdAt(Instant.now())
+                .build();
+
+        when(interestGateway.findAll()).thenReturn(List.of(ownInterest, otherInterest));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(UserProfile.builder().id("seller-1").build()));
+        when(sellerItemGateway.findByOwnerIdOrderByCreatedAtDesc("seller-1")).thenReturn(List.of());
+
+        List<InterestPost> results = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(true)
+                .currentUserId("seller-1")
+                .build());
+
+        assertThat(results).extracting(InterestPost::getId).containsExactly("other");
+    }
+
+    @Test
+    void createInterestShouldNormalizePostalCodeWithDigitsOnly() {
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(operationalCatalogService.requireActiveCategory("SERVICOS")).thenReturn("SERVICOS");
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> {
+            InterestPost interest = invocation.getArgument(0);
+            interest.setId("interest-cep");
+            return interest;
+        });
+
+        InterestPost result = marketplaceService.createInterest("buyer-1", CreateInterestCommand.builder()
+                .title("Violao")
+                .description("Busco violao usado")
+                .category("SERVICOS")
+                .budgetMax(new BigDecimal("500"))
+                .postalCode("13010-111")
+                .city("Campinas")
+                .state("SP")
+                .build());
+
+        assertThat(result.getLocation().getPostalCode()).isEqualTo("13010-111");
+    }
+
+    @Test
+    void createInterestShouldRejectInvalidPostalCode() {
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(operationalCatalogService.requireActiveCategory("SERVICOS")).thenReturn("SERVICOS");
+
+        assertThatThrownBy(() -> marketplaceService.createInterest("buyer-1", CreateInterestCommand.builder()
+                .title("Violao")
+                .description("Busco violao usado")
+                .category("SERVICOS")
+                .postalCode("123")
+                .city("Campinas")
+                .state("SP")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("CEP valido");
     }
 
     @Test
@@ -352,6 +523,36 @@ class MarketplaceServiceTest {
         assertThat(result.getId()).isEqualTo("offer-1");
         assertThat(result.getStatus()).isEqualTo(OfferStatus.SENT);
         verify(eventPublisherGateway).publish(eq("offer.created"), any(Map.class));
+    }
+
+    @Test
+    void createOfferShouldAllowMissingSellerPhone() {
+        InterestPost interest = baseInterest();
+        UserProfile seller = UserProfile.builder()
+                .id("seller-1")
+                .name("Carlos")
+                .email("carlos@teste.com")
+                .sellerCredits(5)
+                .build();
+
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(offerGateway.save(any(Offer.class))).thenAnswer(invocation -> {
+            Offer offer = invocation.getArgument(0);
+            offer.setId("offer-1");
+            return offer;
+        });
+
+        Offer result = marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
+                .offeredPrice(new BigDecimal("450"))
+                .sellerPhone("   ")
+                .message("Tenho um violao nessa faixa")
+                .build());
+
+        assertThat(result.getSellerPhone()).isNull();
+        verify(offerGateway).save(argThat(offer -> offer.getSellerPhone() == null));
     }
 
     @Test
@@ -480,6 +681,114 @@ class MarketplaceServiceTest {
                 .build(), -5, 999);
 
         assertThat(result).extracting(InterestPost::getId).containsExactly("active");
+    }
+
+    @Test
+    void listInterestsWithPaginationShouldForcePublicVisibilityWhenOpenOnlyIsFalse() {
+        InterestPost publicInterest = baseInterest();
+        publicInterest.setId("public");
+
+        InterestPost hiddenInterest = baseInterest();
+        hiddenInterest.setId("hidden");
+        hiddenInterest.setStatus(InterestStatus.HIDDEN);
+
+        when(interestSearchGateway.search(argThat(InterestSearchCriteria::isOpenOnly), eq(0), eq(10)))
+                .thenReturn(List.of(publicInterest, hiddenInterest));
+
+        List<InterestPost> result = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(false)
+                .build(), 0, 10);
+
+        assertThat(result).extracting(InterestPost::getId).containsExactly("public");
+        verify(interestSearchGateway).search(argThat(InterestSearchCriteria::isOpenOnly), eq(0), eq(10));
+    }
+
+    @Test
+    void listInterestsWithCurrentUserShouldPrioritizeLocationAndSellerItemMatches() {
+        UserProfile currentUser = UserProfile.builder()
+                .id("seller-1")
+                .city("Erechim")
+                .state("RS")
+                .country("Brasil")
+                .build();
+        SellerItem sellerItem = SellerItem.builder()
+                .id("item-1")
+                .ownerId("seller-1")
+                .title("Celta 2012")
+                .description("Carro conservado")
+                .category("AUTOMOVEIS")
+                .location(LocationInfo.builder().city("Erechim").state("RS").country("Brasil").build())
+                .tags(List.of("celta", "chevrolet"))
+                .active(true)
+                .build();
+        InterestPost genericRecent = baseInterest().toBuilder()
+                .id("generic")
+                .title("Procuro apartamento")
+                .description("Preciso alugar imovel")
+                .category("IMOVEIS")
+                .location(LocationInfo.builder().city("Porto Alegre").state("RS").country("Brasil").build())
+                .tags(List.of("apartamento"))
+                .createdAt(Instant.now())
+                .build();
+        InterestPost matchingOlder = baseInterest().toBuilder()
+                .id("matching")
+                .title("Procuro Celta 2012")
+                .description("Busco Chevrolet Celta em Erechim")
+                .category("AUTOMOVEIS")
+                .location(LocationInfo.builder().city("Erechim").state("RS").country("Brasil").build())
+                .tags(List.of("celta"))
+                .createdAt(Instant.now().minus(20, ChronoUnit.DAYS))
+                .build();
+
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(currentUser));
+        when(sellerItemGateway.findByOwnerIdOrderByCreatedAtDesc("seller-1")).thenReturn(List.of(sellerItem));
+        when(interestSearchGateway.search(any(InterestSearchCriteria.class), eq(0), eq(100)))
+                .thenReturn(List.of(genericRecent, matchingOlder));
+
+        List<InterestPost> result = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(true)
+                .currentUserId("seller-1")
+                .build(), 0, 10);
+
+        assertThat(result).extracting(InterestPost::getId).containsExactly("matching", "generic");
+    }
+
+    @Test
+    void listInterestsWithCurrentUserShouldHideOwnInterestsBeforePagination() {
+        UserProfile currentUser = UserProfile.builder()
+                .id("seller-1")
+                .city("Erechim")
+                .state("RS")
+                .country("Brasil")
+                .build();
+        InterestPost ownInterest = baseInterest().toBuilder()
+                .id("own")
+                .ownerId("seller-1")
+                .createdAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+        InterestPost firstVisible = baseInterest().toBuilder()
+                .id("first-visible")
+                .ownerId("buyer-2")
+                .createdAt(Instant.now())
+                .build();
+        InterestPost secondVisible = baseInterest().toBuilder()
+                .id("second-visible")
+                .ownerId("buyer-3")
+                .createdAt(Instant.now().minus(1, ChronoUnit.HOURS))
+                .build();
+
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(currentUser));
+        when(sellerItemGateway.findByOwnerIdOrderByCreatedAtDesc("seller-1")).thenReturn(List.of());
+        when(interestSearchGateway.search(any(InterestSearchCriteria.class), eq(0), eq(100)))
+                .thenReturn(List.of(ownInterest, firstVisible, secondVisible));
+
+        List<InterestPost> result = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(true)
+                .currentUserId("seller-1")
+                .build(), 0, 2);
+
+        assertThat(result).extracting(InterestPost::getId)
+                .containsExactly("first-visible", "second-visible");
     }
 
     @Test

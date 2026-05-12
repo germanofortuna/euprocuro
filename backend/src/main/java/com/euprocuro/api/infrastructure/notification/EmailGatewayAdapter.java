@@ -44,6 +44,7 @@ public class EmailGatewayAdapter implements EmailGateway {
     private final String conversationMessageTemplateId;
     private final String purchaseConfirmationTemplateId;
     private final String boostActivatedTemplateId;
+    private final String ombudsmanTemplateId;
     private final String appUrl;
     private final String termsUrl;
     private final String privacyUrl;
@@ -64,6 +65,7 @@ public class EmailGatewayAdapter implements EmailGateway {
             @Value("${application.email.mailersend.template-id.conversation-message:}") String conversationMessageTemplateId,
             @Value("${application.email.mailersend.template-id.purchase-confirmation:}") String purchaseConfirmationTemplateId,
             @Value("${application.email.mailersend.template-id.boost-activated:}") String boostActivatedTemplateId,
+            @Value("${application.email.mailersend.template-id.ombudsman:}") String ombudsmanTemplateId,
             @Value("${application.email.app-url:${application.auth.reset-base-url:http://localhost:5173}}") String appUrl,
             @Value("${application.email.terms-url:http://localhost:5173#termos-de-uso}") String termsUrl,
             @Value("${application.email.privacy-url:http://localhost:5173#politica-de-privacidade}") String privacyUrl,
@@ -83,6 +85,7 @@ public class EmailGatewayAdapter implements EmailGateway {
         this.conversationMessageTemplateId = conversationMessageTemplateId;
         this.purchaseConfirmationTemplateId = purchaseConfirmationTemplateId;
         this.boostActivatedTemplateId = boostActivatedTemplateId;
+        this.ombudsmanTemplateId = ombudsmanTemplateId;
         this.appUrl = appUrl;
         this.termsUrl = termsUrl;
         this.privacyUrl = privacyUrl;
@@ -267,6 +270,66 @@ public class EmailGatewayAdapter implements EmailGateway {
         );
     }
 
+    @Override
+    public boolean sendOmbudsmanConfirmationEmail(String name, String email, String protocol, String subjectText) {
+        UserProfile recipient = emailRecipient(name, email);
+        String subject = "Eu Procuro - manifestacao recebida";
+        String text = "Ola, " + recipient.getName() + "!\n\n"
+                + "Recebemos sua manifestacao na Ouvidoria.\n"
+                + "Protocolo: " + protocol + "\n"
+                + "Assunto: " + subjectText + "\n\n"
+                + "Responderemos assim que a analise for concluida.";
+        return sendEmail(
+                EmailKind.OMBUDSMAN,
+                recipient,
+                subject,
+                text,
+                "Ouvidoria recebida. Protocolo: " + protocol,
+                variables(
+                        subject,
+                        "Recebemos sua manifestacao na Ouvidoria.",
+                        "Ouvidoria",
+                        "Manifestacao recebida",
+                        "Seu relato foi registrado e sera analisado pela equipe responsavel.",
+                        "Protocolo",
+                        protocol + " - " + subjectText,
+                        "Abrir plataforma",
+                        appUrl,
+                        "Guarde o protocolo para futuras consultas."
+                )
+        );
+    }
+
+    @Override
+    public boolean sendOmbudsmanResponseEmail(String name, String email, String protocol, String subjectText, String response) {
+        UserProfile recipient = emailRecipient(name, email);
+        String subject = "Eu Procuro - resposta da Ouvidoria";
+        String text = "Ola, " + recipient.getName() + "!\n\n"
+                + "Sua manifestacao recebeu uma resposta.\n"
+                + "Protocolo: " + protocol + "\n"
+                + "Assunto: " + subjectText + "\n\n"
+                + response;
+        return sendEmail(
+                EmailKind.OMBUDSMAN,
+                recipient,
+                subject,
+                text,
+                "Resposta da Ouvidoria. Protocolo: " + protocol,
+                variables(
+                        subject,
+                        "Sua manifestacao recebeu uma resposta.",
+                        "Ouvidoria",
+                        "Resposta da Ouvidoria",
+                        response,
+                        "Protocolo",
+                        protocol + " - " + subjectText,
+                        "Abrir plataforma",
+                        appUrl,
+                        "Esta resposta foi enviada pelo canal oficial da plataforma."
+                )
+        );
+    }
+
     private boolean sendEmail(
             EmailKind kind,
             UserProfile user,
@@ -424,6 +487,9 @@ public class EmailGatewayAdapter implements EmailGateway {
             case BOOST_ACTIVATED:
                 templateId = boostActivatedTemplateId;
                 break;
+            case OMBUDSMAN:
+                templateId = ombudsmanTemplateId;
+                break;
             default:
                 templateId = defaultTemplateId;
                 break;
@@ -438,5 +504,14 @@ public class EmailGatewayAdapter implements EmailGateway {
         CONVERSATION_MESSAGE,
         PURCHASE_CONFIRMATION,
         BOOST_ACTIVATED
+        ,
+        OMBUDSMAN
+    }
+
+    private UserProfile emailRecipient(String name, String email) {
+        return UserProfile.builder()
+                .name(StringUtils.hasText(name) ? name : "usuario")
+                .email(email)
+                .build();
     }
 }

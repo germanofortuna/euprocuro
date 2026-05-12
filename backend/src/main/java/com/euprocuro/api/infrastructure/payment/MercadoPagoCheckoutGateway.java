@@ -1,6 +1,7 @@
 package com.euprocuro.api.infrastructure.payment;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import com.euprocuro.api.application.service.ExternalIntegrationLogService;
 import com.euprocuro.api.application.view.CheckoutView;
 import com.euprocuro.api.application.view.MonetizationProductView;
 import com.euprocuro.api.domain.gateway.PaymentCheckoutGateway;
@@ -29,6 +31,7 @@ public class MercadoPagoCheckoutGateway implements PaymentCheckoutGateway {
     private static final String CREATE_PREFERENCE_URL = "https://api.mercadopago.com/checkout/preferences";
 
     private final RestTemplate restTemplate;
+    private final ExternalIntegrationLogService externalIntegrationLogService;
 
     @Value("${application.monetization.mercado-pago.access-token:}")
     private String accessToken;
@@ -43,8 +46,12 @@ public class MercadoPagoCheckoutGateway implements PaymentCheckoutGateway {
     @Value("${application.monetization.mercado-pago.sandbox:false}")
     private boolean sandbox;
 
-    public MercadoPagoCheckoutGateway(RestTemplateBuilder restTemplateBuilder) {
+    public MercadoPagoCheckoutGateway(
+            RestTemplateBuilder restTemplateBuilder,
+            ExternalIntegrationLogService externalIntegrationLogService
+    ) {
         this.restTemplate = restTemplateBuilder.build();
+        this.externalIntegrationLogService = externalIntegrationLogService;
     }
 
     @Override
@@ -58,6 +65,7 @@ public class MercadoPagoCheckoutGateway implements PaymentCheckoutGateway {
         headers.setBearerAuth(accessToken);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
+        Instant startedAt = externalIntegrationLogService.startedAt();
         try {
             Map response = restTemplate.exchange(
                     CREATE_PREFERENCE_URL,
@@ -65,6 +73,17 @@ public class MercadoPagoCheckoutGateway implements PaymentCheckoutGateway {
                     new HttpEntity<>(body, headers),
                     Map.class
             ).getBody();
+            externalIntegrationLogService.recordSuccess(
+                    "MERCADO_PAGO_CREATE_CHECKOUT_PREFERENCE",
+                    paymentOrder.getId(),
+                    "POST",
+                    CREATE_PREFERENCE_URL,
+                    Map.of("Authorization", "Bearer " + accessToken, "Content-Type", MediaType.APPLICATION_JSON_VALUE),
+                    body,
+                    200,
+                    response,
+                    startedAt
+            );
 
             String preferenceId = valueAsString(response, "id");
             String checkoutUrl = sandbox
@@ -91,6 +110,18 @@ public class MercadoPagoCheckoutGateway implements PaymentCheckoutGateway {
                     .message("Checkout criado. Finalize o pagamento no Mercado Pago para liberar os creditos.")
                     .build();
         } catch (RestClientException exception) {
+            externalIntegrationLogService.recordFailure(
+                    "MERCADO_PAGO_CREATE_CHECKOUT_PREFERENCE",
+                    paymentOrder.getId(),
+                    "POST",
+                    CREATE_PREFERENCE_URL,
+                    Map.of("Authorization", "Bearer " + accessToken, "Content-Type", MediaType.APPLICATION_JSON_VALUE),
+                    body,
+                    null,
+                    null,
+                    startedAt,
+                    exception
+            );
             throw new IllegalStateException("Nao foi possivel criar a preferencia no Mercado Pago.", exception);
         }
     }

@@ -30,6 +30,7 @@ import com.euprocuro.api.domain.gateway.ContentReportGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.ModerationRuleGateway;
 import com.euprocuro.api.domain.gateway.RealtimeMessageGateway;
+import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.ContentReport;
 import com.euprocuro.api.domain.model.ContentReportStatus;
 import com.euprocuro.api.domain.model.InterestPost;
@@ -39,6 +40,8 @@ import com.euprocuro.api.domain.model.ModerationContent;
 import com.euprocuro.api.domain.model.ModerationResult;
 import com.euprocuro.api.domain.model.ModerationRiskLevel;
 import com.euprocuro.api.domain.model.ModerationRule;
+import com.euprocuro.api.domain.model.UserBlockListEntry;
+import com.euprocuro.api.domain.model.UserProfile;
 
 @ExtendWith(MockitoExtension.class)
 class ModerationServiceTest {
@@ -55,6 +58,10 @@ class ModerationServiceTest {
     private RealtimeMessageGateway realtimeMessageGateway;
     @Mock
     private PublicCacheService publicCacheService;
+    @Mock
+    private UserGateway userGateway;
+    @Mock
+    private UserBlockListService userBlockListService;
 
     @InjectMocks
     private ModerationService moderationService;
@@ -150,8 +157,31 @@ class ModerationServiceTest {
     }
 
     @Test
+    void processInterestModerationShouldBlockOwnerAfterHighLocalRuleRejection() {
+        InterestPost interest = pendingInterest().toBuilder()
+                .title("Procuro termo bloqueado")
+                .build();
+        UserProfile owner = ownerWithDocument();
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(owner));
+        when(moderationRuleGateway.findByActiveTrue()).thenReturn(List.of(ModerationRule.builder()
+                .term("termo bloqueado")
+                .riskLevel(ModerationRiskLevel.HIGH)
+                .active(true)
+                .build()));
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        moderationService.processInterestModeration("interest-1");
+
+        verify(userBlockListService).block(eq(owner), any(InterestPost.class), eq("LOCAL_RULE"), any(String.class));
+        verify(aiModerationGateway, never()).moderate(any(ModerationContent.class));
+    }
+
+    @Test
     void processInterestModerationShouldRejectFlaggedAiResult() {
+        UserProfile owner = ownerWithDocument();
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(pendingInterest()));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(owner));
         when(moderationRuleGateway.findByActiveTrue()).thenReturn(List.of());
         when(aiModerationGateway.moderate(any(ModerationContent.class))).thenReturn(Optional.of(ModerationResult.builder()
                 .flagged(true)
@@ -167,6 +197,28 @@ class ModerationServiceTest {
         verify(interestGateway).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(InterestStatus.REJECTED);
         assertThat(captor.getValue().getModeration().getProvider()).isEqualTo("OPENAI");
+        verify(userBlockListService).block(eq(owner), any(InterestPost.class), eq("OPENAI"), any(String.class));
+    }
+
+    @Test
+    void processInterestModerationShouldSendBlockListedOwnerToManualReview() {
+        UserProfile owner = ownerWithDocument();
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(pendingInterest()));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(owner));
+        when(moderationRuleGateway.findByActiveTrue()).thenReturn(List.of());
+        when(userBlockListService.findActiveBlock(owner)).thenReturn(Optional.of(UserBlockListEntry.builder()
+                .documentHash("document-hash")
+                .active(true)
+                .build()));
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        moderationService.processInterestModeration("interest-1");
+
+        ArgumentCaptor<InterestPost> captor = ArgumentCaptor.forClass(InterestPost.class);
+        verify(interestGateway).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(InterestStatus.REVIEW_REQUIRED);
+        assertThat(captor.getValue().getModeration().getProvider()).isEqualTo("BLOCK_LIST");
+        verify(aiModerationGateway, never()).moderate(any(ModerationContent.class));
     }
 
     @Test
@@ -262,6 +314,16 @@ class ModerationServiceTest {
                 .status(InterestStatus.PENDING)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
+                .build();
+    }
+
+    private UserProfile ownerWithDocument() {
+        return UserProfile.builder()
+                .id("buyer-1")
+                .name("Ana")
+                .email("ana@teste.com")
+                .documentNumber("123.456.789-01")
+                .documentType("CPF")
                 .build();
     }
 }

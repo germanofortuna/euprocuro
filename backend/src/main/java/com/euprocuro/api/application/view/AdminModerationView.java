@@ -13,4 +13,5 @@ public class AdminModerationView {
     List<InterestPost> pendingInterests;
     List<ModerationRuleView> rules;
     List<ContentReportView> openReports;
+    List<ContentReportView> processedReports;
 }

@@ -14,6 +14,8 @@ import com.euprocuro.api.application.command.CatalogProductCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.ModerationDecisionCommand;
+import com.euprocuro.api.application.command.ModerationSettingsCommand;
+import com.euprocuro.api.application.command.MonetizationSettingsCommand;
 import com.euprocuro.api.application.command.PurchaseProductCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ReportInterestCommand;
@@ -50,6 +52,7 @@ import com.euprocuro.api.application.view.RegistrationView;
 import com.euprocuro.api.application.view.SellerItemMatchesView;
 import com.euprocuro.api.domain.model.InterestModeration;
 import com.euprocuro.api.domain.model.InterestPost;
+import com.euprocuro.api.domain.model.InterestStatus;
 import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.ModerationRule;
 import com.euprocuro.api.domain.model.Offer;
@@ -169,6 +172,16 @@ public final class RestMapper {
 
     public static SaveOperationalCatalogCommand toCommand(SaveOperationalCatalogRequest request) {
         return SaveOperationalCatalogCommand.builder()
+                .monetizationSettings(MonetizationSettingsCommand.builder()
+                        .creditPurchasesEnabled(request.getMonetizationSettings() != null
+                                && request.getMonetizationSettings().isCreditPurchasesEnabled())
+                        .boostPurchasesEnabled(request.getMonetizationSettings() != null
+                                && request.getMonetizationSettings().isBoostPurchasesEnabled())
+                        .build())
+                .moderationSettings(ModerationSettingsCommand.builder()
+                        .userBlockListEnabled(request.getModerationSettings() == null
+                                || request.getModerationSettings().isUserBlockListEnabled())
+                        .build())
                 .categories(Optional.ofNullable(request.getCategories()).orElse(List.of())
                         .stream()
                         .map(category -> CatalogCategoryCommand.builder()
@@ -372,6 +385,8 @@ public final class RestMapper {
                 .subscriptionPlan(view.getSubscriptionPlan())
                 .subscriptionActiveUntil(view.getSubscriptionActiveUntil())
                 .subscriptionActive(view.isSubscriptionActive())
+                .creditPurchasesEnabled(view.isCreditPurchasesEnabled())
+                .boostPurchasesEnabled(view.isBoostPurchasesEnabled())
                 .products(view.getProducts().stream().map(RestMapper::toResponse).collect(Collectors.toList()))
                 .paymentHistory(Optional.ofNullable(view.getPaymentHistory()).orElse(List.of())
                         .stream()
@@ -435,6 +450,8 @@ public final class RestMapper {
 
     public static AdminOperationalCatalogResponse toResponse(AdminOperationalCatalogView view) {
         return AdminOperationalCatalogResponse.builder()
+                .monetizationSettings(toResponse(view.getMonetizationSettings()))
+                .moderationSettings(toResponse(view.getModerationSettings()))
                 .categories(Optional.ofNullable(view.getCategories()).orElse(List.of())
                         .stream()
                         .map(RestMapper::toResponse)
@@ -447,8 +464,33 @@ public final class RestMapper {
                 .build();
     }
 
+    public static MonetizationSettingsResponse toResponse(com.euprocuro.api.application.view.MonetizationSettingsView view) {
+        if (view == null) {
+            return MonetizationSettingsResponse.builder().build();
+        }
+        return MonetizationSettingsResponse.builder()
+                .creditPurchasesEnabled(view.isCreditPurchasesEnabled())
+                .boostPurchasesEnabled(view.isBoostPurchasesEnabled())
+                .build();
+    }
+
+    public static ModerationSettingsResponse toResponse(com.euprocuro.api.application.view.ModerationSettingsView view) {
+        if (view == null) {
+            return ModerationSettingsResponse.builder()
+                    .userBlockListEnabled(true)
+                    .build();
+        }
+        return ModerationSettingsResponse.builder()
+                .userBlockListEnabled(view.isUserBlockListEnabled())
+                .build();
+    }
+
     public static InterestResponse toResponse(InterestPost domain) {
         return toResponse(domain, true);
+    }
+
+    public static InterestResponse toPublicInterestResponse(InterestPost domain) {
+        return toResponse(domain, false);
     }
 
     public static InterestResponse toResponse(InterestPost domain, boolean exposeRestrictedDetails) {
@@ -458,11 +500,11 @@ public final class RestMapper {
                 .ownerName(exposeRestrictedDetails ? domain.getOwnerName() : null)
                 .title(domain.getTitle())
                 .description(domain.getDescription())
-                .referenceImageUrl(domain.getReferenceImageUrl())
+                .referenceImageUrl(exposeRestrictedDetails ? domain.getReferenceImageUrl() : publicReferenceImageUrl(domain.getReferenceImageUrl()))
                 .category(domain.getCategory())
                 .budgetMin(exposeRestrictedDetails ? domain.getBudgetMin() : null)
                 .budgetMax(exposeRestrictedDetails ? domain.getBudgetMax() : null)
-                .location(toResponse(domain.getLocation()))
+                .location(toResponse(domain.getLocation(), exposeRestrictedDetails))
                 .tags(Optional.ofNullable(domain.getTags()).orElse(List.of()))
                 .desiredRadiusKm(domain.getDesiredRadiusKm())
                 .allowsWhatsappContact(exposeRestrictedDetails && domain.isAllowsWhatsappContact())
@@ -470,12 +512,33 @@ public final class RestMapper {
                 .boostedUntil(domain.getBoostedUntil())
                 .preferredCondition(domain.getPreferredCondition())
                 .preferredContactMode(domain.getPreferredContactMode())
-                .status(domain.getStatus())
-                .moderation(toResponse(domain.getModeration()))
+                .status(exposeRestrictedDetails ? domain.getStatus() : publicInterestStatus(domain.getStatus()))
+                .moderation(exposeRestrictedDetails ? toResponse(domain.getModeration()) : null)
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .expiresAt(domain.getExpiresAt())
                 .build();
+    }
+
+    private static InterestStatus publicInterestStatus(InterestStatus status) {
+        if (status == InterestStatus.OPEN || status == InterestStatus.APPROVED || status == InterestStatus.REPORTED) {
+            return InterestStatus.OPEN;
+        }
+        return null;
+    }
+
+    private static String publicReferenceImageUrl(String referenceImageUrl) {
+        if (referenceImageUrl == null) {
+            return null;
+        }
+
+        String value = referenceImageUrl.trim();
+        String normalized = value.toLowerCase();
+        if (normalized.startsWith("data:") || normalized.startsWith("javascript:")) {
+            return null;
+        }
+
+        return value;
     }
 
     public static InterestModerationResponse toResponse(InterestModeration domain) {
@@ -563,13 +626,17 @@ public final class RestMapper {
                 .version(view.getVersion())
                 .draftValue(view.getDraftValue())
                 .publishedValue(view.getPublishedValue())
+                .defaultValue(view.getDefaultValue())
+                .defaultValueHash(view.getDefaultValueHash())
                 .description(view.getDescription())
                 .screen(view.getScreen())
                 .legalSlug(view.getLegalSlug())
                 .requiresUserAcceptance(view.isRequiresUserAcceptance())
+                .defaultUpdateAvailable(view.isDefaultUpdateAvailable())
                 .effectiveFrom(view.getEffectiveFrom())
                 .createdAt(view.getCreatedAt())
                 .updatedAt(view.getUpdatedAt())
+                .defaultUpdatedAt(view.getDefaultUpdatedAt())
                 .publishedAt(view.getPublishedAt())
                 .build();
     }
@@ -605,6 +672,9 @@ public final class RestMapper {
                 .id(view.getId())
                 .contentType(view.getContentType())
                 .contentId(view.getContentId())
+                .contentTitle(view.getContentTitle())
+                .contentDescription(view.getContentDescription())
+                .contentStatus(view.getContentStatus())
                 .reportedBy(view.getReportedBy())
                 .reason(view.getReason())
                 .message(view.getMessage())
@@ -626,6 +696,10 @@ public final class RestMapper {
                         .map(RestMapper::toResponse)
                         .collect(Collectors.toList()))
                 .openReports(Optional.ofNullable(view.getOpenReports()).orElse(List.of())
+                        .stream()
+                        .map(RestMapper::toResponse)
+                        .collect(Collectors.toList()))
+                .processedReports(Optional.ofNullable(view.getProcessedReports()).orElse(List.of())
                         .stream()
                         .map(RestMapper::toResponse)
                         .collect(Collectors.toList()))
@@ -672,7 +746,7 @@ public final class RestMapper {
         List<InterestPost> matchingInterests = Optional.ofNullable(view.getMatchingInterests()).orElse(List.of());
         return SellerItemMatchesResponse.builder()
                 .item(toResponse(view.getItem()))
-                .matchingInterests(matchingInterests.stream().map(RestMapper::toResponse).collect(Collectors.toList()))
+                .matchingInterests(matchingInterests.stream().map(RestMapper::toPublicInterestResponse).collect(Collectors.toList()))
                 .matchCount(matchingInterests.size())
                 .build();
     }
@@ -753,15 +827,19 @@ public final class RestMapper {
     }
 
     private static LocationResponse toResponse(LocationInfo location) {
+        return toResponse(location, true);
+    }
+
+    private static LocationResponse toResponse(LocationInfo location, boolean exposeExactDetails) {
         if (location == null) {
             return null;
         }
 
         return LocationResponse.builder()
-                .postalCode(location.getPostalCode())
+                .postalCode(exposeExactDetails ? location.getPostalCode() : null)
                 .city(location.getCity())
                 .state(location.getState())
-                .neighborhood(location.getNeighborhood())
+                .neighborhood(exposeExactDetails ? location.getNeighborhood() : null)
                 .country(location.getCountry())
                 .remote(location.isRemote())
                 .build();

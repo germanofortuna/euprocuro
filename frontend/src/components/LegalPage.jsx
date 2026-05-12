@@ -1,7 +1,7 @@
 import { useContentText } from "../content/ContentContext";
 import { useLegalContent } from "../content/useLegalContent";
 
-export default function LegalPage({ slug }) {
+export default function LegalPage({ slug, onNavigate }) {
   const { t } = useContentText();
   const { pages } = useLegalContent();
   const page = pages[slug];
@@ -17,7 +17,18 @@ export default function LegalPage({ slug }) {
   return (
     <section className="legal-page">
       <div className="legal-hero">
-        <a className="back-link" href="#">
+        <a
+          className="back-link"
+          href="/"
+          onClick={(event) => {
+            if (!onNavigate) {
+              return;
+            }
+
+            event.preventDefault();
+            onNavigate("/");
+          }}
+        >
           {t("common.actions.backHome")}
         </a>
         <span className="eyebrow">{t("footer.legal.aria")}</span>
@@ -35,7 +46,15 @@ export default function LegalPage({ slug }) {
             <a
               key={item.slug}
               className={item.slug === slug ? "active" : ""}
-              href={`#${item.slug}`}
+              href={`/legal/${item.slug}`}
+              onClick={(event) => {
+                if (!onNavigate) {
+                  return;
+                }
+
+                event.preventDefault();
+                onNavigate(`/legal/${item.slug}`);
+              }}
             >
               {item.title}
             </a>

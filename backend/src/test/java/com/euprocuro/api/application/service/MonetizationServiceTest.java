@@ -75,8 +75,13 @@ class MonetizationServiceTest {
 
     @BeforeEach
     void setUpCatalog() {
+        ReflectionTestUtils.setField(monetizationService, "checkoutProvider", "LOCAL_CHECKOUT_MOCK");
+        ReflectionTestUtils.setField(monetizationService, "localCheckoutEnabled", true);
+        ReflectionTestUtils.setField(monetizationService, "localCheckoutBaseUrl", "http://localhost:8080/api/monetization/local-checkout/approve");
         List<MonetizationProductView> products = defaultProducts();
         lenient().when(monetizationCatalog.products()).thenReturn(products);
+        lenient().when(monetizationCatalog.creditPurchasesEnabled()).thenReturn(true);
+        lenient().when(monetizationCatalog.boostPurchasesEnabled()).thenReturn(true);
         lenient().when(monetizationCatalog.findByCode(anyString())).thenReturn(Optional.empty());
         for (MonetizationProductView product : products) {
             lenient().when(monetizationCatalog.findByCode(product.getCode())).thenReturn(Optional.of(product));
@@ -159,9 +164,8 @@ class MonetizationServiceTest {
     }
 
     @Test
-    void purchaseShouldAddCreditsAndSendEmail() {
+    void purchaseShouldCreatePendingLocalCheckoutWithoutAddingCredits() {
         when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CheckoutView result = monetizationService.purchase("user-1", PurchaseProductCommand.builder()
@@ -169,38 +173,36 @@ class MonetizationServiceTest {
                 .paymentMethod("pix")
                 .build());
 
-        assertThat(result.getProvider()).isEqualTo("LOCAL_MOCK");
+        assertThat(result.getProvider()).isEqualTo("LOCAL_CHECKOUT_MOCK");
         assertThat(result.getProductCode()).isEqualTo("CREDITS_10");
-        assertThat(result.getStatus()).isEqualTo("APPROVED");
-        verify(userGateway).save(org.mockito.ArgumentMatchers.argThat(user ->
-                user.getSellerCredits() == 10 && user.getPurchasedCreditsTotal() == 10
-        ));
-        verify(emailGateway).sendPurchaseConfirmationEmail(any(UserProfile.class), eq("10 propostas"), eq("PIX"));
-        verify(eventPublisherGateway).publish(eq("monetization.purchase.completed"), any(Map.class));
+        assertThat(result.getStatus()).isEqualTo("PENDING");
+        assertThat(result.getCheckoutUrl()).contains("/local-checkout/approve/");
+        verify(userGateway, never()).save(any(UserProfile.class));
+        verify(emailGateway, never()).sendPurchaseConfirmationEmail(any(UserProfile.class), anyString(), anyString());
+        verify(eventPublisherGateway).publish(eq("monetization.purchase.created"), any(Map.class));
     }
 
     @Test
-    void purchaseShouldActivateSubscription() {
+    void purchaseShouldCreatePendingSubscriptionCheckout() {
         when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        monetizationService.purchase("user-1", PurchaseProductCommand.builder()
+        CheckoutView result = monetizationService.purchase("user-1", PurchaseProductCommand.builder()
                 .productCode("SELLER_PRO")
                 .paymentMethod("CREDIT_CARD")
                 .build());
 
-        verify(userGateway).save(any(UserProfile.class));
-        verify(emailGateway).sendPurchaseConfirmationEmail(any(UserProfile.class), eq("Plano vendedor Pro"), eq("CREDIT_CARD"));
+        assertThat(result.getStatus()).isEqualTo("PENDING");
+        verify(userGateway, never()).save(any(UserProfile.class));
+        verify(emailGateway, never()).sendPurchaseConfirmationEmail(any(UserProfile.class), anyString(), anyString());
     }
 
     @Test
-    void purchaseShouldExtendExistingActiveSubscription() {
+    void purchaseShouldNotExtendExistingActiveSubscriptionBeforePaymentApproval() {
         UserProfile user = baseUser().toBuilder()
                 .subscriptionActiveUntil(Instant.now().plus(10, ChronoUnit.DAYS))
                 .build();
         when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         monetizationService.purchase("user-1", PurchaseProductCommand.builder()
@@ -208,9 +210,7 @@ class MonetizationServiceTest {
                 .paymentMethod("PIX")
                 .build());
 
-        verify(userGateway).save(org.mockito.ArgumentMatchers.argThat(savedUser ->
-                savedUser.getSubscriptionActiveUntil().isAfter(user.getSubscriptionActiveUntil().plus(29, ChronoUnit.DAYS))
-        ));
+        verify(userGateway, never()).save(any(UserProfile.class));
     }
 
     @Test
@@ -252,6 +252,20 @@ class MonetizationServiceTest {
                 .build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Boost");
+    }
+
+    @Test
+    void purchaseShouldRejectWhenCreditPurchasesAreDisabled() {
+        when(monetizationCatalog.creditPurchasesEnabled()).thenReturn(false);
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
+
+        assertThatThrownBy(() -> monetizationService.purchase("user-1", PurchaseProductCommand.builder()
+                .productCode("CREDITS_10")
+                .paymentMethod("PIX")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("creditos");
+        verify(paymentOrderGateway, never()).save(any(PaymentOrder.class));
     }
 
     @Test
@@ -364,6 +378,21 @@ class MonetizationServiceTest {
         assertThatThrownBy(() -> monetizationService.approveLocalCheckout("order-1"))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("checkout local");
+    }
+
+
+    @Test
+    void approveLocalCheckoutShouldRejectWhenLocalCheckoutIsDisabled() {
+        ReflectionTestUtils.setField(monetizationService, "localCheckoutEnabled", false);
+        when(paymentOrderGateway.findById("order-1")).thenReturn(Optional.of(PaymentOrder.builder()
+                .id("order-1")
+                .provider("LOCAL_CHECKOUT_MOCK")
+                .status(PaymentOrderStatus.PENDING)
+                .build()));
+
+        assertThatThrownBy(() -> monetizationService.approveLocalCheckout("order-1"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Checkout local desabilitado");
     }
 
     @Test
@@ -554,10 +583,9 @@ class MonetizationServiceTest {
     }
 
     @Test
-    void boostInterestShouldExtendInterestBoost() {
+    void boostInterestShouldCreatePendingCheckoutWithoutExtendingBoost() {
         InterestPost interest = baseInterest();
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
-        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
         when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -566,26 +594,24 @@ class MonetizationServiceTest {
                 .paymentMethod("PIX")
                 .build());
 
-        assertThat(result.getStatus()).isEqualTo("APPROVED");
+        assertThat(result.getStatus()).isEqualTo("PENDING");
         assertThat(result.getProductCode()).isEqualTo("BOOST_3_DAYS");
-        verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
-                "BOOST_3_DAYS".equals(order.getProductCode()) && "interest-1".equals(order.getBoostInterestId())
-        ));
-        verify(interestGateway).save(org.mockito.ArgumentMatchers.argThat(savedInterest ->
-                savedInterest.getBoostedUntil().isAfter(Instant.now())
-        ));
-        verify(emailGateway).sendBoostActivatedEmail(any(UserProfile.class), eq("Quero um carro"), any(String.class));
-        verify(eventPublisherGateway).publish(eq("interest.boosted"), any(Map.class));
+        // Verifica se pelo menos uma das chamadas ao save tem os argumentos esperados
+        org.mockito.Mockito.verify(paymentOrderGateway, org.mockito.Mockito.atLeastOnce())
+                .save(org.mockito.ArgumentMatchers.argThat(order ->
+                        "BOOST_3_DAYS".equals(order.getProductCode()) && "interest-1".equals(order.getBoostInterestId())
+                ));
+        verify(interestGateway, never()).save(any(InterestPost.class));
+        verify(emailGateway, never()).sendBoostActivatedEmail(any(UserProfile.class), anyString(), anyString());
+        verify(eventPublisherGateway).publish(eq("monetization.purchase.created"), any(Map.class));
     }
 
     @Test
-    void boostInterestShouldExtendExistingBoostWindow() {
+    void boostInterestShouldNotExtendExistingBoostWindowBeforePaymentApproval() {
         InterestPost interest = baseInterest().toBuilder()
                 .boostedUntil(Instant.now().plus(2, ChronoUnit.DAYS))
                 .build();
-        Instant previousBoostedUntil = interest.getBoostedUntil();
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
-        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
         when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -594,9 +620,7 @@ class MonetizationServiceTest {
                 .paymentMethod("PIX")
                 .build());
 
-        verify(interestGateway).save(org.mockito.ArgumentMatchers.argThat(savedInterest ->
-                savedInterest.getBoostedUntil().isAfter(previousBoostedUntil.plus(2, ChronoUnit.DAYS))
-        ));
+        verify(interestGateway, never()).save(any(InterestPost.class));
     }
 
     @Test
@@ -689,6 +713,20 @@ class MonetizationServiceTest {
                 .build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("boost");
+    }
+
+    @Test
+    void boostInterestShouldRejectWhenBoostPurchasesAreDisabled() {
+        when(monetizationCatalog.boostPurchasesEnabled()).thenReturn(false);
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+
+        assertThatThrownBy(() -> monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+                .boostCode("BOOST_3_DAYS")
+                .paymentMethod("PIX")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("boosts");
+        verify(paymentOrderGateway, never()).save(any(PaymentOrder.class));
     }
 
     private UserProfile baseUser() {

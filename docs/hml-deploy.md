@@ -10,6 +10,11 @@ Vercel (React)
   -> MongoDB Atlas (database euprocuro_hml)
 ```
 
+Dominios esperados quando a zona estiver na Cloudflare:
+
+- Frontend HML: `https://hml.euprocuro.com`
+- Backend HML: `https://api-hml.euprocuro.com`
+
 ## Banco no MongoDB Atlas
 
 Use o mesmo cluster do Atlas, mas com outro database:
@@ -53,8 +58,8 @@ Variaveis obrigatorias no Render:
 ```env
 SPRING_PROFILES_ACTIVE=prod,hml
 MONGO_ATLAS_HML_URI=mongodb+srv://usuario:senha@cluster.mongodb.net/euprocuro_hml?retryWrites=true&w=majority&appName=euprocuro
-APP_CORS_ALLOWED_ORIGINS=https://sua-url-hml.vercel.app
-APP_RESET_BASE_URL=https://sua-url-hml.vercel.app
+APP_CORS_ALLOWED_ORIGINS=https://hml.euprocuro.com
+APP_RESET_BASE_URL=https://hml.euprocuro.com
 APP_AUTH_COOKIE_SECURE=true
 APP_AUTH_COOKIE_SAME_SITE=None
 APP_AUTH_EXPOSE_RESET_PREVIEW=false
@@ -94,11 +99,11 @@ Configure o projeto apontando para a pasta `frontend`.
 Variaveis obrigatorias na Vercel:
 
 ```env
-VITE_API_BASE=https://sua-api-hml.onrender.com/api
-VITE_WS_BASE=wss://sua-api-hml.onrender.com/ws/chat
+VITE_API_BASE=https://api-hml.euprocuro.com/api
+VITE_WS_BASE=wss://api-hml.euprocuro.com/ws/chat
 ```
 
-Depois que a URL final da Vercel existir, volte no Render e ajuste `APP_CORS_ALLOWED_ORIGINS` e `APP_RESET_BASE_URL` para essa URL.
+Depois que os dominios finais existirem, confirme que `APP_CORS_ALLOWED_ORIGINS` e `APP_RESET_BASE_URL` apontam para `https://hml.euprocuro.com`.
 
 ## Deploy automatico
 

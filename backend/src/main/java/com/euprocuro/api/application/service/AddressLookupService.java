@@ -1,39 +1,40 @@
 package com.euprocuro.api.application.service;
 
-import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.view.AddressLookupView;
-
-import lombok.Data;
+import com.euprocuro.api.infrastructure.address.ViaCepClient;
+import com.euprocuro.api.infrastructure.address.ViaCepResponse;
 
 @Service
 public class AddressLookupService {
 
     private static final String BRAZIL = "Brasil";
 
-    private final RestTemplate restTemplate;
+    private final ViaCepClient viaCepClient;
     private final PublicCacheService publicCacheService;
+    private final ExternalIntegrationLogService externalIntegrationLogService;
 
     @Value("${application.address.lookup.viacep-base-url:https://viacep.com.br/ws}")
     private String viaCepBaseUrl;
     @Value("${application.cache.public.address-ttl-seconds:2592000}")
     private long addressCacheTtlSeconds = 2_592_000;
 
-    public AddressLookupService(RestTemplateBuilder restTemplateBuilder, PublicCacheService publicCacheService) {
+    public AddressLookupService(
+            ViaCepClient viaCepClient,
+            PublicCacheService publicCacheService,
+            ExternalIntegrationLogService externalIntegrationLogService
+    ) {
+        this.viaCepClient = viaCepClient;
         this.publicCacheService = publicCacheService;
-        this.restTemplate = restTemplateBuilder
-                .setConnectTimeout(Duration.ofSeconds(2))
-                .setReadTimeout(Duration.ofSeconds(3))
-                .build();
+        this.externalIntegrationLogService = externalIntegrationLogService;
     }
 
     public AddressLookupView lookupBrazilianPostalCode(String postalCode) {
@@ -51,14 +52,35 @@ public class AddressLookupService {
     }
 
     private AddressLookupView lookupBrazilianPostalCodeUncached(String digits) {
+        Instant startedAt = externalIntegrationLogService.startedAt();
+        String url = viaCepBaseUrl + "/" + digits + "/json/";
         ViaCepResponse response;
         try {
-            response = restTemplate.getForObject(
-                    viaCepBaseUrl + "/{postalCode}/json/",
-                    ViaCepResponse.class,
-                    digits
+            response = viaCepClient.lookup(digits);
+            externalIntegrationLogService.recordSuccess(
+                    "VIA_CEP",
+                    digits,
+                    "GET",
+                    url,
+                    Map.of(),
+                    null,
+                    200,
+                    response,
+                    startedAt
             );
-        } catch (RestClientException exception) {
+        } catch (RuntimeException exception) {
+            externalIntegrationLogService.recordFailure(
+                    "VIA_CEP",
+                    digits,
+                    "GET",
+                    url,
+                    Map.of(),
+                    null,
+                    null,
+                    null,
+                    startedAt,
+                    exception
+            );
             throw new BusinessException("Nao foi possivel consultar o CEP agora. Tente novamente.");
         }
 
@@ -83,12 +105,4 @@ public class AddressLookupService {
         return digits.substring(0, 5) + "-" + digits.substring(5);
     }
 
-    @Data
-    private static class ViaCepResponse {
-        private String cep;
-        private String bairro;
-        private String localidade;
-        private String uf;
-        private boolean erro;
-    }
 }

@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.function.Supplier;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -14,50 +15,38 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestTemplate;
 
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
-
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import com.euprocuro.api.infrastructure.address.ViaCepClient;
+import com.euprocuro.api.infrastructure.address.ViaCepResponse;
 
 @ExtendWith(MockitoExtension.class)
 class AddressLookupServiceTest {
 
     @Mock
+    private ViaCepClient viaCepClient;
+    @Mock
     private PublicCacheService publicCacheService;
+    @Mock
+    private ExternalIntegrationLogService externalIntegrationLogService;
 
     private AddressLookupService service;
-    private MockRestServiceServer server;
 
     @BeforeEach
     void setUp() {
-        service = new AddressLookupService(new RestTemplateBuilder(), publicCacheService);
+        service = new AddressLookupService(viaCepClient, publicCacheService, externalIntegrationLogService);
         ReflectionTestUtils.setField(service, "viaCepBaseUrl", "https://viacep.test/ws");
-        RestTemplate restTemplate = (RestTemplate) ReflectionTestUtils.getField(service, "restTemplate");
-        server = MockRestServiceServer.bindTo(restTemplate).build();
 
         lenient().when(publicCacheService.getOrLoad(eq(PublicCacheService.ADDRESS), any(), eq(2_592_000L), any()))
                 .thenAnswer(invocation -> invocation.getArgument(3, Supplier.class).get());
+        lenient().when(externalIntegrationLogService.startedAt()).thenReturn(Instant.parse("2026-05-06T10:00:00Z"));
     }
 
     @Test
     void lookupBrazilianPostalCodeShouldNormalizeAndReturnAddress() {
-        server.expect(requestTo("https://viacep.test/ws/99709164/json/"))
-                .andRespond(withSuccess(
-                        "{"
-                                + "\"cep\":\"99709-164\","
-                                + "\"bairro\":\"Centro\","
-                                + "\"localidade\":\"Erechim\","
-                                + "\"uf\":\"RS\""
-                                + "}",
-                        MediaType.APPLICATION_JSON));
+        when(viaCepClient.lookup("99709164")).thenReturn(viaCep("99709-164", "Centro", "Erechim", "RS", false));
 
         var result = service.lookupBrazilianPostalCode("99709-164");
 
@@ -66,7 +55,6 @@ class AddressLookupServiceTest {
         assertThat(result.getState()).isEqualTo("RS");
         assertThat(result.getNeighborhood()).isEqualTo("Centro");
         assertThat(result.getCountry()).isEqualTo("Brasil");
-        server.verify();
     }
 
     @Test
@@ -78,8 +66,7 @@ class AddressLookupServiceTest {
 
     @Test
     void lookupBrazilianPostalCodeShouldRejectMissingOrInvalidViaCepResponse() {
-        server.expect(requestTo("https://viacep.test/ws/99709164/json/"))
-                .andRespond(withSuccess("{\"erro\": true}", MediaType.APPLICATION_JSON));
+        when(viaCepClient.lookup("99709164")).thenReturn(viaCep("99709-164", null, null, null, true));
 
         assertThatThrownBy(() -> service.lookupBrazilianPostalCode("99709164"))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -88,11 +75,20 @@ class AddressLookupServiceTest {
 
     @Test
     void lookupBrazilianPostalCodeShouldWrapProviderFailures() {
-        server.expect(requestTo("https://viacep.test/ws/99709164/json/"))
-                .andRespond(withServerError());
+        when(viaCepClient.lookup("99709164")).thenThrow(new RuntimeException("provider down"));
 
         assertThatThrownBy(() -> service.lookupBrazilianPostalCode("99709164"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("consultar o CEP");
+    }
+
+    private ViaCepResponse viaCep(String cep, String bairro, String localidade, String uf, boolean erro) {
+        ViaCepResponse response = new ViaCepResponse();
+        response.setCep(cep);
+        response.setBairro(bairro);
+        response.setLocalidade(localidade);
+        response.setUf(uf);
+        response.setErro(erro);
+        return response;
     }
 }

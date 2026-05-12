@@ -34,6 +34,22 @@ public class ContentReportGatewayAdapter implements ContentReportGateway {
     }
 
     @Override
+    public List<ContentReport> findByStatusInOrderByCreatedAtDesc(List<ContentReportStatus> statuses) {
+        return repository.findByStatusInOrderByCreatedAtDesc(statuses)
+                .stream()
+                .map(ContentReportPersistenceMapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ContentReport> findByContentIdAndStatusOrderByCreatedAtDesc(String contentId, ContentReportStatus status) {
+        return repository.findByContentIdAndStatusOrderByCreatedAtDesc(contentId, status)
+                .stream()
+                .map(ContentReportPersistenceMapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public Optional<ContentReport> findById(String id) {
         return repository.findById(id).map(ContentReportPersistenceMapper::toDomain);
     }

@@ -12,6 +12,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import org.apache.catalina.connector.ClientAbortException;
+
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
@@ -61,6 +63,11 @@ public class RestExceptionHandler {
                 .collect(Collectors.toList());
 
         return buildResponse(HttpStatus.BAD_REQUEST, details);
+    }
+
+    @ExceptionHandler(ClientAbortException.class)
+    public void handleClientAbort() {
+        // Client disconnected before the response could be written.
     }
 
     @ExceptionHandler(Exception.class)

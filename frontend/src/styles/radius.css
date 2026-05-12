@@ -1,0 +1,80 @@
+:root {
+  --radius-shell: 15px;
+  --radius-panel: 10px;
+  --radius-card: 10px;
+  --radius-control: 8px;
+}
+
+.topbar,
+.hero,
+.panel,
+.site-footer,
+.legal-hero,
+.legal-document,
+.auth-modal,
+.conversation-modal,
+.form-modal,
+.feedback-modal,
+.notification-modal,
+.legal-modal {
+  border-radius: var(--radius-shell);
+}
+
+.hero-card,
+.how-it-works-section,
+.how-it-works-card,
+.how-it-works-secondary,
+.cta-card,
+.sent-offer-summary,
+.preview-card,
+.detail-block,
+.offers,
+.media-field,
+.stat-card,
+.loading-card,
+.empty-state,
+.admin-card,
+.credits-summary,
+.plan-active-card {
+  border-radius: var(--radius-panel);
+}
+
+.interest-card,
+.offer-card,
+.product-chip,
+.catalog-admin__item,
+.admin-list-item,
+.checkbox-row--panel,
+.context-filter-card,
+.notification-item,
+input,
+select,
+textarea,
+.primary-button,
+.ghost-button {
+  border-radius: var(--radius-card);
+}
+
+.topbar__nav button,
+.section-nav button,
+.auth-tabs button,
+.profile-badge,
+.credits-badge,
+.notification-button,
+.theme-toggle-button,
+.site-footer__links a,
+.ghost-button--small,
+.mercado-pago-button {
+  border-radius: var(--radius-control);
+}
+
+@media (max-width: 720px) {
+  .topbar,
+  .hero,
+  .panel,
+  .legal-hero,
+  .legal-document,
+  .site-footer {
+    border-radius: 13px;
+  }
+}

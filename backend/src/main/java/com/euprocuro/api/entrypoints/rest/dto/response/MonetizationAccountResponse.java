@@ -14,6 +14,8 @@ public class MonetizationAccountResponse {
     String subscriptionPlan;
     Instant subscriptionActiveUntil;
     boolean subscriptionActive;
+    boolean creditPurchasesEnabled;
+    boolean boostPurchasesEnabled;
     List<MonetizationProductResponse> products;
     List<PaymentOrderResponse> paymentHistory;
 }
