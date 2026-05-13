@@ -2594,8 +2594,11 @@ export default function App() {
     setIsSubmittingAuth(true);
     setLoginInlineError("");
 
+    let loginSucceeded = false;
+
     try {
       const authResponse = await login(loginForm);
+      loginSucceeded = true;
 
       const nextSession = {
         expiresAt: authResponse.expiresAt,
@@ -2621,9 +2624,9 @@ export default function App() {
       clearSession();
       setSession(null);
 
-      const message = isAuthError(requestError)
+      const message = loginSucceeded && isAuthError(requestError)
         ? "Nao foi possivel manter sua sessao. Tente novamente em instantes."
-        : requestError.message || t("auth.feedback.login.error.message");
+        : getLoginErrorMessage(requestError);
       if (message.toLowerCase().includes("confirme seu e-mail")) {
         setLoginInlineError(message);
       } else {
@@ -2632,6 +2635,16 @@ export default function App() {
     } finally {
       setIsSubmittingAuth(false);
     }
+  }
+
+  function getLoginErrorMessage(error) {
+    const message = error?.message || t("auth.feedback.login.error.message");
+
+    if (error?.status === 401 && message.toLowerCase().includes("senha")) {
+      return t("auth.feedback.login.error.message");
+    }
+
+    return message;
   }
 
   async function handleRegisterSubmit(event) {
