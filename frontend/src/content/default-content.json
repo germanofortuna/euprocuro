@@ -41,6 +41,7 @@
     "common.status.unavailable": "Não informado",
     "common.empty.none": "Nenhum registro encontrado.",
     "errors.request.generic": "Não foi possível completar a requisição.",
+    "errors.request.network": "Não conseguimos conectar com o servidor agora. Verifique sua conexão ou tente novamente em instantes.",
     "errors.retry": "Tente novamente.",
     "errors.platform.load": "Não foi possível carregar a plataforma.",
     "errors.image.invalid": "Selecione uma imagem válida.",

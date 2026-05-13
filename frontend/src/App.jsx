@@ -72,6 +72,9 @@ import { useContentText } from "./content/ContentContext";
 import { useLegalContent } from "./content/useLegalContent";
 import { legalPages } from "./legalContent";
 
+const PAYMENT_ERROR_MESSAGE = "Houve um problema ao finalizar seu pagamento, tente novamente mais tarde.";
+const PAYMENT_UNCONFIRMED_MESSAGE = "O pagamento não foi confirmado";
+
 const initialInterestForm = {
   title: "",
   description: "",
@@ -1889,6 +1892,10 @@ export default function App() {
         return;
       }
 
+      if (logoutInProgressRef.current) {
+        return;
+      }
+
       openFeedback(
         "error",
         "Instabilidade temporária",
@@ -2144,6 +2151,20 @@ export default function App() {
     const url = new URL(window.location.href);
     const paymentId = url.searchParams.get("payment_id") || url.searchParams.get("collection_id");
     const paymentResult = url.searchParams.get("payment");
+    const returnSection = creditPurchasesEnabled ? loggedSections.CREDITS : loggedSections.EXPLORE;
+
+    if (!paymentId && ["failure", "pending"].includes(paymentResult)) {
+      paymentReturnHandledRef.current = true;
+      navigateTo(returnSection);
+      setPaymentStatus((current) => ({
+        ...(current ?? {}),
+        step: "PAYMENT",
+        message: PAYMENT_UNCONFIRMED_MESSAGE
+      }));
+      openFeedback("warning", "Pagamento não confirmado", PAYMENT_UNCONFIRMED_MESSAGE);
+      replaceCurrentUrl(currentSectionPath(returnSection));
+      return;
+    }
 
     if (!paymentId) {
       return;
@@ -2151,7 +2172,7 @@ export default function App() {
 
     paymentReturnHandledRef.current = true;
     setIsPaymentReturnLoading(true);
-    navigateTo(creditPurchasesEnabled ? loggedSections.CREDITS : loggedSections.EXPLORE);
+    navigateTo(returnSection);
     setPaymentStatus((current) => ({
       ...(current ?? {}),
       step: paymentResult === "failure" ? "FAILED" : "PAYMENT",
@@ -2163,27 +2184,31 @@ export default function App() {
       .then(() => {
         setPaymentStatus((current) => ({
           ...(current ?? {}),
-          step: paymentResult === "failure" ? "FAILED" : "COMPLETED",
+          step: paymentResult === "failure" ? "FAILED" : paymentResult === "pending" ? "PAYMENT" : "COMPLETED",
           message: paymentResult === "failure"
-            ? "O Mercado Pago retornou uma tentativa recusada."
-            : "Pagamento sincronizado. Se aprovado, seus créditos já foram liberados."
+            ? PAYMENT_ERROR_MESSAGE
+            : paymentResult === "pending"
+              ? PAYMENT_UNCONFIRMED_MESSAGE
+              : "Pagamento sincronizado. Se aprovado, seus créditos já foram liberados."
         }));
         if (paymentResult === "failure") {
-          openFeedback("error", "Pagamento recusado", "O Mercado Pago retornou uma tentativa recusada.");
+          openFeedback("error", "Erro no pagamento", PAYMENT_ERROR_MESSAGE);
+        } else if (paymentResult === "pending") {
+          openFeedback("warning", "Pagamento não confirmado", PAYMENT_UNCONFIRMED_MESSAGE);
         } else {
           openFeedback("success", "Pagamento sincronizado", "Atualizamos seu saldo com o status retornado pelo Mercado Pago.");
         }
       })
-      .catch((requestError) => {
+      .catch(() => {
         setPaymentStatus((current) => ({
           ...(current ?? {}),
           step: "PAYMENT",
-          message: requestError.message || "Pagamento recebido, mas ainda pendente de confirmação."
+          message: PAYMENT_ERROR_MESSAGE
         }));
-        openFeedback("error", "Pagamento pendente", requestError.message || "Ainda não foi possível confirmar o pagamento.");
+        openFeedback("error", "Erro no pagamento", PAYMENT_ERROR_MESSAGE);
       })
       .finally(() => {
-        replaceCurrentUrl(currentSectionPath(creditPurchasesEnabled ? loggedSections.CREDITS : loggedSections.EXPLORE));
+        replaceCurrentUrl(currentSectionPath(returnSection));
         setIsPaymentReturnLoading(false);
       });
   }, [session?.token]);
@@ -2573,8 +2598,11 @@ export default function App() {
     setIsSubmittingAuth(true);
     setLoginInlineError("");
 
+    let loginSucceeded = false;
+
     try {
       const authResponse = await login(loginForm);
+      loginSucceeded = true;
 
       const nextSession = {
         expiresAt: authResponse.expiresAt,
@@ -2600,9 +2628,9 @@ export default function App() {
       clearSession();
       setSession(null);
 
-      const message = isAuthError(requestError)
+      const message = loginSucceeded && isAuthError(requestError)
         ? "Nao foi possivel manter sua sessao. Tente novamente em instantes."
-        : requestError.message || t("auth.feedback.login.error.message");
+        : getLoginErrorMessage(requestError);
       if (message.toLowerCase().includes("confirme seu e-mail")) {
         setLoginInlineError(message);
       } else {
@@ -2611,6 +2639,16 @@ export default function App() {
     } finally {
       setIsSubmittingAuth(false);
     }
+  }
+
+  function getLoginErrorMessage(error) {
+    const message = error?.message || t("auth.feedback.login.error.message");
+
+    if (error?.status === 401 && message.toLowerCase().includes("senha")) {
+      return t("auth.feedback.login.error.message");
+    }
+
+    return message;
   }
 
   async function handleRegisterSubmit(event) {
@@ -2680,6 +2718,7 @@ export default function App() {
 
   async function handleLogout() {
     logoutInProgressRef.current = true;
+    setFeedbackModal(null);
     try {
       await logout();
     } catch (requestError) {
@@ -3445,7 +3484,7 @@ export default function App() {
     const button = notificationButtonRef.current;
     if (button) {
       const rect = button.getBoundingClientRect();
-      const modalWidth = Math.min(360, window.innerWidth - 24);
+      const modalWidth = Math.min(320, window.innerWidth - 24);
       const left = Math.max(
         window.scrollX + 12,
         Math.min(window.scrollX + rect.right - modalWidth, window.scrollX + window.innerWidth - modalWidth - 12)

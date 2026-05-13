@@ -14,7 +14,7 @@ services:
       - key: MONGO_ATLAS_HML_URI
         sync: false
       - key: APP_CORS_ALLOWED_ORIGINS
-        sync: false
+        value: https://hml.euprocuro.com
       - key: APP_RESET_BASE_URL
         sync: false
       - key: APP_AUTH_COOKIE_SECURE

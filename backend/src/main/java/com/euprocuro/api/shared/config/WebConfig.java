@@ -1,6 +1,7 @@
 package com.euprocuro.api.shared.config;
 
 import java.util.Arrays;
+import java.util.stream.Stream;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +23,9 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Value("${application.security.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}")
     private String allowedOrigins;
+
+    @Value("${application.security.default-allowed-origins:http://localhost:5173,http://127.0.0.1:5173}")
+    private String defaultAllowedOrigins;
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
@@ -54,9 +58,19 @@ public class WebConfig implements WebMvcConfigurer {
     }
 
     private String[] parseAllowedOrigins() {
-        return Arrays.stream(allowedOrigins.split(","))
-                .map(String::trim)
-                .filter(value -> !value.isEmpty())
+        return Stream.concat(splitOrigins(defaultAllowedOrigins), splitOrigins(allowedOrigins))
+                .distinct()
                 .toArray(String[]::new);
+    }
+
+    private Stream<String> splitOrigins(String origins) {
+        if (origins == null || origins.trim().isEmpty()) {
+            return Stream.empty();
+        }
+
+        return Arrays.stream(origins.split(","))
+                .map(String::trim)
+                .map(value -> value.replaceAll("/+$", ""))
+                .filter(value -> !value.isEmpty());
     }
 }

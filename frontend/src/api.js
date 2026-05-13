@@ -3,6 +3,7 @@ import defaultContent from "./content/default-content.json";
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080/api";
 const SESSION_STORAGE_KEY = "eu-procuro-session";
 const GENERIC_REQUEST_ERROR = defaultContent.entries["errors.request.generic"];
+const NETWORK_REQUEST_ERROR = defaultContent.entries["errors.request.network"];
 const inFlightGetRequests = new Map();
 const PUBLIC_GET_PATHS = [
   /^\/addresses\/postal-code\/[^/]+$/,
@@ -83,23 +84,31 @@ async function request(path, options = {}) {
     return inFlightGetRequests.get(requestKey);
   }
 
-  const requestPromise = fetch(url, requestOptions).then(async (response) => {
-    if (!response.ok) {
-      let payload = null;
-      try {
-        payload = await response.clone().json();
-      } catch (error) {
-        payload = await response.text().catch(() => null);
+  const requestPromise = fetch(url, requestOptions)
+    .then(async (response) => {
+      if (!response.ok) {
+        let payload = null;
+        try {
+          payload = await response.clone().json();
+        } catch (error) {
+          payload = await response.text().catch(() => null);
+        }
+
+        throw new ApiError(
+          buildErrorMessage(payload, GENERIC_REQUEST_ERROR),
+          { status: response.status, payload }
+        );
       }
 
-      throw new ApiError(
-        buildErrorMessage(payload, GENERIC_REQUEST_ERROR),
-        { status: response.status, payload }
-      );
-    }
+      return response.status === 204 ? null : response.json();
+    })
+    .catch((error) => {
+      if (error instanceof ApiError) {
+        throw error;
+      }
 
-    return response.status === 204 ? null : response.json();
-  });
+      throw new ApiError(NETWORK_REQUEST_ERROR, { payload: error?.message ?? null });
+    });
 
   if (requestKey) {
     inFlightGetRequests.set(requestKey, requestPromise);

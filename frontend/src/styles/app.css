@@ -1504,13 +1504,15 @@ textarea:focus {
 
 .payment-history__empty {
   padding: 14px;
-  border: 1px dashed rgba(15, 41, 84, 0.16);
+  border: 1px dashed rgba(103, 232, 249, 0.24);
   border-radius: 16px;
-  background: rgba(248, 251, 255, 0.7);
+  background: rgba(12, 23, 38, 0.82);
+  color: var(--ink);
 }
 
 .payment-history__empty p {
   margin: 4px 0 0;
+  color: var(--muted);
 }
 
 .payment-status-pill {
@@ -2449,7 +2451,8 @@ textarea:focus {
   padding: 14px;
   border-radius: 18px;
   border: 1px solid rgba(30, 111, 242, 0.16);
-  background: rgba(232, 241, 255, 0.72);
+  background: rgba(16, 32, 55, 0.82);
+  color: var(--ink);
 }
 
 .moderation-callout p {
@@ -2458,9 +2461,17 @@ textarea:focus {
 }
 
 .moderation-callout--warning {
-  border-color: rgba(245, 158, 11, 0.24);
-  background: rgb(107 93 46 / 85%);
+  border-color: rgba(245, 158, 11, 0.42);
+  background: rgba(62, 45, 14, 0.76);
   margin-bottom: 10px;
+}
+
+.moderation-callout--warning strong {
+  color: #ffe3a3;
+}
+
+.moderation-callout--warning p {
+  color: #f4c978;
 }
 
 .moderation-callout--rejected {
@@ -3411,6 +3422,14 @@ textarea:focus {
 
 .feedback-modal--error {
   border: 1px solid rgba(179, 38, 30, 0.2);
+}
+
+.feedback-modal--warning {
+  border: 1px solid rgba(245, 158, 11, 0.32);
+}
+
+.feedback-modal--warning .feedback-modal__status-icon {
+  color: #f59e0b;
 }
 
 .feedback-modal--info {

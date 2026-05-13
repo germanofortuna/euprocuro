@@ -127,3 +127,13 @@
   width: 0;
   height: 0;
 }
+
+.app-shell[data-theme="light"] .payment-history__empty {
+  background: rgba(248, 251, 255, 0.72);
+  border-color: rgba(30, 111, 242, 0.18);
+  color: var(--ink);
+}
+
+.app-shell[data-theme="light"] .payment-history__empty p {
+  color: var(--muted);
+}

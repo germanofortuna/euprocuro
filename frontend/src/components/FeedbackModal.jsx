@@ -1,6 +1,6 @@
 import { useContentText } from "../content/ContentContext";
 
-function ErrorIcon() {
+function StatusIcon() {
   return (
     <svg
       className="feedback-modal__status-icon"
@@ -23,6 +23,8 @@ export default function FeedbackModal({ modal, onClose }) {
     return null;
   }
 
+  const hasStatusIcon = ["error", "warning"].includes(modal.type);
+
   return (
     <div className="modal-overlay" role="presentation" onClick={onClose}>
       <div
@@ -33,7 +35,7 @@ export default function FeedbackModal({ modal, onClose }) {
       >
         <div className="feedback-modal__header">
           <div className="feedback-modal__title">
-            {modal.type === "error" ? <ErrorIcon /> : null}
+            {hasStatusIcon ? <StatusIcon /> : null}
             <strong>{modal.title}</strong>
           </div>
           <button
