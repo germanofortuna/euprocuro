@@ -1892,6 +1892,10 @@ export default function App() {
         return;
       }
 
+      if (logoutInProgressRef.current) {
+        return;
+      }
+
       openFeedback(
         "error",
         "Instabilidade temporária",
@@ -2714,6 +2718,7 @@ export default function App() {
 
   async function handleLogout() {
     logoutInProgressRef.current = true;
+    setFeedbackModal(null);
     try {
       await logout();
     } catch (requestError) {
