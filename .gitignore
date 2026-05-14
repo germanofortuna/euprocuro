@@ -1,7 +1,9 @@
 backend/target/
 backend/.m2/
 frontend/dist/
+frontend/.next/
 frontend/node_modules/
+frontend/tsconfig.tsbuildinfo
 .idea/
 .vscode/
 *.log
