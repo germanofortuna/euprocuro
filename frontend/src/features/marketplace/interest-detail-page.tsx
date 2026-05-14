@@ -1,0 +1,181 @@
+"use client";
+
+import Link from "next/link";
+import { ArrowLeft, Copy, Flag, MapPin, MessageSquare, Send, Share2, Tag } from "lucide-react";
+import { useEffect, useState } from "react";
+import { usePlatform } from "@/features/platform/platform-context";
+import type { Interest } from "@/shared/api/types";
+import { budgetLabel, categoryLabel, locationLabel } from "@/shared/lib/format";
+import { Button } from "@/shared/ui/button";
+import { trackEvent } from "@/features/analytics/analytics";
+
+function WhatsAppIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="brand-svg">
+      <path d="M12.04 2a9.86 9.86 0 0 0-8.5 14.86L2.5 22l5.28-1.02A9.93 9.93 0 1 0 12.04 2Zm5.78 14.16c-.24.68-1.38 1.3-1.93 1.34-.5.04-1.13.06-3.66-.98-3.07-1.27-5.05-4.37-5.2-4.57-.15-.2-1.24-1.65-1.24-3.16s.78-2.25 1.06-2.56c.28-.31.61-.39.82-.39h.59c.19.01.44-.07.69.52.26.63.88 2.15.96 2.31.08.16.13.35.03.55-.1.2-.15.32-.31.5-.16.18-.33.4-.47.54-.15.15-.31.32-.13.63.18.31.81 1.33 1.73 2.15 1.19 1.06 2.2 1.39 2.51 1.54.31.16.49.13.67-.08.18-.21.78-.91.99-1.22.21-.31.42-.26.7-.16.29.1 1.82.86 2.13 1.02.31.16.52.23.6.36.08.13.08.75-.16 1.43Z" />
+    </svg>
+  );
+}
+
+function XBrandIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="brand-svg">
+      <path d="M14.38 10.23 22.26 1h-1.87l-6.84 8.01L8.09 1H1.8l8.26 12.12L1.8 22.8h1.87l7.22-8.46 5.77 8.46h6.29l-8.57-12.57Zm-2.56 3-0.84-1.21L4.33 2.42h2.86l5.38 7.76.84 1.21 6.99 10.09h-2.86l-5.72-8.25Z" />
+    </svg>
+  );
+}
+
+function FacebookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="brand-svg">
+      <path d="M14.2 8.1V6.55c0-.74.5-.91.85-.91h2.16V2.12L14.24 2.1c-3.3 0-4.05 2.47-4.05 4.05V8.1H7.6v3.63h2.59V22h4.01V11.73h2.96l.39-3.63H14.2Z" />
+    </svg>
+  );
+}
+
+export function InterestDetailPage({ initialInterest }: { initialInterest?: Interest | null }) {
+  const { categories, selectedInterest, selectInterest, currentUser, submitOffer, submitReport, openAuthModal, setFeedback } = usePlatform();
+  const interest = selectedInterest ?? initialInterest;
+  const [offerForm, setOfferForm] = useState({ offeredPrice: "", sellerPhone: "", message: "", highlights: "" });
+  const [reportForm, setReportForm] = useState({ reason: "", message: "" });
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isOfferSubmitting, setIsOfferSubmitting] = useState(false);
+  const [isReportSubmitting, setIsReportSubmitting] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+
+  useEffect(() => {
+    if (initialInterest?.id) {
+      selectInterest(initialInterest.id).catch(() => {});
+    }
+  }, [initialInterest?.id, selectInterest]);
+
+  useEffect(() => {
+    setShareUrl(window.location.href);
+  }, []);
+
+  if (!interest) {
+    return (
+      <section className="route-shell centered-route">
+        <div className="auth-card">
+          <h1>Procura não encontrada</h1>
+          <p>Essa procura pode não existir mais ou ainda não estar pública.</p>
+          <Link className="button button--primary" href="/">Voltar para procuras</Link>
+        </div>
+      </section>
+    );
+  }
+
+  const detailInterest = interest;
+  const isMine = Boolean(currentUser?.id && detailInterest.ownerId === currentUser.id);
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`Olha esta procura no Eu Procuro: ${detailInterest.title} - ${shareUrl}`)}`;
+  const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Olha esta procura no Eu Procuro: ${detailInterest.title}`)}&url=${encodeURIComponent(shareUrl)}`;
+  const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+
+  async function submitOfferForm(event: React.FormEvent) {
+    event.preventDefault();
+    setIsOfferSubmitting(true);
+    try {
+      await submitOffer(detailInterest.id, {
+        offeredPrice: offerForm.offeredPrice ? Number(offerForm.offeredPrice) : null,
+        sellerPhone: offerForm.sellerPhone,
+        message: offerForm.message,
+        highlights: offerForm.highlights.split(",").map((item) => item.trim()).filter(Boolean)
+      });
+      setOfferForm({ offeredPrice: "", sellerPhone: "", message: "", highlights: "" });
+    } finally {
+      setIsOfferSubmitting(false);
+    }
+  }
+
+  async function copyLink() {
+    await navigator.clipboard?.writeText(shareUrl);
+    trackEvent("share_interest", { method: "copy", interest_id: detailInterest.id });
+    setFeedback({ type: "success", title: "Link copiado", message: "Agora você pode compartilhar esta procura." });
+  }
+
+  async function submitReportForm(event: React.FormEvent) {
+    event.preventDefault();
+    setIsReportSubmitting(true);
+    try {
+      await submitReport(detailInterest.id, reportForm);
+      setReportForm({ reason: "", message: "" });
+      setIsReportOpen(false);
+    } finally {
+      setIsReportSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="route-shell detail-route">
+      <Link href="/" className="back-link"><ArrowLeft size={16} /> Voltar para procuras</Link>
+      <div className="detail-grid">
+        <article className="detail-main">
+          <span className="pill">Procura publicada</span>
+          <h1>{detailInterest.title}</h1>
+          <div className="interest-meta interest-meta--large">
+            <span><Tag size={16} /> {categoryLabel(categories, detailInterest.category)}</span>
+            <span><MapPin size={16} /> {locationLabel(detailInterest)}</span>
+          </div>
+          <section className="document-section">
+            <h2>Descrição</h2>
+            <p>{detailInterest.description}</p>
+          </section>
+          <section className="document-section">
+            <h2>Tags</h2>
+            <div className="tag-list">{(detailInterest.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
+          </section>
+        </article>
+        <aside className="action-panel">
+          <div>
+            <span>Orçamento estimado</span>
+            <strong>{budgetLabel(detailInterest)}</strong>
+          </div>
+          {isMine ? (
+            <div className="notice-box">
+              <strong>Esta procura é sua</strong>
+              <p>Use a área logada para acompanhar propostas recebidas, editar, renovar ou impulsionar.</p>
+              <Link className="button button--primary" href="/meus-interesses">Ir para minhas procuras</Link>
+            </div>
+          ) : currentUser?.id ? (
+            <form className="stack-form" onSubmit={submitOfferForm}>
+              <label>Valor da proposta<input type="number" min="0" value={offerForm.offeredPrice} onChange={(event) => setOfferForm((current) => ({ ...current, offeredPrice: event.target.value }))} /></label>
+              <label>Telefone ou WhatsApp<input value={offerForm.sellerPhone} onChange={(event) => setOfferForm((current) => ({ ...current, sellerPhone: event.target.value }))} /></label>
+              <label>Mensagem<textarea rows={4} value={offerForm.message} onChange={(event) => setOfferForm((current) => ({ ...current, message: event.target.value }))} required /></label>
+              <label>Destaques<input value={offerForm.highlights} onChange={(event) => setOfferForm((current) => ({ ...current, highlights: event.target.value }))} placeholder="Entrega, garantia, disponibilidade" /></label>
+              <Button type="submit" disabled={isOfferSubmitting}><Send size={16} /> {isOfferSubmitting ? "Enviando..." : "Enviar proposta"}</Button>
+            </form>
+          ) : (
+            <div className="notice-box">
+              <strong>Tem algo para atender esta procura?</strong>
+              <p>Entre na plataforma para enviar uma proposta ou publicar sua própria procura.</p>
+              <Button type="button" onClick={() => openAuthModal("login")}>Entrar para enviar proposta</Button>
+            </div>
+          )}
+          <div className="share-panel">
+            <h2><Share2 size={17} /> Compartilhar</h2>
+            <div className="share-grid">
+              <a className="button button--outline button--sm" href={whatsappUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent("share_interest", { method: "whatsapp", interest_id: detailInterest.id })}><span className="brand-icon brand-icon--whatsapp"><WhatsAppIcon /></span> WhatsApp</a>
+              <a className="button button--outline button--sm" href={xUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent("share_interest", { method: "x", interest_id: detailInterest.id })}><span className="brand-icon brand-icon--x"><XBrandIcon /></span> X</a>
+              <a className="button button--outline button--sm" href={facebookUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent("share_interest", { method: "facebook", interest_id: detailInterest.id })}><span className="brand-icon brand-icon--facebook"><FacebookIcon /></span> Facebook</a>
+              <button className="button button--outline button--sm" type="button" onClick={copyLink}><Copy size={15} /> Link</button>
+            </div>
+          </div>
+          <button type="button" className="text-button danger-text" onClick={() => currentUser?.id ? setIsReportOpen(true) : openAuthModal("login")}><Flag size={15} /> Denunciar esta procura</button>
+        </aside>
+      </div>
+      {isReportOpen ? (
+        <div className="modal-overlay" role="presentation" onClick={() => setIsReportOpen(false)}>
+          <form className="modal-card report-modal stack-form" role="dialog" aria-modal="true" onSubmit={submitReportForm} onClick={(event) => event.stopPropagation()}>
+            <h2>Denunciar procura</h2>
+            <label>Motivo<input value={reportForm.reason} onChange={(event) => setReportForm((current) => ({ ...current, reason: event.target.value }))} required /></label>
+            <label>Mensagem<textarea rows={4} value={reportForm.message} onChange={(event) => setReportForm((current) => ({ ...current, message: event.target.value }))} required /></label>
+            <div className="modal-actions">
+              <Button type="button" variant="outline" onClick={() => setIsReportOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={isReportSubmitting}><MessageSquare size={16} /> {isReportSubmitting ? "Enviando..." : "Enviar denuncia"}</Button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+    </section>
+  );
+}
