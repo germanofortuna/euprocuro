@@ -10,6 +10,7 @@ import { MarketplaceFilters } from "./marketplace-filters";
 import { budgetLabel, categoryLabel, categorySearchPlaceholder, locationLabel, slugifyCategory } from "@/shared/lib/format";
 import { rememberInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { Button } from "@/shared/ui/button";
+import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
 
 export function PublicHome() {
   const { categories, interests, selectedInterest, selectInterest, refreshPublicData, openAuthModal } = usePlatform();
@@ -27,7 +28,7 @@ export function PublicHome() {
           <h1>O que você procura hoje?</h1>
           <p>Diga o que você precisa. Receba propostas de quem tem o que você procura. Simples, rápido e direto ao ponto.</p>
           <div className="hero-actions">
-            <Link className="button button--secondary button--lg" href="/cadastrar-interesse">Publicar uma procura</Link>
+            <AuthIntentLink className="button button--secondary button--lg" href="/cadastrar-interesse">Publicar uma procura</AuthIntentLink>
             <Button variant="primary" size="lg" type="button" onClick={() => openAuthModal("register")}>Responder procuras</Button>
           </div>
         </div>
@@ -95,9 +96,9 @@ export function CategoryLanding({ categorySlug }: { categorySlug?: string }) {
             ? `Pessoas estão procurando ${currentCategory.label.toLowerCase()} agora mesmo. Encontre demandas reais e envie propostas relevantes.`
             : "Explore categorias ativas do Eu Procuro e encontre pessoas declarando exatamente o que precisam."}
         </p>
-        <Link className="button button--primary" href="/cadastrar-interesse">
+        <AuthIntentLink className="button button--primary" href="/cadastrar-interesse">
           {currentCategory ? `Publicar procura em ${currentCategory.label}` : "Publicar uma procura"}
-        </Link>
+        </AuthIntentLink>
       </section>
       <section className="marketplace-section">
         <div className="marketplace-layout marketplace-layout--wide">

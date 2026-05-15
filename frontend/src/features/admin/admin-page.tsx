@@ -15,6 +15,7 @@ import {
   publishContentEntry,
   updateAdminOmbudsmanStatus,
   saveAdminCatalog,
+  saveOperationalFlags,
   saveContentEntry,
   saveModerationRule,
   updateContentReportStatus
@@ -174,15 +175,30 @@ export function AdminPage() {
     }
     setBusyAction("catalog:save");
     const payload = {
-      monetizationSettings: nextCatalog.monetizationSettings ?? {},
-      moderationSettings: nextCatalog.moderationSettings ?? {},
-      categories: nextCatalog.categories ?? [],
-      products: nextCatalog.products ?? []
+      categories: (nextCatalog.categories ?? []).filter((cat) => String(cat.code ?? "").trim()),
+      products: (nextCatalog.products ?? []).filter((prod) => String(prod.code ?? "").trim())
     };
     try {
       const saved = await saveAdminCatalog(payload);
       setCatalog(saved as AdminCatalog);
-      setFeedback({ type: "success", title: "Catalogo salvo", message: "Flags e catalogo operacional foram atualizados." });
+      setFeedback({ type: "success", title: "Catalogo salvo", message: "Produtos e categorias foram atualizados." });
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function saveOperationalFlagSettings(nextCatalog = catalog) {
+    if (!nextCatalog) {
+      return;
+    }
+    setBusyAction("flags:save");
+    try {
+      const saved = await saveOperationalFlags({
+        monetizationSettings: nextCatalog.monetizationSettings ?? {},
+        moderationSettings: nextCatalog.moderationSettings ?? {}
+      });
+      setCatalog(saved as AdminCatalog);
+      setFeedback({ type: "success", title: "Flags salvas", message: "As flags operacionais foram atualizadas." });
     } finally {
       setBusyAction(null);
     }
@@ -333,7 +349,7 @@ export function AdminPage() {
                 <label className="checkbox-row"><input type="checkbox" checked={Boolean(catalog.monetizationSettings?.creditPurchasesEnabled)} onChange={(event) => updateCatalogFlag("monetizationSettings", "creditPurchasesEnabled", event.target.checked)} /><span>Ativar compra de creditos</span></label>
                 <label className="checkbox-row"><input type="checkbox" checked={Boolean(catalog.monetizationSettings?.boostPurchasesEnabled)} onChange={(event) => updateCatalogFlag("monetizationSettings", "boostPurchasesEnabled", event.target.checked)} /><span>Ativar boost de procuras</span></label>
                 <label className="checkbox-row"><input type="checkbox" checked={Boolean(catalog.moderationSettings?.userBlockListEnabled)} onChange={(event) => updateCatalogFlag("moderationSettings", "userBlockListEnabled", event.target.checked)} /><span>Ativar block list de usuarios</span></label>
-                <Button onClick={() => saveCatalogSettings()} disabled={busyAction === "catalog:save"}><Save size={16} /> {busyAction === "catalog:save" ? "Salvando..." : "Salvar flags"}</Button>
+                <Button onClick={() => saveOperationalFlagSettings()} disabled={busyAction === "flags:save"}><Save size={16} /> {busyAction === "flags:save" ? "Salvando..." : "Salvar flags"}</Button>
               </div>
             ) : <EmptyState title="Catalogo indisponivel" description="Nao foi possivel carregar as flags operacionais." />}
           </section>

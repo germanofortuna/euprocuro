@@ -16,6 +16,7 @@ import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.ModerationDecisionCommand;
 import com.euprocuro.api.application.command.ModerationSettingsCommand;
 import com.euprocuro.api.application.command.MonetizationSettingsCommand;
+import com.euprocuro.api.application.command.OperationalFlagsCommand;
 import com.euprocuro.api.application.command.PurchaseProductCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ReportInterestCommand;
@@ -72,6 +73,7 @@ import com.euprocuro.api.entrypoints.rest.dto.request.ResetPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.SaveContentEntryRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.SaveModerationRuleRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.SaveOperationalCatalogRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.SaveOperationalFlagsRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.SendConversationMessageRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ShareSellerItemRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.UpdateInterestRequest;
@@ -208,6 +210,21 @@ public final class RestMapper {
                                 .sortOrder(product.getSortOrder())
                                 .build())
                         .collect(Collectors.toList()))
+                .build();
+    }
+
+    public static OperationalFlagsCommand toCommand(SaveOperationalFlagsRequest request) {
+        return OperationalFlagsCommand.builder()
+                .monetizationSettings(MonetizationSettingsCommand.builder()
+                        .creditPurchasesEnabled(request.getMonetizationSettings() != null
+                                && request.getMonetizationSettings().isCreditPurchasesEnabled())
+                        .boostPurchasesEnabled(request.getMonetizationSettings() != null
+                                && request.getMonetizationSettings().isBoostPurchasesEnabled())
+                        .build())
+                .moderationSettings(ModerationSettingsCommand.builder()
+                        .userBlockListEnabled(request.getModerationSettings() == null
+                                || request.getModerationSettings().isUserBlockListEnabled())
+                        .build())
                 .build();
     }
 

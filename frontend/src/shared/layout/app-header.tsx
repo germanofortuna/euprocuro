@@ -11,6 +11,7 @@ import { buildOfferNotifications, NotificationModal } from "@/features/notificat
 import { usePlatform } from "@/features/platform/platform-context";
 import { useTheme } from "@/features/theme/theme-provider";
 import { Button } from "@/shared/ui/button";
+import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
 
 const navItems = [
   { href: "/categorias", label: "Explorar" },
@@ -122,7 +123,7 @@ export function AppHeader() {
           ) : (
             <>
               <Button variant="ghost" size="sm" type="button" onClick={() => openAuthModal("login")}>Entrar</Button>
-              <Link className="button button--primary button--sm" href="/cadastrar-interesse">Publicar Procura</Link>
+              <AuthIntentLink className="button button--primary button--sm" href="/cadastrar-interesse">Publicar Procura</AuthIntentLink>
             </>
           )}
           <button type="button" className="icon-button mobile-menu-button" onClick={() => setIsMenuOpen((current) => !current)} aria-label="Abrir menu">
@@ -146,7 +147,7 @@ export function AppHeader() {
           ) : (
             <button type="button" className="mobile-menu-action" onClick={() => { setIsMenuOpen(false); openAuthModal("login"); }}>Entrar</button>
           )}
-          <Link className="mobile-menu-cta" href="/cadastrar-interesse" onClick={() => setIsMenuOpen(false)}>Publicar procura</Link>
+          <AuthIntentLink className="mobile-menu-cta" href="/cadastrar-interesse" onClick={() => setIsMenuOpen(false)}>Publicar procura</AuthIntentLink>
         </div>
       ) : null}
       <NotificationModal

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CheckCircle2, Clock, MessageSquare, Shield, Target, Zap } from "lucide-react";
 import { canonical } from "@/shared/lib/seo";
 import { PublicLayout } from "@/shared/layout/public-layout";
+import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
 
 export const metadata: Metadata = {
   title: "Como funciona",
@@ -28,7 +29,7 @@ export default function HowItWorksPage() {
                 <div><h3>{title}</h3><p>{index === 0 ? "Descreva o que você precisa, onde está e qual é seu orçamento." : index === 1 ? "Vendedores encontram sua procura e enviam propostas relevantes." : "Compare propostas, converse pelo chat e decida com segurança."}</p></div>
               </div>
             ))}
-            <Link className="button button--primary" href="/cadastrar-interesse">Publicar uma Procura</Link>
+            <AuthIntentLink className="button button--primary" href="/cadastrar-interesse">Publicar uma Procura</AuthIntentLink>
           </article>
           <article>
             <h2><Zap size={24} /> Para quem quer vender</h2>

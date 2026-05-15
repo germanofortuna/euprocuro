@@ -27,6 +27,7 @@ import com.euprocuro.api.application.command.CatalogCategoryCommand;
 import com.euprocuro.api.application.command.CatalogProductCommand;
 import com.euprocuro.api.application.command.ModerationSettingsCommand;
 import com.euprocuro.api.application.command.MonetizationSettingsCommand;
+import com.euprocuro.api.application.command.OperationalFlagsCommand;
 import com.euprocuro.api.application.command.SaveOperationalCatalogCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.domain.gateway.ContentEntryGateway;
@@ -142,9 +143,36 @@ class OperationalCatalogServiceIntegrationStyleTest {
 
         assertThat(adminCatalog.getCategories()).hasSize(2);
         assertThat(service.listActiveCategories()).extracting("code").containsExactly("AUTO");
-        assertThat(service.listActiveProducts()).extracting("code").containsExactly("CREDITS_10");
-        assertThat(service.listActiveProducts().get(0).getOriginalPrice()).isEqualByComparingTo("12.90");
-        assertThat(service.listActiveProducts().get(0).getPromotionLabel()).isEqualTo("Oferta");
+        assertThat(adminCatalog.getProducts()).extracting("code").containsExactly("CREDITS_10", "BOOST_3_DAYS");
+        assertThat(adminCatalog.getProducts().get(0).getOriginalPrice()).isEqualByComparingTo("12.90");
+        assertThat(adminCatalog.getProducts().get(0).getPromotionLabel()).isEqualTo("Oferta");
+        assertThat(service.getMonetizationSettings().isCreditPurchasesEnabled()).isFalse();
+        assertThat(service.getMonetizationSettings().isBoostPurchasesEnabled()).isFalse();
+        assertThat(service.getModerationSettings().isUserBlockListEnabled()).isTrue();
+        verify(publicCacheService).invalidate(PublicCacheService.CATALOG);
+    }
+
+    @Test
+    void saveOperationalFlagsShouldNotValidateProductsOrCategories() {
+        when(adminAccessService.requireAdmin("admin-1"))
+                .thenReturn(UserProfile.builder().id("admin-1").email("admin@test.com").build());
+
+        var adminCatalog = service.saveOperationalFlags("admin-1", OperationalFlagsCommand.builder()
+                .monetizationSettings(MonetizationSettingsCommand.builder()
+                        .creditPurchasesEnabled(true)
+                        .boostPurchasesEnabled(true)
+                        .build())
+                .moderationSettings(ModerationSettingsCommand.builder()
+                        .userBlockListEnabled(false)
+                        .build())
+                .build());
+
+        assertThat(adminCatalog.getCategories()).extracting("code")
+                .containsExactly("AUTOMOVEIS", "IMOVEIS", "SERVICOS", "ELETRONICOS", "INSTRUMENTOS", "OUTROS");
+        assertThat(adminCatalog.getProducts()).extracting("code")
+                .contains("CREDITS_10", "BOOST_3_DAYS");
+        assertThat(service.getMonetizationSettings().isCreditPurchasesEnabled()).isTrue();
+        assertThat(service.getMonetizationSettings().isBoostPurchasesEnabled()).isTrue();
         assertThat(service.getModerationSettings().isUserBlockListEnabled()).isFalse();
         verify(publicCacheService).invalidate(PublicCacheService.CATALOG);
     }

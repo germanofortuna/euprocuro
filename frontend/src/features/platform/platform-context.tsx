@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AUTH_SESSION_MODE,
   activateInterest,
@@ -62,10 +63,11 @@ type PlatformContextValue = {
   adminModeration: AdminModeration | null;
   isLoadingPublic: boolean;
   isLoadingPrivate: boolean;
+  isSessionReady: boolean;
   feedback: FeedbackState;
   setFeedback: (feedback: FeedbackState) => void;
-  authModal: { visible: boolean; mode: AuthMode };
-  openAuthModal: (mode?: AuthMode) => void;
+  authModal: { visible: boolean; mode: AuthMode; redirectTo?: string | null };
+  openAuthModal: (mode?: AuthMode, redirectTo?: string | null) => void;
   closeAuthModal: () => void;
   setAuthMode: (mode: AuthMode) => void;
   signIn: (payload: { email: string; password: string }) => Promise<void>;
@@ -150,6 +152,7 @@ function normalizeMonetizationAccount(payload: MonetizationAccount | null): Mone
 }
 
 export function PlatformProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [session, setSession] = useState<StoredSession | null>(null);
   const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES);
   const [interests, setInterests] = useState<Interest[]>(sampleInterests);
@@ -160,8 +163,9 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const [adminModeration, setAdminModeration] = useState<AdminModeration | null>(null);
   const [isLoadingPublic, setIsLoadingPublic] = useState(false);
   const [isLoadingPrivate, setIsLoadingPrivate] = useState(false);
+  const [isSessionReady, setIsSessionReady] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
-  const [authModal, setAuthModal] = useState<{ visible: boolean; mode: AuthMode }>({ visible: false, mode: "login" });
+  const [authModal, setAuthModal] = useState<{ visible: boolean; mode: AuthMode; redirectTo?: string | null }>({ visible: false, mode: "login", redirectTo: null });
   const socketRef = useRef<WebSocket | null>(null);
 
   const currentUser = session?.user ?? null;
@@ -234,6 +238,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       setSession(stored);
     }
     if (AUTH_SESSION_MODE !== "cookie" && !stored) {
+      setIsSessionReady(true);
       return;
     }
     try {
@@ -242,10 +247,10 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       storeSession(nextSession);
       setSession(nextSession);
     } catch {
-      if (!stored) {
-        clearSession();
-        setSession(null);
-      }
+      clearSession();
+      setSession(null);
+    } finally {
+      setIsSessionReady(true);
     }
   }, []);
 
@@ -289,7 +294,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     }
   }, [interests]);
 
-  const openAuthModal = useCallback((mode: AuthMode = "login") => setAuthModal({ visible: true, mode }), []);
+  const openAuthModal = useCallback((mode: AuthMode = "login", redirectTo: string | null = null) => setAuthModal({ visible: true, mode, redirectTo }), []);
   const closeAuthModal = useCallback(() => setAuthModal((current) => ({ ...current, visible: false })), []);
   const setAuthMode = useCallback((mode: AuthMode) => setAuthModal((current) => ({ ...current, mode })), []);
 
@@ -298,12 +303,16 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     const nextSession = auth?.user?.id ? auth : normalizeMe(await fetchMe(), auth);
     storeSession(nextSession);
     setSession(nextSession);
+    const redirectTo = authModal.redirectTo;
     closeAuthModal();
-  }, [closeAuthModal]);
+    if (redirectTo) {
+      router.push(redirectTo);
+    }
+  }, [authModal.redirectTo, closeAuthModal, router]);
 
   const signUp = useCallback(async (payload: Record<string, unknown>) => {
     await register(payload);
-    setAuthModal({ visible: true, mode: "login" });
+    setAuthModal((current) => ({ visible: true, mode: "login", redirectTo: current.redirectTo ?? null }));
     setFeedback({ type: "success", title: "Confirme seu e-mail", message: "Sua conta foi criada. Confirme seu e-mail para entrar." });
   }, []);
 
@@ -431,6 +440,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     adminModeration,
     isLoadingPublic,
     isLoadingPrivate,
+    isSessionReady,
     feedback,
     setFeedback,
     authModal,
@@ -473,6 +483,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     interests,
     isLoadingPrivate,
     isLoadingPublic,
+    isSessionReady,
     monetization,
     openAuthModal,
     recoverSession,

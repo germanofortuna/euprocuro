@@ -8,6 +8,7 @@ import { useLegalContent } from "@/features/legal/use-legal-content";
 import { usePlatform } from "@/features/platform/platform-context";
 import { useTheme } from "@/features/theme/theme-provider";
 import { slugifyCategory } from "@/shared/lib/format";
+import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
 
 export function AppFooter() {
   const { theme } = useTheme();
@@ -27,7 +28,7 @@ export function AppFooter() {
           <Link href="/">Home</Link>
           <Link href="/categorias">Explorar categorias</Link>
           <Link href="/como-funciona">Como funciona</Link>
-          <Link href="/cadastrar-interesse">Publicar procura</Link>
+          <AuthIntentLink className="footer-link-button" href="/cadastrar-interesse">Publicar procura</AuthIntentLink>
           <Link href="/ouvidoria">Ouvidoria</Link>
         </nav>
         <nav aria-label="Categorias">

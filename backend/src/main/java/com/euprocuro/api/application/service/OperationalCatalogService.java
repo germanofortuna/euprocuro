@@ -18,6 +18,7 @@ import com.euprocuro.api.application.command.CatalogCategoryCommand;
 import com.euprocuro.api.application.command.CatalogProductCommand;
 import com.euprocuro.api.application.command.ModerationSettingsCommand;
 import com.euprocuro.api.application.command.MonetizationSettingsCommand;
+import com.euprocuro.api.application.command.OperationalFlagsCommand;
 import com.euprocuro.api.application.command.SaveOperationalCatalogCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.view.AdminOperationalCatalogView;
@@ -119,11 +120,22 @@ public class OperationalCatalogService {
 
         List<CatalogCategoryView> categories = validateCategories(command.getCategories());
         List<MonetizationProductView> products = validateProducts(command.getProducts());
-        MonetizationSettingsView monetizationSettings = validateMonetizationSettings(command.getMonetizationSettings());
-        ModerationSettingsView moderationSettings = validateModerationSettings(command.getModerationSettings());
 
         saveCatalogEntry(CATEGORY_KEY, "Categorias de anuncios", categories, admin.getId());
         saveCatalogEntry(PRODUCT_KEY, "Produtos, planos e promocoes", products, admin.getId());
+        publicCacheService.invalidate(PublicCacheService.CATALOG);
+        return buildAdminView();
+    }
+
+    public AdminOperationalCatalogView saveOperationalFlags(String currentUserId, OperationalFlagsCommand command) {
+        UserProfile admin = adminAccessService.requireAdmin(currentUserId);
+        if (command == null) {
+            throw new BusinessException("Informe as flags operacionais para salvar.");
+        }
+
+        MonetizationSettingsView monetizationSettings = validateMonetizationSettings(command.getMonetizationSettings());
+        ModerationSettingsView moderationSettings = validateModerationSettings(command.getModerationSettings());
+
         saveCatalogEntry(MONETIZATION_SETTINGS_KEY, "Configuracao de monetizacao", monetizationSettings, admin.getId());
         saveCatalogEntry(MODERATION_SETTINGS_KEY, "Configuracao de moderacao", moderationSettings, admin.getId());
         publicCacheService.invalidate(PublicCacheService.CATALOG);
@@ -274,6 +286,9 @@ public class OperationalCatalogService {
         List<CatalogCategoryView> categories = new ArrayList<>();
         for (CatalogCategoryCommand command : commands) {
             String code = normalizeCode(command.getCode());
+            if (StringUtils.isEmpty(code)) {
+                throw new BusinessException("Codigo da categoria nao pode ser vazio.");
+            }
             if (!code.matches(CODE_PATTERN) || !codes.add(code)) {
                 throw new BusinessException("Categoria duplicada ou com codigo invalido: " + code);
             }
@@ -301,6 +316,9 @@ public class OperationalCatalogService {
         List<MonetizationProductView> products = new ArrayList<>();
         for (CatalogProductCommand command : commands) {
             String code = normalizeCode(command.getCode());
+            if (StringUtils.isEmpty(code)) {
+                throw new BusinessException("Codigo do produto nao pode ser vazio.");
+            }
             if (!code.matches(CODE_PATTERN) || !codes.add(code)) {
                 throw new BusinessException("Produto duplicado ou com codigo invalido: " + code);
             }

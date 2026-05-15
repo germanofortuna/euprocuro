@@ -333,6 +333,7 @@ export const applyDefaultContentEntry = (entryId: string) => request<Record<stri
 export const dismissDefaultContentEntry = (entryId: string) => request<Record<string, unknown>>(`/admin/content/${entryId}/dismiss-default`, { method: "POST" });
 export const fetchAdminCatalog = () => request<Record<string, unknown>>("/admin/catalog");
 export const saveAdminCatalog = (payload: unknown) => request<Record<string, unknown>>("/admin/catalog", { method: "PUT", body: JSON.stringify(payload) });
+export const saveOperationalFlags = (payload: unknown) => request<Record<string, unknown>>("/admin/operational-flags", { method: "PUT", body: JSON.stringify(payload) });
 export const invalidatePublicCache = (scope = "all") => request<Record<string, unknown>>(`/admin/cache/invalidate?${new URLSearchParams({ scope })}`, { method: "POST" });
 export const saveModerationRule = (ruleId: string | null, payload: unknown) => request<Record<string, unknown>>(ruleId ? `/admin/moderation/rules/${ruleId}` : "/admin/moderation/rules", { method: ruleId ? "PUT" : "POST", body: JSON.stringify(payload) });
 export const deleteModerationRule = (ruleId: string) => request<null>(`/admin/moderation/rules/${ruleId}`, { method: "DELETE" });

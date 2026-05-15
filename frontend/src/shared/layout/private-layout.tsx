@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { CreditCard, LayoutDashboard, MessageSquare, Package, Search, Settings, Sparkles } from "lucide-react";
+import { useEffect } from "react";
 import { AppHeader } from "./app-header";
 import { AppFooter } from "./app-footer";
 import { usePlatform } from "@/features/platform/platform-context";
@@ -19,7 +20,8 @@ const navItems = [
 
 export function PrivateLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { currentUser, monetization, openAuthModal, adminModeration, sellerItems } = usePlatform();
+  const router = useRouter();
+  const { currentUser, monetization, isSessionReady, adminModeration, sellerItems } = usePlatform();
   const credits = monetization?.sellerCredits ?? currentUser?.sellerCredits ?? currentUser?.credits ?? 0;
   const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
   const visibleNavItems = navItems.filter((item) => {
@@ -29,6 +31,26 @@ export function PrivateLayout({ children }: { children: React.ReactNode }) {
     return item.href !== "/admin" || pathname === "/admin" || isAdminUser(currentUser, Boolean(adminModeration));
   });
 
+  useEffect(() => {
+    if (isSessionReady && !currentUser?.id) {
+      router.replace("/");
+    }
+  }, [currentUser?.id, isSessionReady, router]);
+
+  if (!isSessionReady || !currentUser?.id) {
+    return (
+      <div className="app-shell private-shell">
+        <AppHeader />
+        <main className="private-content private-content--standalone">
+          <section className="auth-gate">
+            <span className="pill">Área logada</span>
+            <h1>{isSessionReady ? "Redirecionando..." : "Carregando sua sessão..."}</h1>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell private-shell">
       <AppHeader />
@@ -36,7 +58,7 @@ export function PrivateLayout({ children }: { children: React.ReactNode }) {
         <aside className="dashboard-sidebar">
           <div className="sidebar-title">
             <span>Painel do usuário</span>
-            <strong>{currentUser?.name || "Sua conta"}</strong>
+            <strong>{currentUser.name || "Sua conta"}</strong>
           </div>
           <nav>
             {visibleNavItems.map((item) => {
@@ -62,16 +84,7 @@ export function PrivateLayout({ children }: { children: React.ReactNode }) {
             <Link href="/comprar-creditos">Comprar mais</Link>
           </div> : null}
         </aside>
-        <main className="private-content">
-          {!currentUser?.id ? (
-            <section className="auth-gate">
-              <span className="pill">Área logada</span>
-              <h1>Entre para continuar</h1>
-              <p>{creditPurchasesEnabled ? "Use sua conta para gerenciar procuras, propostas, itens, créditos e administração." : "Use sua conta para gerenciar procuras, propostas, itens e administração."}</p>
-              <button type="button" className="button button--primary" onClick={() => openAuthModal("login")}>Entrar</button>
-            </section>
-          ) : children}
-        </main>
+        <main className="private-content">{children}</main>
       </div>
       <AppFooter />
     </div>
