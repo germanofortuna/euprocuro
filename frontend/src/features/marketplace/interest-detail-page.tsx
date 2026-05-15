@@ -9,7 +9,7 @@ import mercadoPagoLogo from "@/assets/mercado-pago.svg";
 import { usePlatform } from "@/features/platform/platform-context";
 import { fetchInterest } from "@/shared/api/client";
 import type { Interest, MonetizationProduct } from "@/shared/api/types";
-import { budgetLabel, categoryLabel, listingExpirationLabel, locationLabel, statusTone } from "@/shared/lib/format";
+import { budgetLabel, categoryLabel, listingExpirationLabel, locationLabel, statusLabel, statusTone } from "@/shared/lib/format";
 import { referenceImageSrc } from "@/shared/lib/images";
 import { readInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { Button } from "@/shared/ui/button";
@@ -70,6 +70,8 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
   const [isOfferSubmitting, setIsOfferSubmitting] = useState(false);
   const [isReportSubmitting, setIsReportSubmitting] = useState(false);
   const [boostingKey, setBoostingKey] = useState<string | null>(null);
+  const [selectedBoostCode, setSelectedBoostCode] = useState("");
+  const [selectedBoostPayment, setSelectedBoostPayment] = useState<"CREDITS" | "MERCADO_PAGO">("MERCADO_PAGO");
   const [shareUrl, setShareUrl] = useState("");
 
   useEffect(() => {
@@ -141,8 +143,16 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
   const boostProducts = (monetization?.products ?? [])
     .filter((product) => String(product.type).toUpperCase() === "BOOST" && product.enabled !== false)
     .sort(boostSort);
+  const selectedBoostProduct = boostProducts.find((product) => product.code === selectedBoostCode) ?? boostProducts[0] ?? null;
+  const selectedBoostCreditCost = Number(selectedBoostProduct?.credits ?? 0);
+  const selectedBoostCanUseCredits = creditPurchasesEnabled && selectedBoostCreditCost > 0;
+  const selectedBoostHasEnoughCredits = selectedBoostCanUseCredits && sellerCredits >= selectedBoostCreditCost;
+  const selectedBoostPaymentMethod = selectedBoostCanUseCredits ? selectedBoostPayment : "MERCADO_PAGO";
   const boostedUntil = resolvedInterest.boostedUntil ? new Date(resolvedInterest.boostedUntil) : null;
   const isBoostActive = Boolean(boostedUntil && boostedUntil.getTime() > Date.now());
+  const interestStatus = String(resolvedInterest.status ?? "OPEN").toUpperCase();
+  const isPublishedInterest = ["OPEN", "APPROVED"].includes(interestStatus);
+  const shouldShowBoostWaitMessage = isMine && ["PENDING", "REVIEW_REQUIRED", "IN_REVIEW"].includes(interestStatus);
 
   const submitOfferForm: FormSubmitHandler = async (event) => {
     event.preventDefault();
@@ -190,12 +200,19 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
     }
   }
 
+  async function handleSelectedBoost() {
+    if (!selectedBoostProduct) {
+      return;
+    }
+    await handleBoost(selectedBoostProduct, selectedBoostPaymentMethod);
+  }
+
   return (
     <section className="route-shell detail-route">
       <Link href={interestListHref} className="back-link"><ArrowLeft size={16} /> Voltar para as procuras</Link>
       <div className="detail-grid">
         <article className="detail-main">
-          <span className={`pill pill--${statusTone(resolvedInterest.status)}`}>{isRejected ? "Procura rejeitada" : "Procura publicada"}</span>
+          <span className={`pill pill--${statusTone(resolvedInterest.status)}`}>{statusLabel(resolvedInterest.status ?? "OPEN")}</span>
           {detailImageSrc ? (
             <button type="button" className="detail-hero-image" onClick={() => setIsImageOpen(true)} aria-label="Ampliar imagem da procura">
               <img src={detailImageSrc} alt={`Imagem de referencia da procura ${resolvedInterest.title}`} />
@@ -225,41 +242,59 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
               <strong>{isRejected ? "Sua procura foi rejeitada pela nossa moderação!" : "Esta procura é sua"}</strong>
               <p>{isRejected ? "Você pode editá-la para que seja reavaliada." : "Gerencie ajustes, renovacao e disponibilidade desta procura por aqui."}</p>
               {!isRejected ? <span className="detail-expiration">{listingExpirationLabel(resolvedInterest)}</span> : null}
-              {!isRejected && boostPurchasesEnabled && boostProducts.length ? (
+              {shouldShowBoostWaitMessage ? (
+                <div className="boost-wait-message">
+                  <strong>Aguarde a publicação</strong>
+                  <p>O boost ficará disponível depois que sua procura for aprovada e publicada pela moderação.</p>
+                </div>
+              ) : null}
+              {isPublishedInterest && boostPurchasesEnabled && boostProducts.length ? (
                 <div className="boost-panel">
                   <div className="boost-panel__header">
                     <strong><Sparkles size={16} /> Impulsionar procura</strong>
                     {isBoostActive && boostedUntil ? <span>Boost ativo ate {boostedUntil.toLocaleDateString("pt-BR")}</span> : null}
                   </div>
-                  <div className="boost-product-list">
-                    {boostProducts.map((product) => {
-                      const creditCost = Number(product.credits ?? 0);
-                      const canUseCredits = creditPurchasesEnabled && creditCost > 0;
-                      const hasEnoughCredits = sellerCredits >= creditCost;
-                      return (
-                        <article className="boost-product-card" key={product.code}>
-                          <div>
-                            <strong>{product.name}</strong>
-                            <span>{product.durationDays ? `${product.durationDays} dias` : "Duracao configuravel"} - {moneyLabel(product.price)}</span>
-                            {canUseCredits ? <small>{creditCost} creditos no CRM</small> : null}
-                          </div>
-                          <div className="boost-action-row">
-                            {canUseCredits ? (
-                              hasEnoughCredits ? (
-                                <Button type="button" variant="outline" disabled={boostingKey === `${product.code}:CREDITS`} onClick={() => handleBoost(product, "CREDITS")}><CreditCard size={15} /> {boostingKey === `${product.code}:CREDITS` ? "Ativando..." : `Usar ${creditCost} creditos`}</Button>
-                              ) : (
-                                <Link className="button button--outline button--sm" href="/comprar-creditos"><CreditCard size={15} /> Adicionar creditos</Link>
-                              )
-                            ) : null}
-                            <Button type="button" className="payment-button payment-button--compact" disabled={boostingKey === `${product.code}:MERCADO_PAGO`} onClick={() => handleBoost(product, "MERCADO_PAGO")}>
-                              <Image className="payment-gateway-icon" src={mercadoPagoLogo} alt="" width={54} height={36} aria-hidden="true" />
-                              <span>{boostingKey === `${product.code}:MERCADO_PAGO` ? "Abrindo..." : "Pagar Mercado Pago"}</span>
-                            </Button>
-                          </div>
-                        </article>
-                      );
-                    })}
+                  <label className="boost-select-label">Escolha o boost
+                    <select value={selectedBoostProduct?.code ?? ""} onChange={(event) => setSelectedBoostCode(event.target.value)}>
+                      {boostProducts.map((product) => (
+                        <option key={product.code} value={product.code}>
+                          {product.name} - {product.durationDays ? `${product.durationDays} dias` : "duracao configuravel"} - {moneyLabel(product.price)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedBoostProduct ? (
+                    <div className="boost-selected-summary">
+                      <strong>{selectedBoostProduct.name}</strong>
+                      <span>{selectedBoostProduct.durationDays ? `${selectedBoostProduct.durationDays} dias de destaque` : "Duração configurável"} · {moneyLabel(selectedBoostProduct.price)}</span>
+                      {selectedBoostCanUseCredits ? <small>{selectedBoostCreditCost} créditos para ativar pelo saldo</small> : creditPurchasesEnabled ? <small>Custo em créditos ainda não configurado no CRM.</small> : null}
+                    </div>
+                  ) : null}
+                  <div className="boost-payment-choice" role="radiogroup" aria-label="Forma de pagamento do boost">
+                    {selectedBoostCanUseCredits ? (
+                      <label>
+                        <input type="radio" name="boost-payment" checked={selectedBoostPayment === "CREDITS"} onChange={() => setSelectedBoostPayment("CREDITS")} />
+                        <span><CreditCard size={15} /> Usar {selectedBoostCreditCost} créditos</span>
+                      </label>
+                    ) : null}
+                    <label>
+                      <input type="radio" name="boost-payment" checked={selectedBoostPaymentMethod === "MERCADO_PAGO"} onChange={() => setSelectedBoostPayment("MERCADO_PAGO")} />
+                      <span><Image className="payment-gateway-icon payment-gateway-icon--inline" src={mercadoPagoLogo} alt="" width={42} height={26} aria-hidden="true" /> Mercado Pago</span>
+                    </label>
                   </div>
+                  {selectedBoostPaymentMethod === "CREDITS" && selectedBoostCanUseCredits && !selectedBoostHasEnoughCredits ? (
+                    <Link className="button button--outline" href="/comprar-creditos"><CreditCard size={15} /> Adicionar créditos</Link>
+                  ) : (
+                    <Button
+                      type="button"
+                      className="payment-button"
+                      disabled={!selectedBoostProduct || Boolean(boostingKey)}
+                      onClick={handleSelectedBoost}
+                    >
+                      {selectedBoostPaymentMethod === "MERCADO_PAGO" ? <Image className="payment-gateway-icon" src={mercadoPagoLogo} alt="" width={54} height={36} aria-hidden="true" /> : <CreditCard size={17} />}
+                      <span>{boostingKey ? "Ativando..." : selectedBoostPaymentMethod === "CREDITS" ? `Impulsionar com ${selectedBoostCreditCost} créditos` : "Pagar boost com Mercado Pago"}</span>
+                    </Button>
+                  )}
                 </div>
               ) : null}
               <div className="owner-action-grid">

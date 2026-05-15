@@ -1068,6 +1068,27 @@ select:focus {
   border-top: 1px solid var(--border);
 }
 
+.boost-wait-message {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--warning) 38%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+}
+
+.boost-wait-message strong {
+  color: var(--warning);
+}
+
+.boost-wait-message p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
 .boost-panel__header {
   display: grid;
   gap: 5px;
@@ -1118,6 +1139,79 @@ select:focus {
 .boost-action-row {
   display: grid;
   gap: 8px;
+}
+
+.boost-select-label,
+.boost-selected-summary {
+  display: grid;
+  gap: 7px;
+}
+
+.boost-select-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.boost-select-label select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 12px;
+  font: inherit;
+  font-size: 0.9rem;
+  text-transform: none;
+}
+
+.boost-selected-summary {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.boost-selected-summary strong {
+  margin: 0;
+}
+
+.boost-selected-summary span,
+.boost-selected-summary small {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.boost-payment-choice {
+  display: grid;
+  gap: 8px;
+}
+
+.boost-payment-choice label {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.boost-payment-choice span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+}
+
+.payment-gateway-icon--inline {
+  width: 36px;
+  height: 22px;
 }
 
 .payment-button--compact {
@@ -2314,6 +2408,12 @@ small {
     padding: 0 16px;
   }
 
+  .private-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
   .hero-section {
     min-height: 390px;
     padding: 62px 18px;
@@ -2345,7 +2445,7 @@ small {
   .private-workspace {
     display: block;
     height: auto;
-    min-height: calc(100vh - var(--header-height));
+    min-height: calc(100dvh - var(--header-height));
     overflow: visible;
   }
 
