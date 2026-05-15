@@ -7,6 +7,7 @@ import { usePlatform } from "@/features/platform/platform-context";
 import {
   decideInterestModeration,
   deleteModerationRule,
+  fetchAdminModeration,
   fetchAdminCatalog,
   fetchAdminContent,
   fetchAdminOmbudsman,
@@ -21,7 +22,7 @@ import {
   updateContentReportStatus
 } from "@/shared/api/client";
 import defaultContent from "@/content/default-content.json";
-import type { OmbudsmanRequest } from "@/shared/api/types";
+import type { AdminModeration, OmbudsmanRequest } from "@/shared/api/types";
 import { formatDateTime, statusLabel } from "@/shared/lib/format";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -66,6 +67,9 @@ function normalizeAdminContent(payload: AdminContent | null): AdminContent {
 
 export function AdminPage() {
   const { adminModeration, isLoadingPrivate, refreshPrivateData, setFeedback } = usePlatform();
+  const [localAdminModeration, setLocalAdminModeration] = useState<AdminModeration | null>(null);
+  const [isAdminModerationLoading, setIsAdminModerationLoading] = useState(true);
+  const [adminLoadError, setAdminLoadError] = useState<string | null>(null);
   const [ruleForm, setRuleForm] = useState<{ id: string | null; term: string; riskLevel: string; active: boolean }>({ id: null, term: "", riskLevel: "HIGH", active: true });
   const [catalog, setCatalog] = useState<AdminCatalog | null>(null);
   const [content, setContent] = useState<AdminContent | null>(null);
@@ -75,6 +79,24 @@ export function AdminPage() {
   const [contentQuery, setContentQuery] = useState("");
   const [ombudsmanStatusFilter, setOmbudsmanStatusFilter] = useState("OPEN");
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const effectiveAdminModeration = adminModeration ?? localAdminModeration;
+
+  async function refreshAdminModeration() {
+    setIsAdminModerationLoading(true);
+    setAdminLoadError(null);
+    try {
+      const moderation = await fetchAdminModeration();
+      setLocalAdminModeration(moderation);
+      return moderation;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel carregar a area administrativa.";
+      setAdminLoadError(message);
+      setLocalAdminModeration(null);
+      return null;
+    } finally {
+      setIsAdminModerationLoading(false);
+    }
+  }
 
   async function refreshAdminData() {
     setIsAdminDataLoading(true);
@@ -104,10 +126,22 @@ export function AdminPage() {
   }
 
   useEffect(() => {
+    refreshAdminModeration().catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (adminModeration) {
+      setLocalAdminModeration(null);
+      setAdminLoadError(null);
+      setIsAdminModerationLoading(false);
+    }
+  }, [adminModeration]);
+
+  useEffect(() => {
+    if (effectiveAdminModeration) {
       refreshAdminData().catch(() => {});
     }
-  }, [adminModeration, ombudsmanStatusFilter]);
+  }, [effectiveAdminModeration, ombudsmanStatusFilter]);
 
   async function decision(interestId: string, status: "APPROVED" | "REJECTED" | "HIDDEN") {
     setBusyAction(`decision:${interestId}:${status}`);
@@ -298,7 +332,7 @@ export function AdminPage() {
           ? "A denuncia foi marcada como analisada. A decisao sobre o anuncio fica na fila de moderacao."
           : "A denuncia foi arquivada sem acao adicional sobre o anuncio."
       });
-      await refreshPrivateData();
+      await Promise.all([refreshPrivateData(), refreshAdminModeration()]);
       await refreshAdminData();
     } finally {
       setBusyAction(null);
@@ -322,15 +356,15 @@ export function AdminPage() {
           <Button onClick={clearCache} disabled={Boolean(busyAction)}>{busyAction === "cache:clear" ? "Limpando..." : "Limpar cache"}</Button>
         </div>
       </div>
-      {!adminModeration && isLoadingPrivate ? (
+      {!effectiveAdminModeration && (isLoadingPrivate || isAdminModerationLoading || (!adminLoadError && isAdminDataLoading)) ? (
         <div className="section-loading" role="status">Carregando dados administrativos...</div>
-      ) : !adminModeration ? (
-        <EmptyState title="Admin indisponivel" description="O backend libera esta area apenas para e-mails configurados como administradores." />
+      ) : !effectiveAdminModeration ? (
+        <EmptyState title="Admin indisponivel" description={adminLoadError ?? "O backend libera esta area apenas para e-mails configurados como administradores."} />
       ) : (
         <div className="admin-grid">
           <section className="dashboard-section">
             <h2>Fila de moderacao</h2>
-            {adminModeration.pendingInterests?.length ? adminModeration.pendingInterests.map((interest) => (
+            {effectiveAdminModeration.pendingInterests?.length ? effectiveAdminModeration.pendingInterests.map((interest) => (
               <article className="manage-card" key={interest.id}>
                 <div><span className="pill">{interest.status}</span><h3>{interest.title}</h3><p>{interest.description}</p></div>
                 <div className="inline-actions">
@@ -364,7 +398,7 @@ export function AdminPage() {
               {ruleForm.id ? <Button type="button" variant="outline" onClick={() => setRuleForm({ id: null, term: "", riskLevel: "HIGH", active: true })}>Cancelar edicao</Button> : null}
             </form>
             <div className="rule-list">
-              {(adminModeration.rules ?? []).map((rule) => (
+              {(effectiveAdminModeration.rules ?? []).map((rule) => (
                 <article key={String(rule.id ?? rule.term)} className="rule-row">
                   <div>
                     <strong>{String(rule.term ?? "")}</strong>
@@ -420,7 +454,7 @@ export function AdminPage() {
           <section className="dashboard-section">
             <h2>Denuncias abertas</h2>
             <p className="admin-help-text">Resolver marca a denuncia como analisada. Dispensar arquiva a denuncia quando nao houver acao necessaria; a decisao sobre o anuncio denunciado continua na fila de moderacao.</p>
-            {(adminModeration.openReports ?? []).length ? (adminModeration.openReports ?? []).map((report) => (
+            {(effectiveAdminModeration.openReports ?? []).length ? (effectiveAdminModeration.openReports ?? []).map((report) => (
               <article className="manage-card" key={String(report.id)}>
                 <div><span className="status-pill status-pill--warning">{String(report.contentStatus ?? "REPORT")}</span><h3>{String(report.contentTitle ?? report.reason ?? "Denuncia")}</h3><p>{String(report.message ?? "Sem mensagem adicional.")}</p><small>{String(report.reason ?? "Sem motivo informado.")}</small></div>
                 <div className="inline-actions">

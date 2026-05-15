@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -96,6 +97,16 @@ public class InterestGatewayAdapter implements InterestGateway, InterestSearchGa
     @Override
     public Optional<InterestPost> findById(String id) {
         return repository.findById(id).map(InterestPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public List<InterestPost> findByIdIn(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return StreamSupport.stream(repository.findAllById(ids).spliterator(), false)
+                .map(InterestPersistenceMapper::toDomain)
+                .collect(Collectors.toList());
     }
 
     @Override

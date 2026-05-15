@@ -1141,55 +1141,17 @@ select:focus {
   gap: 8px;
 }
 
-.boost-select-label,
-.boost-selected-summary {
-  display: grid;
-  gap: 7px;
-}
-
-.boost-select-label {
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.boost-select-label select {
-  width: 100%;
-  min-height: 42px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text);
-  padding: 0 12px;
-  font: inherit;
-  font-size: 0.9rem;
-  text-transform: none;
-}
-
-.boost-selected-summary {
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.boost-selected-summary strong {
-  margin: 0;
-}
-
-.boost-selected-summary span,
-.boost-selected-summary small {
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
+.boost-option-list,
 .boost-payment-choice {
   display: grid;
   gap: 8px;
 }
 
+.boost-option-list {
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+}
+
+.boost-option-list label,
 .boost-payment-choice label {
   min-height: 42px;
   display: flex;
@@ -1202,10 +1164,33 @@ select:focus {
   cursor: pointer;
 }
 
+.boost-option-list label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+}
+
+.boost-option-list label.is-selected,
+.boost-payment-choice label.is-selected {
+  border-color: color-mix(in srgb, var(--primary) 54%, var(--border));
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+.boost-option-list input {
+  grid-row: span 2;
+}
+
+.boost-option-list span,
 .boost-payment-choice span {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  font-weight: 800;
+}
+
+.boost-option-list small {
+  color: var(--muted);
+  font-size: 0.72rem;
   font-weight: 800;
 }
 

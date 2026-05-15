@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   AUTH_SESSION_MODE,
   activateInterest,
@@ -45,7 +45,7 @@ import type {
   StoredSession,
   User
 } from "@/shared/api/types";
-import { activeCategories, FALLBACK_CATEGORIES } from "@/shared/lib/format";
+import { activeCategories, FALLBACK_CATEGORIES, isAdminUser } from "@/shared/lib/format";
 import { sampleInterests } from "@/shared/lib/sample-data";
 import type { FeedbackState } from "@/shared/ui/feedback-modal";
 
@@ -153,6 +153,7 @@ function normalizeMonetizationAccount(payload: MonetizationAccount | null): Mone
 
 export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [session, setSession] = useState<StoredSession | null>(null);
   const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES);
   const [interests, setInterests] = useState<Interest[]>(sampleInterests);
@@ -169,6 +170,8 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const socketRef = useRef<WebSocket | null>(null);
 
   const currentUser = session?.user ?? null;
+  const shouldLoadSellerItems = pathname === "/meus-itens";
+  const shouldLoadAdminModeration = pathname === "/admin" || isAdminUser(currentUser);
 
   const refreshPublicData = useCallback(async (filters: Record<string, string | number | undefined | null> = {}) => {
     setIsLoadingPublic(true);
@@ -193,11 +196,21 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     }
     setIsLoadingPrivate(true);
     try {
+      const adminRequest = shouldLoadAdminModeration ? fetchAdminModeration() : Promise.resolve(null);
+      if (shouldLoadAdminModeration) {
+        adminRequest
+          .then((value) => {
+            if (value) {
+              setAdminModeration(value);
+            }
+          })
+          .catch(() => {});
+      }
       const [dashboardResult, monetizationResult, sellerItemsResult, adminResult] = await Promise.allSettled([
         fetchDashboard(),
         fetchMonetizationAccount(),
-        fetchSellerItems({ includeInactive: true }),
-        fetchAdminModeration()
+        shouldLoadSellerItems ? fetchSellerItems({ includeInactive: true }) : Promise.resolve(null),
+        adminRequest
       ]);
 
       const authError = [dashboardResult, monetizationResult, sellerItemsResult]
@@ -218,10 +231,14 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       if (monetizationResult.status === "fulfilled") {
         setMonetization(normalizeMonetizationAccount(monetizationResult.value));
       }
-      if (sellerItemsResult.status === "fulfilled") {
+      if (sellerItemsResult.status === "fulfilled" && sellerItemsResult.value) {
         setSellerItems(sellerItemsResult.value);
       }
-      setAdminModeration(adminResult.status === "fulfilled" ? adminResult.value : null);
+      if (adminResult.status === "fulfilled" && adminResult.value) {
+        setAdminModeration(adminResult.value);
+      } else if (!shouldLoadAdminModeration) {
+        setAdminModeration(null);
+      }
     } catch (error) {
       if (isAuthError(error)) {
         clearSession();
@@ -230,7 +247,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoadingPrivate(false);
     }
-  }, []);
+  }, [shouldLoadAdminModeration, shouldLoadSellerItems]);
 
   const recoverSession = useCallback(async () => {
     const stored = getStoredSession();

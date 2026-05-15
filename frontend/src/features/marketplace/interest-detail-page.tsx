@@ -254,30 +254,23 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
                     <strong><Sparkles size={16} /> Impulsionar procura</strong>
                     {isBoostActive && boostedUntil ? <span>Boost ativo ate {boostedUntil.toLocaleDateString("pt-BR")}</span> : null}
                   </div>
-                  <label className="boost-select-label">Escolha o boost
-                    <select value={selectedBoostProduct?.code ?? ""} onChange={(event) => setSelectedBoostCode(event.target.value)}>
-                      {boostProducts.map((product) => (
-                        <option key={product.code} value={product.code}>
-                          {product.name} - {product.durationDays ? `${product.durationDays} dias` : "duracao configuravel"} - {moneyLabel(product.price)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {selectedBoostProduct ? (
-                    <div className="boost-selected-summary">
-                      <strong>{selectedBoostProduct.name}</strong>
-                      <span>{selectedBoostProduct.durationDays ? `${selectedBoostProduct.durationDays} dias de destaque` : "Duração configurável"} · {moneyLabel(selectedBoostProduct.price)}</span>
-                      {selectedBoostCanUseCredits ? <small>{selectedBoostCreditCost} créditos para ativar pelo saldo</small> : creditPurchasesEnabled ? <small>Custo em créditos ainda não configurado no CRM.</small> : null}
-                    </div>
-                  ) : null}
+                  <div className="boost-option-list" role="radiogroup" aria-label="Escolha o boost">
+                    {boostProducts.map((product) => (
+                      <label key={product.code} className={selectedBoostProduct?.code === product.code ? "is-selected" : ""}>
+                        <input type="radio" name="boost-code" checked={selectedBoostProduct?.code === product.code} onChange={() => setSelectedBoostCode(product.code)} />
+                        <span>{product.name}</span>
+                        <small>{product.durationDays ? `${product.durationDays} dias` : "Configuravel"} - {moneyLabel(product.price)}</small>
+                      </label>
+                    ))}
+                  </div>
                   <div className="boost-payment-choice" role="radiogroup" aria-label="Forma de pagamento do boost">
                     {selectedBoostCanUseCredits ? (
-                      <label>
+                      <label className={selectedBoostPayment === "CREDITS" ? "is-selected" : ""}>
                         <input type="radio" name="boost-payment" checked={selectedBoostPayment === "CREDITS"} onChange={() => setSelectedBoostPayment("CREDITS")} />
                         <span><CreditCard size={15} /> Usar {selectedBoostCreditCost} créditos</span>
                       </label>
                     ) : null}
-                    <label>
+                    <label className={selectedBoostPaymentMethod === "MERCADO_PAGO" ? "is-selected" : ""}>
                       <input type="radio" name="boost-payment" checked={selectedBoostPaymentMethod === "MERCADO_PAGO"} onChange={() => setSelectedBoostPayment("MERCADO_PAGO")} />
                       <span><Image className="payment-gateway-icon payment-gateway-icon--inline" src={mercadoPagoLogo} alt="" width={42} height={26} aria-hidden="true" /> Mercado Pago</span>
                     </label>
@@ -299,7 +292,7 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
               ) : null}
               <div className="owner-action-grid">
                 <Link className="button button--primary" href={`/cadastrar-interesse?editar=${resolvedInterest.id}`}><Pencil size={16} /> Editar</Link>
-                {!isRejected ? <Button type="button" variant="outline" onClick={() => renewOwnInterest(resolvedInterest.id)} title="Usa 1 credito para adicionar mais 30 dias a procura"><RefreshCw size={16} /> Renovar por 1 credito</Button> : null}
+                {isPublishedInterest ? <Button type="button" variant="outline" onClick={() => renewOwnInterest(resolvedInterest.id)} title="Usa 1 credito para adicionar mais 30 dias a procura"><RefreshCw size={16} /> Renovar por 1 credito</Button> : null}
                 {resolvedInterest.status === "CLOSED" ? (
                   <Button type="button" variant="outline" onClick={() => activateOwnInterest(resolvedInterest.id)}>Ativar</Button>
                 ) : (
