@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { ComponentProps } from "react";
 import { X } from "lucide-react";
 import { useLegalContent } from "@/features/legal/use-legal-content";
 import { usePlatform } from "@/features/platform/platform-context";
@@ -42,6 +43,9 @@ const initialRegister: RegisterForm = {
   termsAccepted: false
 };
 
+type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
+type SubmitHandlerEvent = Parameters<FormSubmitHandler>[0];
+
 function passwordStatus(password: string) {
   if (!password) {
     return "Use pelo menos 8 caracteres, com letras e números.";
@@ -69,7 +73,7 @@ export function AuthModal() {
     return null;
   }
 
-  async function submitLogin(event: React.FormEvent) {
+  const submitLogin: FormSubmitHandler = async (event) => {
     event.preventDefault();
     setIsSubmitting(true);
     try {
@@ -84,9 +88,9 @@ export function AuthModal() {
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
-  async function submitRegister(event: React.FormEvent) {
+  const submitRegister: FormSubmitHandler = async (event) => {
     event.preventDefault();
     if (!registerForm.termsOpened || !registerForm.termsAccepted) {
       setFeedback({ type: "error", title: "Aceite os termos", message: "Abra os Termos de Uso e marque o aceite para criar sua conta." });
@@ -113,9 +117,9 @@ export function AuthModal() {
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
-  function submitLocalFeedback(event: React.FormEvent, kind: "forgot" | "reset") {
+  function submitLocalFeedback(event: SubmitHandlerEvent, kind: "forgot" | "reset") {
     event.preventDefault();
     setFeedback({
       type: "info",

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import type { FormEvent } from "react";
+import type { ComponentProps } from "react";
 import { fetchOfferConversation, sendOfferMessage } from "@/shared/api/client";
 import type { Offer, OfferConversation } from "@/shared/api/types";
 import { formatDateTime, statusLabel, statusTone } from "@/shared/lib/format";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { usePlatform } from "@/features/platform/platform-context";
+
+type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 
 export function OffersPage({ type }: { type: "sent" | "received" }) {
   const { dashboard, currentUser, refreshPrivateData, setFeedback } = usePlatform();
@@ -31,7 +33,7 @@ export function OffersPage({ type }: { type: "sent" | "received" }) {
     }
   }
 
-  async function submitConversationMessage(event: FormEvent) {
+  const submitConversationMessage: FormSubmitHandler = async (event) => {
     event.preventDefault();
     if (!conversation.offer?.id || !conversation.message.trim()) {
       return;
@@ -46,7 +48,7 @@ export function OffersPage({ type }: { type: "sent" | "received" }) {
       setConversation((current) => ({ ...current, loading: false }));
       setFeedback({ type: "error", title: "Mensagem nao enviada", message: error instanceof Error ? error.message : "Tente novamente em instantes." });
     }
-  }
+  };
 
   function closeConversation() {
     setConversation({ visible: false, offer: null, data: null, message: "", loading: false });

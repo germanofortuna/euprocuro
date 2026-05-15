@@ -3,14 +3,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { CreditCard, Eye, MessageSquare, Package, Plus, Search, Sparkles, Trash2, type LucideIcon } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ComponentProps } from "react";
 import mercadoPagoLogo from "@/assets/mercado-pago.svg";
 import { usePlatform } from "@/features/platform/platform-context";
 import type { Interest, Offer, OfferConversation } from "@/shared/api/types";
 import { fetchOfferConversation, sendOfferMessage } from "@/shared/api/client";
 import { budgetLabel, categoryLabel, formatDateTime, listingExpirationLabel, locationLabel, statusLabel, statusTone } from "@/shared/lib/format";
+import { referenceImageSrc } from "@/shared/lib/images";
+import { rememberInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
+
+type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 
 function StatCard({ title, value, detail, icon: Icon }: { title: string; value: number | string; detail: string; icon: LucideIcon }) {
   return (
@@ -22,10 +27,17 @@ function StatCard({ title, value, detail, icon: Icon }: { title: string; value: 
 }
 
 function ManageInterestCard({ interest }: { interest: Interest }) {
-  const { categories, closeOwnInterest, activateOwnInterest, deleteOwnInterest, renewOwnInterest } = usePlatform();
+  const { categories, deleteOwnInterest } = usePlatform();
+  const imageSrc = referenceImageSrc(interest);
 
   return (
-    <article className="manage-card">
+    <article className={`manage-card${imageSrc ? " manage-card--with-image" : ""}`}>
+      
+      {imageSrc ? (
+        <Link className="manage-card__image" href={`/interesses/${interest.id}`} aria-label={`Ver detalhes de ${interest.title}`}>
+          <img src={imageSrc} alt={`Imagem de referencia da procura ${interest.title}`} loading="lazy" />
+        </Link>
+      ) : null}
       <div>
         <span className={`status-pill status-pill--${statusTone(interest.status)}`}>{statusLabel(interest.status ?? "OPEN")}</span>
         <h3>{interest.title}</h3>
@@ -39,12 +51,6 @@ function ManageInterestCard({ interest }: { interest: Interest }) {
       </div>
       <div className="inline-actions">
         <Link className="button button--outline button--sm" href={`/interesses/${interest.id}`}>Detalhes</Link>
-        <Button size="sm" variant="outline" onClick={() => renewOwnInterest(interest.id)} title="Usa 1 credito para adicionar mais 30 dias a procura">Renovar por 1 credito</Button>
-        {interest.status === "CLOSED" ? (
-          <Button size="sm" variant="outline" onClick={() => activateOwnInterest(interest.id)}>Ativar</Button>
-        ) : (
-          <Button size="sm" variant="outline" onClick={() => closeOwnInterest(interest.id)}>Desativar</Button>
-        )}
         <Button size="icon" variant="danger" onClick={() => window.confirm("Deseja excluir esta procura definitivamente?") && deleteOwnInterest(interest.id)} aria-label="Excluir procura"><Trash2 size={16} /><span className="responsive-action-label">Excluir</span></Button>
       </div>
     </article>
@@ -52,10 +58,13 @@ function ManageInterestCard({ interest }: { interest: Interest }) {
 }
 
 export function MyInterestsPage() {
-  const { dashboard, currentUser, monetization } = usePlatform();
+  const { dashboard, currentUser, monetization, isLoadingPrivate } = usePlatform();
   const interests = dashboard?.myInterests ?? [];
   const receivedOffers = dashboard?.receivedOffers ?? [];
   const sentOffers = dashboard?.sentOffers ?? [];
+  useEffect(() => {
+    rememberInterestListHref("/meus-interesses");
+  }, []);
 
   return (
     <div className="dashboard-page">
@@ -73,7 +82,9 @@ export function MyInterestsPage() {
       </div>
       <section className="dashboard-section">
         <div className="section-heading"><h2>Minhas procuras</h2><span>{monetization?.sellerCredits ?? currentUser?.credits ?? 0} créditos</span></div>
-        {interests.length ? (
+        {isLoadingPrivate && !dashboard ? (
+          <div className="section-loading" role="status">Carregando suas procuras...</div>
+        ) : interests.length ? (
           <div className="manage-list">{interests.map((interest) => <ManageInterestCard key={interest.id} interest={interest} />)}</div>
         ) : (
           <EmptyState title="Nenhuma procura cadastrada" description="Publique uma necessidade para receber propostas de quem pode atender." />
@@ -84,7 +95,7 @@ export function MyInterestsPage() {
 }
 
 export function OffersPage({ type }: { type: "sent" | "received" }) {
-  const { dashboard, currentUser, refreshPrivateData, setFeedback } = usePlatform();
+  const { dashboard, currentUser, isLoadingPrivate, refreshPrivateData, setFeedback } = usePlatform();
   const offers = type === "sent" ? dashboard?.sentOffers ?? [] : dashboard?.receivedOffers ?? [];
   const [conversation, setConversation] = useState<{ visible: boolean; offer: Offer | null; data: OfferConversation | null; message: string; loading: boolean }>({
     visible: false,
@@ -105,7 +116,7 @@ export function OffersPage({ type }: { type: "sent" | "received" }) {
     }
   }
 
-  async function submitConversationMessage(event: React.FormEvent) {
+  const submitConversationMessage: FormSubmitHandler = async (event) => {
     event.preventDefault();
     if (!conversation.offer?.id || !conversation.message.trim()) {
       return;
@@ -120,7 +131,7 @@ export function OffersPage({ type }: { type: "sent" | "received" }) {
       setConversation((current) => ({ ...current, loading: false }));
       setFeedback({ type: "error", title: "Mensagem nao enviada", message: error instanceof Error ? error.message : "Tente novamente em instantes." });
     }
-  }
+  };
 
   function closeConversation() {
     setConversation({ visible: false, offer: null, data: null, message: "", loading: false });
@@ -131,7 +142,9 @@ export function OffersPage({ type }: { type: "sent" | "received" }) {
       <div className="dashboard-heading">
         <div><h1>{type === "sent" ? "Propostas enviadas" : "Propostas recebidas"}</h1><p>Acompanhe negociações e mensagens pelo chat da plataforma.</p></div>
       </div>
-      {offers.length ? (
+      {isLoadingPrivate && !dashboard ? (
+        <div className="section-loading" role="status">Carregando propostas...</div>
+      ) : offers.length ? (
         <div className="manage-list">
           {offers.map((offer) => (
             <article className="manage-card" key={offer.id}>
@@ -146,7 +159,7 @@ export function OffersPage({ type }: { type: "sent" | "received" }) {
 }
 
 export function SellerItemsPage() {
-  const { sellerItems, saveSellerItem, categories } = usePlatform();
+  const { sellerItems, saveSellerItem, categories, isLoadingPrivate } = usePlatform();
   const [form, setForm] = useState({ title: "", description: "", category: "", desiredPrice: "", tags: "" });
   const [isSavingItem, setIsSavingItem] = useState(false);
   const [selectedSellerItemId, setSelectedSellerItemId] = useState<string | null>(null);
@@ -156,10 +169,23 @@ export function SellerItemsPage() {
     [sellerItems, selectedSellerItemId]
   );
   const selectedItem = selectedSellerItemGroup?.item ?? null;
-  const selectedMatches = useMemo(
-    () => Array.from(new Map((selectedSellerItemGroup?.matchingInterests ?? []).map((interest) => [interest.id, interest])).values()),
-    [selectedSellerItemGroup]
-  );
+  const selectedMatches = useMemo(() => {
+    const itemCity = String(selectedItem?.location?.city ?? "").trim().toLowerCase();
+    const itemState = String(selectedItem?.location?.state ?? "").trim().toLowerCase();
+    return Array.from(new Map((selectedSellerItemGroup?.matchingInterests ?? []).map((interest) => [interest.id, interest])).values())
+      .sort((left, right) => {
+        const leftCity = String(left.location?.city ?? "").trim().toLowerCase();
+        const rightCity = String(right.location?.city ?? "").trim().toLowerCase();
+        const leftState = String(left.location?.state ?? "").trim().toLowerCase();
+        const rightState = String(right.location?.state ?? "").trim().toLowerCase();
+        const leftScore = (itemCity && leftCity === itemCity ? 2 : 0) + (itemState && leftState === itemState ? 1 : 0);
+        const rightScore = (itemCity && rightCity === itemCity ? 2 : 0) + (itemState && rightState === itemState ? 1 : 0);
+        if (rightScore !== leftScore) {
+          return rightScore - leftScore;
+        }
+        return String(left.title ?? "").localeCompare(String(right.title ?? ""), "pt-BR");
+      });
+  }, [selectedItem?.location?.city, selectedItem?.location?.state, selectedSellerItemGroup]);
 
   function selectItem(itemId?: string | null, scrollToMatches = false) {
     if (!itemId) {
@@ -171,7 +197,7 @@ export function SellerItemsPage() {
     }
   }
 
-  async function submit(event: React.FormEvent) {
+  const submit: FormSubmitHandler = async (event) => {
     event.preventDefault();
     setIsSavingItem(true);
     try {
@@ -186,7 +212,7 @@ export function SellerItemsPage() {
     } finally {
       setIsSavingItem(false);
     }
-  }
+  };
 
   return (
     <div className="dashboard-page">
@@ -203,7 +229,9 @@ export function SellerItemsPage() {
         </form>
         <section className="dashboard-section">
           <h2>Itens cadastrados</h2>
-          {sellerItems.length ? (
+          {isLoadingPrivate && !sellerItems.length ? (
+            <div className="section-loading" role="status">Carregando itens cadastrados...</div>
+          ) : sellerItems.length ? (
             <div className="seller-item-list">
               {sellerItems.map((group) => {
                 const item = group.item;
@@ -257,7 +285,7 @@ export function SellerItemsPage() {
           <div className="seller-match-list">
             {selectedMatches.map((interest) => (
               <Link className="seller-match-card" key={interest.id} href={`/interesses/${interest.id}`}>
-                {interest.referenceImageUrl ? <img src={interest.referenceImageUrl} alt="" /> : <span className="seller-item-thumb"><Search size={18} /></span>}
+                {referenceImageSrc(interest) ? <img src={referenceImageSrc(interest)} alt="" /> : <span className="seller-item-thumb"><Search size={18} /></span>}
                 <div>
                   <strong>{interest.title}</strong>
                   <p>{interest.description}</p>
@@ -285,7 +313,7 @@ export function CreditsPage() {
     try {
       await buyProduct(productCode);
     } catch (error) {
-      setFeedback({ type: "error", title: "Compra indisponivel", message: error instanceof Error ? error.message : "Nao foi possivel iniciar o checkout agora." });
+      setFeedback({ type: "error", title: "Compra indisponível", message: error instanceof Error ? error.message : "Nao foi possivel iniciar o checkout agora." });
     } finally {
       setBuyingProductCode(null);
     }
@@ -306,9 +334,9 @@ export function CreditsPage() {
               <h3>{product.name}</h3>
               <p>{product.description}</p>
               <strong>{product.price?.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong>
-              <Button onClick={() => purchase(product.code)} disabled={buyingProductCode === product.code}>
+              <Button className="payment-button" onClick={() => purchase(product.code)} disabled={buyingProductCode === product.code}>
                 <Image className="payment-gateway-icon" src={mercadoPagoLogo} alt="" width={54} height={36} aria-hidden="true" />
-                {buyingProductCode === product.code ? "Abrindo checkout..." : "Comprar com Mercado Pago"}
+                <span>{buyingProductCode === product.code ? "Abrindo checkout..." : "Comprar com Mercado Pago"}</span>
               </Button>
             </article>
           )) : <EmptyState title="Compras indisponíveis" description="O CRM operacional ainda não liberou produtos para compra." />}

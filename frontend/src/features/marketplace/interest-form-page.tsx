@@ -1,20 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Info, Upload } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ComponentProps } from "react";
 import { usePlatform } from "@/features/platform/platform-context";
-import { lookupAddressByPostalCode } from "@/shared/api/client";
+import { fetchInterest, lookupAddressByPostalCode } from "@/shared/api/client";
+import type { Interest } from "@/shared/api/types";
 import { formatCep, hasLink, limitText } from "@/shared/lib/format";
 import { Button } from "@/shared/ui/button";
 import { FieldCounter } from "@/shared/ui/field-counter";
 
 const TITLE_MAX_LENGTH = 80;
 const DESCRIPTION_MAX_LENGTH = 250;
+const MAX_IMAGE_SIDE = 1280;
+const IMAGE_QUALITY = 0.82;
+type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 
-export function InterestFormPage() {
-  const { categories, currentUser, openAuthModal, saveInterest, setFeedback } = usePlatform();
-  const [form, setForm] = useState({
+function initialInterestForm(currentUser?: { city?: string; state?: string; neighborhood?: string; country?: string } | null) {
+  return {
     title: "",
     description: "",
     category: "",
@@ -32,8 +37,65 @@ export function InterestFormPage() {
     allowsWhatsappContact: false,
     whatsappContact: "",
     referenceImageUrl: ""
+  };
+}
+
+function interestToForm(interest: Interest, currentForm: ReturnType<typeof initialInterestForm>) {
+  return {
+    ...currentForm,
+    title: interest.title ?? "",
+    description: interest.description ?? "",
+    category: interest.category ?? "",
+    tags: (interest.tags ?? []).join(", "),
+    budgetMin: interest.budgetMin == null ? "" : String(interest.budgetMin),
+    budgetMax: interest.budgetMax == null ? "" : String(interest.budgetMax),
+    postalCode: formatCep(String(interest.location?.postalCode ?? "")),
+    city: String(interest.location?.city ?? ""),
+    state: String(interest.location?.state ?? "").toUpperCase().slice(0, 2),
+    neighborhood: String(interest.location?.neighborhood ?? ""),
+    country: String(interest.location?.country ?? "Brasil"),
+    preferredCondition: String(interest.preferredCondition ?? ""),
+    preferredContactMode: String(interest.preferredContactMode ?? ""),
+    desiredRadiusKm: String(interest.desiredRadiusKm ?? currentForm.desiredRadiusKm),
+    allowsWhatsappContact: Boolean(interest.allowsWhatsappContact),
+    whatsappContact: String(interest.whatsappContact ?? ""),
+    referenceImageUrl: String(interest.referenceImageUrl ?? "")
+  };
+}
+
+function readImageFile(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) {
+    return Promise.reject(new Error("Selecione uma imagem valida."));
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Nao foi possivel ler a imagem."));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("Nao foi possivel processar a imagem."));
+      image.onload = () => {
+        const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(image.width, image.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+      };
+      image.src = String(reader.result ?? "");
+    };
+    reader.readAsDataURL(file);
   });
+}
+
+export function InterestFormPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const editingInterestId = searchParams.get("editar") ?? searchParams.get("edit");
+  const { categories, currentUser, dashboard, openAuthModal, saveInterest, setFeedback } = usePlatform();
+  const [form, setForm] = useState(() => initialInterestForm(currentUser));
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingInterest, setIsLoadingInterest] = useState(false);
+  const loadedEditingInterestRef = useRef<string | null>(null);
   const [lookupState, setLookupState] = useState<{ loading: boolean; message: string; tone: "muted" | "success" | "error" }>({
     loading: false,
     message: "",
@@ -50,6 +112,30 @@ export function InterestFormPage() {
     }, 380);
     return () => window.clearTimeout(timer);
   }, [form.postalCode]);
+
+  useEffect(() => {
+    if (!editingInterestId) {
+      loadedEditingInterestRef.current = null;
+      return;
+    }
+    if (loadedEditingInterestRef.current === editingInterestId) {
+      return;
+    }
+    const cachedInterest = dashboard?.myInterests?.find((interest) => interest.id === editingInterestId);
+    if (cachedInterest) {
+      setForm((current) => interestToForm(cachedInterest, current));
+      loadedEditingInterestRef.current = editingInterestId;
+      return;
+    }
+    setIsLoadingInterest(true);
+    fetchInterest(editingInterestId)
+      .then((interest) => {
+        setForm((current) => interestToForm(interest, current));
+        loadedEditingInterestRef.current = editingInterestId;
+      })
+      .catch((error) => setFeedback({ type: "error", title: "Procura indisponivel", message: error instanceof Error ? error.message : "Nao foi possivel carregar esta procura para edicao." }))
+      .finally(() => setIsLoadingInterest(false));
+  }, [dashboard?.myInterests, editingInterestId, setFeedback]);
 
   async function handlePostalCodeLookup(postalCode = form.postalCode) {
     const normalizedPostalCode = String(postalCode).replace(/\D/g, "");
@@ -78,23 +164,23 @@ export function InterestFormPage() {
     }
   }
 
-  async function submit(event: React.FormEvent) {
+  const submit: FormSubmitHandler = async (event) => {
     event.preventDefault();
     if (!currentUser?.id) {
       openAuthModal("login");
       return;
     }
     if (hasLink(form.description)) {
-      setFeedback({ type: "error", title: "Link não permitido", message: "Remova links da descrição da procura antes de enviar para moderação." });
+      setFeedback({ type: "error", title: "Link nao permitido", message: "Remova links da descricao da procura antes de enviar para moderacao." });
       return;
     }
     if (form.budgetMin && form.budgetMax && Number(form.budgetMin) > Number(form.budgetMax)) {
-      setFeedback({ type: "error", title: "Orçamento inválido", message: "O orçamento mínimo não pode ser maior que o orçamento máximo." });
+      setFeedback({ type: "error", title: "Orcamento invalido", message: "O orcamento minimo nao pode ser maior que o orcamento maximo." });
       return;
     }
     setIsSaving(true);
     try {
-      await saveInterest({
+      const savedInterest = await saveInterest({
         title: form.title,
         description: form.description,
         category: form.category,
@@ -112,8 +198,18 @@ export function InterestFormPage() {
         state: form.state,
         neighborhood: form.neighborhood,
         country: form.country
-      });
-      setForm((current) => ({ ...current, title: "", description: "", tags: "", budgetMin: "", budgetMax: "", referenceImageUrl: "" }));
+      }, editingInterestId);
+      if (savedInterest?.id) {
+        setFeedback({
+          type: "success",
+          title: editingInterestId ? "Alteracao recebida" : "Procura recebida",
+          message: "Vamos validar sua procura agora. Se houver recusa, voce recebera um aviso para ajustar.",
+          afterClose: () => router.push(`/interesses/${savedInterest.id}`)
+        });
+      }
+      if (!editingInterestId) {
+        setForm((current) => ({ ...current, title: "", description: "", tags: "", budgetMin: "", budgetMax: "", referenceImageUrl: "" }));
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       const friendlyMessage = /city|state|cidade|uf/i.test(message)
@@ -123,26 +219,39 @@ export function InterestFormPage() {
     } finally {
       setIsSaving(false);
     }
-  }
+  };
 
   function update(field: keyof typeof form, value: string | boolean) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  async function handleReferenceImageChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    try {
+      update("referenceImageUrl", await readImageFile(file));
+    } catch (error) {
+      setFeedback({ type: "error", title: "Imagem invalida", message: error instanceof Error ? error.message : "Selecione outra imagem." });
+    }
+  }
+
   return (
     <section className="route-shell form-route">
-      <Link href="/" className="back-link"><ArrowLeft size={16} /> Voltar</Link>
+      <Link href="/meus-interesses" className="back-link"><ArrowLeft size={16} /> Voltar</Link>
       <div className="form-heading">
-        <h1>O que você procura?</h1>
-        <p>Descreva detalhadamente o que você precisa para receber as melhores propostas.</p>
+        <h1>{editingInterestId ? "Editar procura" : "O que voce procura?"}</h1>
+        <p>{editingInterestId ? "Ajuste os dados da procura e envie novamente para validacao." : "Descreva detalhadamente o que voce precisa para receber as melhores propostas."}</p>
       </div>
+      {isLoadingInterest ? <div className="section-loading" role="status">Carregando procura para edicao...</div> : null}
       <form className="feature-form" onSubmit={submit}>
         <section className="form-section">
-          <h2>Informações principais</h2>
-          <p>O título e a descrição são os itens mais importantes da sua procura.</p>
+          <h2>Informacoes principais</h2>
+          <p>O titulo e a descricao sao os itens mais importantes da sua procura.</p>
           <label>
-            Título da procura
-            <input value={form.title} onChange={(event) => update("title", limitText(event.target.value, TITLE_MAX_LENGTH))} placeholder="Ex: Procuro eletricista para instalação residencial" required />
+            Titulo da procura
+            <input value={form.title} onChange={(event) => update("title", limitText(event.target.value, TITLE_MAX_LENGTH))} placeholder="Ex: Procuro eletricista para instalacao residencial" required />
             <FieldCounter value={form.title} max={TITLE_MAX_LENGTH} />
           </label>
           <label>
@@ -153,26 +262,28 @@ export function InterestFormPage() {
             </select>
           </label>
           <label>
-            Descrição detalhada
-            <textarea rows={5} value={form.description} onChange={(event) => update("description", limitText(event.target.value, DESCRIPTION_MAX_LENGTH))} placeholder="Descreva marca, modelo, condição esperada, urgência..." required />
-            <span className="inline-help"><Info size={14} /> Links e contatos não são permitidos.</span>
+            Descricao detalhada
+            <textarea rows={5} value={form.description} onChange={(event) => update("description", limitText(event.target.value, DESCRIPTION_MAX_LENGTH))} placeholder="Descreva marca, modelo, condicao esperada, urgencia..." required />
+            <span className="inline-help"><Info size={14} /> Links e contatos nao sao permitidos.</span>
             <FieldCounter value={form.description} max={DESCRIPTION_MAX_LENGTH} />
           </label>
           <label>
             Tags
             <input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="Ex: urgente, usado, conserto" />
           </label>
-          <div className="upload-box">
-            <Upload size={28} />
-            <strong>Imagem de referência</strong>
-            <p>Use JPG ou PNG. A compressão será aplicada antes do envio quando houver imagem selecionada.</p>
-          </div>
+          <label className="upload-box">
+            {form.referenceImageUrl ? <img className="upload-preview" src={form.referenceImageUrl} alt="Previa da imagem de referencia" /> : <Upload size={28} />}
+            <strong>{form.referenceImageUrl ? "Trocar imagem de referencia" : "Imagem de referencia"}</strong>
+            <p>Use JPG ou PNG. A compressao sera aplicada antes do envio quando houver imagem selecionada.</p>
+            <span className="button button--outline button--sm">Selecionar imagem</span>
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleReferenceImageChange} />
+          </label>
         </section>
         <section className="form-section">
-          <h2>Orçamento e localização</h2>
+          <h2>Orcamento e localizacao</h2>
           <div className="form-grid">
-            <label>Orçamento mínimo<input type="number" min="0" value={form.budgetMin} onChange={(event) => update("budgetMin", event.target.value)} /></label>
-            <label>Orçamento máximo<input type="number" min="0" value={form.budgetMax} onChange={(event) => update("budgetMax", event.target.value)} required /></label>
+            <label>Orcamento minimo<input type="number" min="0" value={form.budgetMin} onChange={(event) => update("budgetMin", event.target.value)} /></label>
+            <label>Orcamento maximo<input type="number" min="0" value={form.budgetMax} onChange={(event) => update("budgetMax", event.target.value)} required /></label>
           </div>
           <div className="form-grid form-grid--3">
             <label>CEP<input value={form.postalCode} onChange={(event) => update("postalCode", formatCep(event.target.value))} onBlur={() => handlePostalCodeLookup()} placeholder="00000-000" /></label>
@@ -182,10 +293,10 @@ export function InterestFormPage() {
           {lookupState.message ? <span className={`address-lookup-note address-lookup-note--${lookupState.tone}`} role="status" aria-live="polite" aria-busy={lookupState.loading}>{lookupState.message}</span> : null}
           <div className="form-grid">
             <label>Bairro<input value={form.neighborhood} onChange={(event) => update("neighborhood", event.target.value)} /></label>
-            <label>País<input value={form.country} onChange={(event) => update("country", event.target.value)} /></label>
+            <label>Pais<input value={form.country} onChange={(event) => update("country", event.target.value)} /></label>
           </div>
           <div className="form-grid">
-            <label>Condição preferida<input value={form.preferredCondition} onChange={(event) => update("preferredCondition", event.target.value)} placeholder="Novo, usado, indiferente" /></label>
+            <label>Condicao preferida<input value={form.preferredCondition} onChange={(event) => update("preferredCondition", event.target.value)} placeholder="Novo, usado, indiferente" /></label>
             <label>Modo de contato<select value={form.preferredContactMode} onChange={(event) => update("preferredContactMode", event.target.value)}><option value="">Selecione...</option><option value="CHAT">Chat da plataforma</option><option value="WHATSAPP">WhatsApp</option><option value="EMAIL">E-mail</option></select></label>
           </div>
           <label className="checkbox-row">
@@ -193,11 +304,11 @@ export function InterestFormPage() {
             <span>Permitir contato via WhatsApp</span>
           </label>
           {form.allowsWhatsappContact ? <label>WhatsApp<input value={form.whatsappContact} onChange={(event) => update("whatsappContact", event.target.value)} /></label> : null}
-          <div className="notice-box">Esta procura ficará ativa por até 30 dias e depois poderá ser renovada com crédito.</div>
+          <div className="notice-box">Esta procura ficara ativa por ate 30 dias e depois podera ser renovada com credito.</div>
         </section>
         <div className="form-actions">
-          <Link className="button button--outline" href="/">Cancelar</Link>
-          <Button type="submit" disabled={isSaving}>{isSaving ? "Publicando..." : "Publicar Procura"}</Button>
+          <Link className="button button--outline" href="/meus-interesses">Cancelar</Link>
+          <Button type="submit" disabled={isSaving || isLoadingInterest}>{isSaving ? (editingInterestId ? "Salvando..." : "Publicando...") : (editingInterestId ? "Salvar alteracoes" : "Publicar Procura")}</Button>
         </div>
       </form>
     </section>

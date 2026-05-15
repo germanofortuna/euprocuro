@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/features/theme/theme-provider";
 import { FeedbackModal } from "@/shared/ui/feedback-modal";
 import { usePlatform } from "@/features/platform/platform-context";
 import { AuthModal } from "@/features/auth/auth-modal";
+import { NavigationLoading } from "@/shared/ui/navigation-loading";
 
 function GlobalModals() {
   const { feedback, setFeedback } = usePlatform();
@@ -26,6 +27,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <PlatformProvider>
           <Suspense fallback={null}>
             <Analytics />
+            <NavigationLoading />
           </Suspense>
           {children}
           <GlobalModals />

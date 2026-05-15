@@ -130,7 +130,7 @@ function normalizeDashboard(payload: Dashboard | null): Dashboard | null {
 }
 
 export function PlatformProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<StoredSession | null>(null);
+  const [session, setSession] = useState<StoredSession | null>(() => getStoredSession());
   const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES);
   const [interests, setInterests] = useState<Interest[]>(sampleInterests);
   const [selectedInterest, setSelectedInterest] = useState<Interest | null>(sampleInterests[0]);
@@ -169,17 +169,35 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     }
     setIsLoadingPrivate(true);
     try {
-      const [dashboardPayload, monetizationPayload, sellerItemsPayload] = await Promise.all([
-        fetchDashboard().catch(() => null),
-        fetchMonetizationAccount().catch(() => null),
-        fetchSellerItems({ includeInactive: true }).catch(() => [])
+      const [dashboardResult, monetizationResult, sellerItemsResult, adminResult] = await Promise.allSettled([
+        fetchDashboard(),
+        fetchMonetizationAccount(),
+        fetchSellerItems({ includeInactive: true }),
+        fetchAdminModeration()
       ]);
-      setDashboard(normalizeDashboard(dashboardPayload));
-      setMonetization(monetizationPayload);
-      setSellerItems(sellerItemsPayload);
-      fetchAdminModeration()
-        .then((payload) => setAdminModeration(payload))
-        .catch(() => setAdminModeration(null));
+
+      const authError = [dashboardResult, monetizationResult, sellerItemsResult]
+        .some((result) => result.status === "rejected" && isAuthError(result.reason));
+      if (authError) {
+        clearSession();
+        setSession(null);
+        setDashboard(null);
+        setMonetization(null);
+        setSellerItems([]);
+        setAdminModeration(null);
+        return;
+      }
+
+      if (dashboardResult.status === "fulfilled") {
+        setDashboard(normalizeDashboard(dashboardResult.value));
+      }
+      if (monetizationResult.status === "fulfilled") {
+        setMonetization(monetizationResult.value);
+      }
+      if (sellerItemsResult.status === "fulfilled") {
+        setSellerItems(sellerItemsResult.value);
+      }
+      setAdminModeration(adminResult.status === "fulfilled" ? adminResult.value : null);
     } catch (error) {
       if (isAuthError(error)) {
         clearSession();

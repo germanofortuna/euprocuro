@@ -44,7 +44,6 @@ export function AppFooter() {
       </div>
       <div className="footer-bottom">
         <p>&copy; {year} Eu Procuro. Todos os direitos reservados.</p>
-        <span>Plataforma de aproximacao entre pessoas que procuram e pessoas que podem atender.</span>
       </div>
     </footer>
   );

@@ -21,7 +21,7 @@ export function PrivateLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { currentUser, monetization, openAuthModal, adminModeration, sellerItems } = usePlatform();
   const credits = monetization?.sellerCredits ?? currentUser?.sellerCredits ?? currentUser?.credits ?? 0;
-  const visibleNavItems = navItems.filter((item) => item.href !== "/admin" || isAdminUser(currentUser, Boolean(adminModeration)));
+  const visibleNavItems = navItems.filter((item) => item.href !== "/admin" || pathname === "/admin" || isAdminUser(currentUser, Boolean(adminModeration)));
 
   return (
     <div className="app-shell private-shell">
