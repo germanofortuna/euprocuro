@@ -1,13 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Copy, Flag, MapPin, MessageSquare, Send, Share2, Tag } from "lucide-react";
+import { ArrowLeft, Copy, Flag, MapPin, MessageSquare, Pencil, RefreshCw, Send, Share2, Tag } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { ComponentProps } from "react";
 import { usePlatform } from "@/features/platform/platform-context";
+import { fetchInterest } from "@/shared/api/client";
 import type { Interest } from "@/shared/api/types";
-import { budgetLabel, categoryLabel, locationLabel } from "@/shared/lib/format";
+import { budgetLabel, categoryLabel, listingExpirationLabel, locationLabel } from "@/shared/lib/format";
+import { referenceImageSrc } from "@/shared/lib/images";
+import { readInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { Button } from "@/shared/ui/button";
+import { FieldCounter } from "@/shared/ui/field-counter";
 import { trackEvent } from "@/features/analytics/analytics";
+
+type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
+const REPORT_REASON_MAX_LENGTH = 120;
+const REPORT_MESSAGE_MAX_LENGTH = 600;
 
 function WhatsAppIcon() {
   return (
@@ -33,9 +42,18 @@ function FacebookIcon() {
   );
 }
 
-export function InterestDetailPage({ initialInterest }: { initialInterest?: Interest | null }) {
-  const { categories, selectedInterest, selectInterest, currentUser, submitOffer, submitReport, openAuthModal, setFeedback } = usePlatform();
-  const interest = selectedInterest ?? initialInterest;
+export function InterestDetailPage({ interestId, initialInterest }: { interestId: string; initialInterest?: Interest | null }) {
+  const { categories, dashboard, isLoadingPrivate, currentUser, submitOffer, submitReport, openAuthModal, setFeedback, closeOwnInterest, activateOwnInterest, renewOwnInterest } = usePlatform();
+  const [routeInterest, setRouteInterest] = useState<Interest | null>(null);
+  const [isLoadingRouteInterest, setIsLoadingRouteInterest] = useState(false);
+  const [isImageOpen, setIsImageOpen] = useState(false);
+  const [interestListHref, setInterestListHref] = useState("/categorias");
+  const ownDashboardInterest = currentUser?.id ? dashboard?.myInterests?.find((item) => item.id === interestId) ?? null : null;
+  const routeInitialInterest = initialInterest?.id === interestId ? initialInterest : null;
+  const routeFetchedInterest = routeInterest?.id === interestId ? routeInterest : null;
+  const publicRouteInterest = routeInitialInterest ?? routeFetchedInterest;
+  const detailInterest = ownDashboardInterest ?? publicRouteInterest;
+  const isMine = Boolean(ownDashboardInterest);
   const [offerForm, setOfferForm] = useState({ offeredPrice: "", sellerPhone: "", message: "", highlights: "" });
   const [reportForm, setReportForm] = useState({ reason: "", message: "" });
   const [isReportOpen, setIsReportOpen] = useState(false);
@@ -44,38 +62,73 @@ export function InterestDetailPage({ initialInterest }: { initialInterest?: Inte
   const [shareUrl, setShareUrl] = useState("");
 
   useEffect(() => {
-    if (initialInterest?.id) {
-      selectInterest(initialInterest.id).catch(() => {});
+    setRouteInterest(null);
+    setIsLoadingRouteInterest(false);
+  }, [interestId]);
+
+  useEffect(() => {
+    if (!interestId || ownDashboardInterest || routeInitialInterest || routeFetchedInterest) {
+      return;
     }
-  }, [initialInterest?.id, selectInterest]);
+    let isCurrent = true;
+    setIsLoadingRouteInterest(true);
+    fetchInterest(interestId)
+      .then((detail) => {
+        if (isCurrent && detail.id === interestId) {
+          setRouteInterest(detail);
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setRouteInterest(null);
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsLoadingRouteInterest(false);
+        }
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [interestId, ownDashboardInterest, routeInitialInterest, routeFetchedInterest]);
 
   useEffect(() => {
     setShareUrl(window.location.href);
+    setInterestListHref(readInterestListHref());
   }, []);
 
-  if (!interest) {
+  if (!detailInterest && (isLoadingRouteInterest || isLoadingPrivate)) {
+    return (
+      <section className="route-shell centered-route">
+        <div className="section-loading" role="status">Carregando detalhes da procura...</div>
+      </section>
+    );
+  }
+
+  if (!detailInterest) {
     return (
       <section className="route-shell centered-route">
         <div className="auth-card">
           <h1>Procura não encontrada</h1>
           <p>Essa procura pode não existir mais ou ainda não estar pública.</p>
-          <Link className="button button--primary" href="/">Voltar para procuras</Link>
+          <Link className="button button--primary" href={interestListHref}>Voltar para as procuras</Link>
         </div>
       </section>
     );
   }
 
-  const detailInterest = interest;
-  const isMine = Boolean(currentUser?.id && detailInterest.ownerId === currentUser.id);
-  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`Olha esta procura no Eu Procuro: ${detailInterest.title} - ${shareUrl}`)}`;
-  const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Olha esta procura no Eu Procuro: ${detailInterest.title}`)}&url=${encodeURIComponent(shareUrl)}`;
+  const resolvedInterest = detailInterest;
+  const detailImageSrc = referenceImageSrc(resolvedInterest);
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`Olha esta procura no Eu Procuro: ${resolvedInterest.title} - ${shareUrl}`)}`;
+  const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Olha esta procura no Eu Procuro: ${resolvedInterest.title}`)}&url=${encodeURIComponent(shareUrl)}`;
   const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
 
-  async function submitOfferForm(event: React.FormEvent) {
+  const submitOfferForm: FormSubmitHandler = async (event) => {
     event.preventDefault();
     setIsOfferSubmitting(true);
     try {
-      await submitOffer(detailInterest.id, {
+      await submitOffer(resolvedInterest.id, {
         offeredPrice: offerForm.offeredPrice ? Number(offerForm.offeredPrice) : null,
         sellerPhone: offerForm.sellerPhone,
         message: offerForm.message,
@@ -85,56 +138,71 @@ export function InterestDetailPage({ initialInterest }: { initialInterest?: Inte
     } finally {
       setIsOfferSubmitting(false);
     }
-  }
+  };
 
   async function copyLink() {
     await navigator.clipboard?.writeText(shareUrl);
-    trackEvent("share_interest", { method: "copy", interest_id: detailInterest.id });
+    trackEvent("share_interest", { method: "copy", interest_id: resolvedInterest.id });
     setFeedback({ type: "success", title: "Link copiado", message: "Agora você pode compartilhar esta procura." });
   }
 
-  async function submitReportForm(event: React.FormEvent) {
+  const submitReportForm: FormSubmitHandler = async (event) => {
     event.preventDefault();
     setIsReportSubmitting(true);
     try {
-      await submitReport(detailInterest.id, reportForm);
+      await submitReport(resolvedInterest.id, reportForm);
       setReportForm({ reason: "", message: "" });
       setIsReportOpen(false);
     } finally {
       setIsReportSubmitting(false);
     }
-  }
+  };
 
   return (
     <section className="route-shell detail-route">
-      <Link href="/" className="back-link"><ArrowLeft size={16} /> Voltar para procuras</Link>
+      <Link href={interestListHref} className="back-link"><ArrowLeft size={16} /> Voltar para as procuras</Link>
       <div className="detail-grid">
         <article className="detail-main">
           <span className="pill">Procura publicada</span>
-          <h1>{detailInterest.title}</h1>
+          {detailImageSrc ? (
+            <button type="button" className="detail-hero-image" onClick={() => setIsImageOpen(true)} aria-label="Ampliar imagem da procura">
+              <img src={detailImageSrc} alt={`Imagem de referencia da procura ${resolvedInterest.title}`} />
+            </button>
+          ) : null}
+          <h1>{resolvedInterest.title}</h1>
           <div className="interest-meta interest-meta--large">
-            <span><Tag size={16} /> {categoryLabel(categories, detailInterest.category)}</span>
-            <span><MapPin size={16} /> {locationLabel(detailInterest)}</span>
+            <span><Tag size={16} /> {categoryLabel(categories, resolvedInterest.category)}</span>
+            <span><MapPin size={16} /> {locationLabel(resolvedInterest)}</span>
           </div>
           <section className="document-section">
             <h2>Descrição</h2>
-            <p>{detailInterest.description}</p>
+            <p>{resolvedInterest.description}</p>
           </section>
           <section className="document-section">
             <h2>Tags</h2>
-            <div className="tag-list">{(detailInterest.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
+            <div className="tag-list">{(resolvedInterest.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
           </section>
         </article>
         <aside className="action-panel">
           <div>
             <span>Orçamento estimado</span>
-            <strong>{budgetLabel(detailInterest)}</strong>
+            <strong>{budgetLabel(resolvedInterest)}</strong>
           </div>
           {isMine ? (
             <div className="notice-box">
               <strong>Esta procura é sua</strong>
-              <p>Use a área logada para acompanhar propostas recebidas, editar, renovar ou impulsionar.</p>
-              <Link className="button button--primary" href="/meus-interesses">Ir para minhas procuras</Link>
+              <p>Gerencie ajustes, renovacao e disponibilidade desta procura por aqui.</p>
+              <span className="detail-expiration">{listingExpirationLabel(resolvedInterest)}</span>
+              <div className="owner-action-grid">
+                <Link className="button button--primary" href={`/cadastrar-interesse?editar=${resolvedInterest.id}`}><Pencil size={16} /> Editar</Link>
+                <Button type="button" variant="outline" onClick={() => renewOwnInterest(resolvedInterest.id)} title="Usa 1 credito para adicionar mais 30 dias a procura"><RefreshCw size={16} /> Renovar por 1 credito</Button>
+                {resolvedInterest.status === "CLOSED" ? (
+                  <Button type="button" variant="outline" onClick={() => activateOwnInterest(resolvedInterest.id)}>Ativar</Button>
+                ) : (
+                  <Button type="button" variant="outline" onClick={() => closeOwnInterest(resolvedInterest.id)}>Desativar</Button>
+                )}
+                <Link className="button button--outline" href="/meus-interesses">Ir para minhas procuras</Link>
+              </div>
             </div>
           ) : currentUser?.id ? (
             <form className="stack-form" onSubmit={submitOfferForm}>
@@ -154,10 +222,10 @@ export function InterestDetailPage({ initialInterest }: { initialInterest?: Inte
           <div className="share-panel">
             <h2><Share2 size={17} /> Compartilhar</h2>
             <div className="share-grid">
-              <a className="button button--outline button--sm" href={whatsappUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent("share_interest", { method: "whatsapp", interest_id: detailInterest.id })}><span className="brand-icon brand-icon--whatsapp"><WhatsAppIcon /></span> WhatsApp</a>
-              <a className="button button--outline button--sm" href={xUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent("share_interest", { method: "x", interest_id: detailInterest.id })}><span className="brand-icon brand-icon--x"><XBrandIcon /></span> X</a>
-              <a className="button button--outline button--sm" href={facebookUrl} target="_blank" rel="noreferrer" onClick={() => trackEvent("share_interest", { method: "facebook", interest_id: detailInterest.id })}><span className="brand-icon brand-icon--facebook"><FacebookIcon /></span> Facebook</a>
-              <button className="button button--outline button--sm" type="button" onClick={copyLink}><Copy size={15} /> Link</button>
+              <a className="button button--outline button--sm share-icon-button" href={whatsappUrl} target="_blank" rel="noreferrer" aria-label="Compartilhar no WhatsApp" title="WhatsApp" onClick={() => trackEvent("share_interest", { method: "whatsapp", interest_id: resolvedInterest.id })}><span className="brand-icon brand-icon--whatsapp"><WhatsAppIcon /></span></a>
+              <a className="button button--outline button--sm share-icon-button" href={xUrl} target="_blank" rel="noreferrer" aria-label="Compartilhar no X" title="X" onClick={() => trackEvent("share_interest", { method: "x", interest_id: resolvedInterest.id })}><span className="brand-icon brand-icon--x"><XBrandIcon /></span></a>
+              <a className="button button--outline button--sm share-icon-button" href={facebookUrl} target="_blank" rel="noreferrer" aria-label="Compartilhar no Facebook" title="Facebook" onClick={() => trackEvent("share_interest", { method: "facebook", interest_id: resolvedInterest.id })}><span className="brand-icon brand-icon--facebook"><FacebookIcon /></span></a>
+              <button className="button button--outline button--sm" type="button" onClick={copyLink}><Copy size={15} /> Copiar Link</button>
             </div>
           </div>
           <button type="button" className="text-button danger-text" onClick={() => currentUser?.id ? setIsReportOpen(true) : openAuthModal("login")}><Flag size={15} /> Denunciar esta procura</button>
@@ -167,13 +235,21 @@ export function InterestDetailPage({ initialInterest }: { initialInterest?: Inte
         <div className="modal-overlay" role="presentation" onClick={() => setIsReportOpen(false)}>
           <form className="modal-card report-modal stack-form" role="dialog" aria-modal="true" onSubmit={submitReportForm} onClick={(event) => event.stopPropagation()}>
             <h2>Denunciar procura</h2>
-            <label>Motivo<input value={reportForm.reason} onChange={(event) => setReportForm((current) => ({ ...current, reason: event.target.value }))} required /></label>
-            <label>Mensagem<textarea rows={4} value={reportForm.message} onChange={(event) => setReportForm((current) => ({ ...current, message: event.target.value }))} required /></label>
+            <label>Motivo<input value={reportForm.reason} maxLength={REPORT_REASON_MAX_LENGTH} onChange={(event) => setReportForm((current) => ({ ...current, reason: event.target.value }))} required /><FieldCounter value={reportForm.reason} max={REPORT_REASON_MAX_LENGTH} /></label>
+            <label>Mensagem<textarea rows={4} value={reportForm.message} maxLength={REPORT_MESSAGE_MAX_LENGTH} onChange={(event) => setReportForm((current) => ({ ...current, message: event.target.value }))} required /><FieldCounter value={reportForm.message} max={REPORT_MESSAGE_MAX_LENGTH} /></label>
             <div className="modal-actions">
               <Button type="button" variant="outline" onClick={() => setIsReportOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={isReportSubmitting}><MessageSquare size={16} /> {isReportSubmitting ? "Enviando..." : "Enviar denuncia"}</Button>
             </div>
           </form>
+        </div>
+      ) : null}
+      {isImageOpen && detailImageSrc ? (
+        <div className="modal-overlay image-lightbox" role="presentation" onClick={() => setIsImageOpen(false)}>
+          <div className="image-lightbox__content" role="dialog" aria-modal="true" aria-label="Imagem ampliada da procura" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="icon-button image-lightbox__close" onClick={() => setIsImageOpen(false)} aria-label="Fechar imagem ampliada">×</button>
+            <img src={detailImageSrc} alt={`Imagem de referencia da procura ${resolvedInterest.title}`} />
+          </div>
         </div>
       ) : null}
     </section>

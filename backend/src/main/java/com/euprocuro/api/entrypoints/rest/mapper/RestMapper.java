@@ -534,11 +534,21 @@ public final class RestMapper {
 
         String value = referenceImageUrl.trim();
         String normalized = value.toLowerCase();
-        if (normalized.startsWith("data:") || normalized.startsWith("javascript:")) {
+        if (normalized.startsWith("javascript:")) {
+            return null;
+        }
+        if (normalized.startsWith("data:") && !isPublicImageDataUrl(normalized)) {
             return null;
         }
 
         return value;
+    }
+
+    private static boolean isPublicImageDataUrl(String value) {
+        return value.startsWith("data:image/png;base64,")
+                || value.startsWith("data:image/jpeg;base64,")
+                || value.startsWith("data:image/jpg;base64,")
+                || value.startsWith("data:image/webp;base64,");
     }
 
     public static InterestModerationResponse toResponse(InterestModeration domain) {

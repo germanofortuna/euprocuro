@@ -21,7 +21,7 @@ export default async function InterestPage({ params }: { params: Promise<{ id: s
   const interest = await serverPublicRequest<Interest>(`/interests/${id}`, 60);
   return (
     <PublicLayout>
-      <main><InterestDetailPage initialInterest={interest} /></main>
+      <main><InterestDetailPage interestId={id} initialInterest={interest} /></main>
     </PublicLayout>
   );
 }

@@ -14,21 +14,17 @@ const ThemeContext = createContext<{
 
 function readInitialTheme(): Theme {
   if (typeof window === "undefined") {
-    return "dark";
+    return "light";
   }
   const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
   if (storedTheme === "light" || storedTheme === "dark") {
     return storedTheme;
   }
-  return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  return "light";
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
-
-  useEffect(() => {
-    setThemeState(readInitialTheme());
-  }, []);
+  const [theme, setThemeState] = useState<Theme>(() => readInitialTheme());
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

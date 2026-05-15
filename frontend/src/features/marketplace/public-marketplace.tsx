@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowRight, Search, TrendingUp } from "lucide-react";
+import { useEffect } from "react";
 import { usePlatform } from "@/features/platform/platform-context";
 import { InterestCard } from "./interest-card";
 import { MarketplaceFilters } from "./marketplace-filters";
 import { budgetLabel, categoryLabel, categorySearchPlaceholder, locationLabel, slugifyCategory } from "@/shared/lib/format";
+import { rememberInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { Button } from "@/shared/ui/button";
 
 export function PublicHome() {
@@ -68,6 +70,9 @@ export function PublicHome() {
 export function CategoryLanding({ categorySlug }: { categorySlug?: string }) {
   const { categories, interests, refreshPublicData, selectInterest } = usePlatform();
   const searchParams = useSearchParams();
+  useEffect(() => {
+    rememberInterestListHref(`${window.location.pathname}${window.location.search}`);
+  }, [categorySlug, searchParams]);
   const query = (searchParams.get("query") ?? "").trim().toLowerCase();
   const currentCategory = categorySlug
     ? categories.find((category) => slugifyCategory(category.value) === categorySlug || slugifyCategory(category.label) === categorySlug)

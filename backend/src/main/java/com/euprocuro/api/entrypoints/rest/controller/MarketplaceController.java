@@ -84,7 +84,6 @@ public class MarketplaceController {
                 .maxBudget(maxBudget)
                 .query(query)
                 .openOnly(true)
-                .currentUserId(currentUserId.orElse(null))
                 .build();
 
         return marketplaceUseCase.listInterests(filter, offset, limit)
