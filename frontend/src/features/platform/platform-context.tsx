@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   AUTH_SESSION_MODE,
   activateInterest,
+  boostInterest as requestBoostInterest,
   cancelSubscription,
   clearSession,
   closeInterest,
@@ -84,6 +85,7 @@ type PlatformContextValue = {
   submitOmbudsman: (payload: Record<string, unknown>) => Promise<{ protocol?: string } | null>;
   saveSellerItem: (payload: Record<string, unknown>, itemId?: string | null) => Promise<void>;
   buyProduct: (productCode: string, paymentMethod?: string) => Promise<void>;
+  boostOwnInterest: (interestId: string, boostCode: string, paymentMethod?: string) => Promise<void>;
   cancelPlan: () => Promise<void>;
 };
 
@@ -129,8 +131,26 @@ function normalizeDashboard(payload: Dashboard | null): Dashboard | null {
   };
 }
 
+function normalizeMonetizationAccount(payload: MonetizationAccount | null): MonetizationAccount | null {
+  if (!payload) {
+    return null;
+  }
+  const creditPurchasesEnabled = payload.settings?.creditPurchasesEnabled ?? payload.creditPurchasesEnabled ?? false;
+  const boostPurchasesEnabled = payload.settings?.boostPurchasesEnabled ?? payload.boostPurchasesEnabled ?? false;
+  return {
+    ...payload,
+    proSubscriptionActive: payload.proSubscriptionActive ?? payload.subscriptionActive ?? false,
+    payments: payload.payments ?? payload.paymentHistory ?? [],
+    settings: {
+      ...(payload.settings ?? {}),
+      creditPurchasesEnabled,
+      boostPurchasesEnabled
+    }
+  };
+}
+
 export function PlatformProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<StoredSession | null>(() => getStoredSession());
+  const [session, setSession] = useState<StoredSession | null>(null);
   const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES);
   const [interests, setInterests] = useState<Interest[]>(sampleInterests);
   const [selectedInterest, setSelectedInterest] = useState<Interest | null>(sampleInterests[0]);
@@ -192,7 +212,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
         setDashboard(normalizeDashboard(dashboardResult.value));
       }
       if (monetizationResult.status === "fulfilled") {
-        setMonetization(monetizationResult.value);
+        setMonetization(normalizeMonetizationAccount(monetizationResult.value));
       }
       if (sellerItemsResult.status === "fulfilled") {
         setSellerItems(sellerItemsResult.value);
@@ -379,6 +399,20 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     await refreshPrivateData();
   }, [refreshPrivateData]);
 
+  const boostOwnInterest = useCallback(async (interestId: string, boostCode: string, paymentMethod = "MERCADO_PAGO") => {
+    const checkout = await requestBoostInterest(interestId, { boostCode, paymentMethod }) as { checkoutUrl?: string; message?: string };
+    if (typeof checkout.checkoutUrl === "string" && checkout.checkoutUrl && !checkout.checkoutUrl.startsWith("local://")) {
+      window.location.assign(checkout.checkoutUrl);
+      return;
+    }
+    setFeedback({
+      type: "success",
+      title: paymentMethod === "CREDITS" ? "Boost ativado" : "Pedido criado",
+      message: String(checkout.message ?? "Boost solicitado com sucesso.")
+    });
+    await Promise.all([refreshPrivateData(), refreshPublicData()]);
+  }, [refreshPrivateData, refreshPublicData]);
+
   const cancelPlan = useCallback(async () => {
     await cancelSubscription();
     setFeedback({ type: "success", title: "Plano cancelado", message: "O Plano Pro foi cancelado para esta conta." });
@@ -420,12 +454,14 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     submitOmbudsman,
     saveSellerItem,
     buyProduct,
+    boostOwnInterest,
     cancelPlan
   }), [
     activateOwnInterest,
     adminModeration,
     authModal,
     buyProduct,
+    boostOwnInterest,
     cancelPlan,
     categories,
     closeAuthModal,

@@ -415,9 +415,11 @@ public class OperationalCatalogService {
                 product("SELLER_PRO", "Plano vendedor Pro", "Propostas ilimitadas por 30 dias neste MVP.",
                         MonetizationProductType.SUBSCRIPTION, new BigDecimal("49.90"), null, 30, 30),
                 product("BOOST_3_DAYS", "Boost 3 dias", "Impulsiona o interesse na busca e na home.",
-                        MonetizationProductType.BOOST, new BigDecimal("9.90"), null, 3, 40),
+                        MonetizationProductType.BOOST, new BigDecimal("9.90"), 3, 3, 40),
                 product("BOOST_7_DAYS", "Boost 7 dias", "Mais tempo em destaque para receber propostas.",
-                        MonetizationProductType.BOOST, new BigDecimal("19.90"), null, 7, 50)
+                        MonetizationProductType.BOOST, new BigDecimal("19.90"), 6, 7, 50),
+                product("BOOST_9_DAYS", "Boost 9 dias", "Destaque prolongado para procuras prioritarias.",
+                        MonetizationProductType.BOOST, new BigDecimal("24.90"), 8, 9, 60)
         );
     }
 

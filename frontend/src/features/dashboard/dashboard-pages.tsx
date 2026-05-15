@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { CreditCard, Eye, MessageSquare, Package, Plus, Search, Sparkles, Trash2, type LucideIcon } from "lucide-react";
+import { CreditCard, Eye, MessageSquare, Package, Plus, Search, Sparkles, Trash2, Upload, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import mercadoPagoLogo from "@/assets/mercado-pago.svg";
@@ -11,6 +11,7 @@ import type { Interest, Offer, OfferConversation } from "@/shared/api/types";
 import { fetchOfferConversation, sendOfferMessage } from "@/shared/api/client";
 import { budgetLabel, categoryLabel, formatDateTime, listingExpirationLabel, locationLabel, statusLabel, statusTone } from "@/shared/lib/format";
 import { referenceImageSrc } from "@/shared/lib/images";
+import { readImageFile } from "@/shared/lib/image-upload";
 import { rememberInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -62,6 +63,7 @@ export function MyInterestsPage() {
   const interests = dashboard?.myInterests ?? [];
   const receivedOffers = dashboard?.receivedOffers ?? [];
   const sentOffers = dashboard?.sentOffers ?? [];
+  const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
   useEffect(() => {
     rememberInterestListHref("/meus-interesses");
   }, []);
@@ -81,7 +83,7 @@ export function MyInterestsPage() {
         <StatCard title="Propostas Enviadas" value={sentOffers.length} detail="Negociações que você iniciou" icon={Package} />
       </div>
       <section className="dashboard-section">
-        <div className="section-heading"><h2>Minhas procuras</h2><span>{monetization?.sellerCredits ?? currentUser?.credits ?? 0} créditos</span></div>
+        <div className="section-heading"><h2>Minhas procuras</h2>{creditPurchasesEnabled ? <span>{monetization?.sellerCredits ?? currentUser?.credits ?? 0} créditos</span> : null}</div>
         {isLoadingPrivate && !dashboard ? (
           <div className="section-loading" role="status">Carregando suas procuras...</div>
         ) : interests.length ? (
@@ -159,8 +161,8 @@ export function OffersPage({ type }: { type: "sent" | "received" }) {
 }
 
 export function SellerItemsPage() {
-  const { sellerItems, saveSellerItem, categories, isLoadingPrivate } = usePlatform();
-  const [form, setForm] = useState({ title: "", description: "", category: "", desiredPrice: "", tags: "" });
+  const { sellerItems, saveSellerItem, categories, isLoadingPrivate, setFeedback } = usePlatform();
+  const [form, setForm] = useState({ title: "", description: "", category: "", desiredPrice: "", tags: "", referenceImageUrl: "" });
   const [isSavingItem, setIsSavingItem] = useState(false);
   const [selectedSellerItemId, setSelectedSellerItemId] = useState<string | null>(null);
   const matchesRef = useRef<HTMLDivElement | null>(null);
@@ -206,13 +208,27 @@ export function SellerItemsPage() {
         description: form.description,
         category: form.category,
         desiredPrice: form.desiredPrice ? Number(form.desiredPrice) : null,
+        referenceImageUrl: form.referenceImageUrl || null,
         tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean)
       });
-      setForm({ title: "", description: "", category: "", desiredPrice: "", tags: "" });
+      setForm({ title: "", description: "", category: "", desiredPrice: "", tags: "", referenceImageUrl: "" });
     } finally {
       setIsSavingItem(false);
     }
   };
+
+  async function handleItemImageChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    try {
+      const referenceImageUrl = await readImageFile(file);
+      setForm((current) => ({ ...current, referenceImageUrl }));
+    } catch (error) {
+      setFeedback({ type: "error", title: "Imagem invalida", message: error instanceof Error ? error.message : "Selecione outra imagem." });
+    }
+  }
 
   return (
     <div className="dashboard-page">
@@ -225,6 +241,13 @@ export function SellerItemsPage() {
           <label>Descrição<textarea rows={4} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} required /></label>
           <label>Valor desejado<input type="number" min="0" value={form.desiredPrice} onChange={(event) => setForm((current) => ({ ...current, desiredPrice: event.target.value }))} /></label>
           <label>Tags<input value={form.tags} onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))} /></label>
+          <label className="upload-box">
+            {form.referenceImageUrl ? <img className="upload-preview" src={form.referenceImageUrl} alt="Previa da imagem do item" /> : <Upload size={28} />}
+            <strong>{form.referenceImageUrl ? "Trocar imagem do item" : "Imagem do item"}</strong>
+            <p>Use uma foto real do produto ou uma referencia visual do servico.</p>
+            <span className="button button--outline button--sm">Selecionar imagem</span>
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleItemImageChange} />
+          </label>
           <Button type="submit" disabled={isSavingItem}><Plus size={16} /> {isSavingItem ? "Cadastrando..." : "Cadastrar Novo Item"}</Button>
         </form>
         <section className="dashboard-section">
@@ -305,8 +328,9 @@ export function SellerItemsPage() {
 }
 
 export function CreditsPage() {
-  const { monetization, buyProduct, cancelPlan, setFeedback } = usePlatform();
+  const { monetization, buyProduct, cancelPlan, setFeedback, isLoadingPrivate } = usePlatform();
   const products = (monetization?.products ?? []).filter((product) => String(product.type).toUpperCase() !== "BOOST");
+  const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
   const [buyingProductCode, setBuyingProductCode] = useState<string | null>(null);
   async function purchase(productCode: string) {
     setBuyingProductCode(productCode);
@@ -317,6 +341,19 @@ export function CreditsPage() {
     } finally {
       setBuyingProductCode(null);
     }
+  }
+  if (isLoadingPrivate && !monetization) {
+    return <div className="dashboard-page"><div className="section-loading" role="status">Carregando produtos...</div></div>;
+  }
+  if (!creditPurchasesEnabled) {
+    return (
+      <div className="dashboard-page">
+        <div className="dashboard-heading"><div><h1>Creditos e Plano</h1><p>Compra de creditos e planos esta desativada no CRM operacional.</p></div></div>
+        <section className="dashboard-section">
+          <EmptyState title="Compra de creditos indisponivel" description="O CRM operacional desativou a compra de creditos e planos no momento." />
+        </section>
+      </div>
+    );
   }
   return (
     <div className="dashboard-page">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ComponentProps } from "react";
-import { ChevronDown, Pencil, RefreshCw, Save, ShieldCheck, Trash2 } from "lucide-react";
+import { ChevronDown, Pencil, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { usePlatform } from "@/features/platform/platform-context";
 import {
   decideInterestModeration,
@@ -203,6 +203,10 @@ export function AdminPage() {
     });
   }
 
+  function addCatalogProduct(product: Record<string, unknown>) {
+    setCatalog((current) => current ? { ...current, products: [...(current.products ?? []), product] } : current);
+  }
+
   function updateContentEntry(index: number, key: string, value: unknown) {
     setContent((current) => {
       if (!current) {
@@ -366,19 +370,27 @@ export function AdminPage() {
                 <article><strong>{catalog.products?.length ?? 0} produtos</strong><span>Credito, assinatura e boost</span></article>
                 <article><strong>{catalog.categories?.length ?? 0} categorias</strong><span>Rotas SEO e filtros publicos</span></article>
                 <h3>Produtos</h3>
+                {!(catalog.products ?? []).some((product) => String(product.code ?? "").toUpperCase() === "BOOST_9_DAYS") ? (
+                  <Button type="button" variant="outline" onClick={() => addCatalogProduct({ code: "BOOST_9_DAYS", name: "Boost 9 dias", description: "Destaque prolongado para procuras prioritarias.", type: "BOOST", price: 24.9, credits: 8, durationDays: 9, enabled: true, sortOrder: 60 })}>
+                    <Plus size={16} /> Adicionar boost 9 dias
+                  </Button>
+                ) : null}
                 {(catalog.products ?? []).map((product, index) => (
                   <article key={String(product.code ?? product.name ?? index)} className="admin-edit-row">
                     <label>Nome<input value={String(product.name ?? "")} onChange={(event) => updateCatalogArrayItem("products", index, "name", event.target.value)} /></label>
                     <label>Codigo<input value={String(product.code ?? "")} onChange={(event) => updateCatalogArrayItem("products", index, "code", event.target.value)} /></label>
-                    <label>Tipo<input value={String(product.type ?? "")} onChange={(event) => updateCatalogArrayItem("products", index, "type", event.target.value)} /></label>
+                    <label>Tipo<select value={String(product.type ?? "")} onChange={(event) => updateCatalogArrayItem("products", index, "type", event.target.value)}><option value="CREDIT_PACK">CREDIT_PACK</option><option value="SUBSCRIPTION">SUBSCRIPTION</option><option value="BOOST">BOOST</option></select></label>
                     <label>Preco<input type="number" min="0" step="0.01" value={Number(product.price ?? 0)} onChange={(event) => updateCatalogArrayItem("products", index, "price", Number(event.target.value))} /></label>
+                    <label>Custo em creditos<input type="number" min="0" value={product.credits == null ? "" : Number(product.credits)} onChange={(event) => updateCatalogArrayItem("products", index, "credits", event.target.value === "" ? null : Number(event.target.value))} /></label>
+                    <label>Dias de duracao<input type="number" min="0" value={product.durationDays == null ? "" : Number(product.durationDays)} onChange={(event) => updateCatalogArrayItem("products", index, "durationDays", event.target.value === "" ? null : Number(event.target.value))} /></label>
+                    <label>Ordem<input type="number" value={Number(product.sortOrder ?? index)} onChange={(event) => updateCatalogArrayItem("products", index, "sortOrder", Number(event.target.value))} /></label>
                     <label className="checkbox-row"><input type="checkbox" checked={product.enabled !== false} onChange={(event) => updateCatalogArrayItem("products", index, "enabled", event.target.checked)} /><span>Ativo</span></label>
                   </article>
                 ))}
                 <h3>Categorias</h3>
                 {(catalog.categories ?? []).map((category, index) => (
-                  <article key={String(category.value ?? category.label ?? index)} className="admin-edit-row">
-                    <label>Valor<input value={String(category.value ?? "")} onChange={(event) => updateCatalogArrayItem("categories", index, "value", event.target.value)} /></label>
+                  <article key={String(category.code ?? category.value ?? category.label ?? index)} className="admin-edit-row">
+                    <label>Codigo<input value={String(category.code ?? category.value ?? "")} onChange={(event) => updateCatalogArrayItem("categories", index, "code", event.target.value)} /></label>
                     <label>Label<input value={String(category.label ?? "")} onChange={(event) => updateCatalogArrayItem("categories", index, "label", event.target.value)} /></label>
                     <label>Ordem<input type="number" value={Number(category.sortOrder ?? index)} onChange={(event) => updateCatalogArrayItem("categories", index, "sortOrder", Number(event.target.value))} /></label>
                     <label className="checkbox-row"><input type="checkbox" checked={category.active !== false} onChange={(event) => updateCatalogArrayItem("categories", index, "active", event.target.checked)} /><span>Ativa</span></label>

@@ -5,6 +5,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -41,6 +42,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class MonetizationService implements MonetizationUseCase {
+
+    private static final String CREDITS_PAYMENT_METHOD = "CREDITS";
 
     private final UserGateway userGateway;
     private final InterestGateway interestGateway;
@@ -199,8 +202,53 @@ public class MonetizationService implements MonetizationUseCase {
 
         UserProfile owner = requireUser(userId);
         String paymentMethod = normalizePaymentMethod(command.getPaymentMethod());
+        if (CREDITS_PAYMENT_METHOD.equals(paymentMethod)) {
+            return activateBoostWithCredits(owner, interestId, product);
+        }
 
         return createPendingCheckout(owner, product, paymentMethod, interestId);
+    }
+
+    private CheckoutView activateBoostWithCredits(UserProfile owner, String interestId, MonetizationProductView product) {
+        if (!monetizationCatalog.creditPurchasesEnabled()) {
+            throw new BusinessException("Uso de creditos para boost esta temporariamente desabilitado.");
+        }
+        int creditCost = Optional.ofNullable(product.getCredits()).orElse(0);
+        if (creditCost <= 0) {
+            throw new BusinessException("Configure o custo em creditos deste boost no CRM.");
+        }
+        if (Optional.ofNullable(product.getDurationDays()).orElse(0) <= 0) {
+            throw new BusinessException("Configure a duracao deste boost no CRM.");
+        }
+        int currentCredits = sellerCredits(owner);
+        if (currentCredits < creditCost) {
+            throw new BusinessException("Creditos insuficientes para ativar este boost.");
+        }
+
+        UserProfile updatedOwner = userGateway.save(owner.toBuilder()
+                .sellerCredits(currentCredits - creditCost)
+                .build());
+        String creditOrderId = "credits-" + UUID.randomUUID();
+        activateBoost(updatedOwner.getId(), interestId, product, CREDITS_PAYMENT_METHOD, creditOrderId);
+
+        eventPublisherGateway.publish("monetization.boost.credits.completed", Map.of(
+                "userId", updatedOwner.getId(),
+                "interestId", interestId,
+                "productCode", product.getCode(),
+                "creditsUsed", creditCost,
+                "remainingCredits", sellerCredits(updatedOwner)
+        ));
+
+        return CheckoutView.builder()
+                .provider(CREDITS_PAYMENT_METHOD)
+                .paymentMethod(CREDITS_PAYMENT_METHOD)
+                .productCode(product.getCode())
+                .paymentOrderId(creditOrderId)
+                .providerPreferenceId(creditOrderId)
+                .checkoutUrl("local://credits")
+                .status("APPROVED")
+                .message("Boost ativado usando creditos.")
+                .build();
     }
 
     private UserProfile applyProductToUser(UserProfile user, MonetizationProductView product) {
@@ -436,7 +484,11 @@ public class MonetizationService implements MonetizationUseCase {
         Instant currentExpiration = interest.getBoostedUntil() != null && interest.getBoostedUntil().isAfter(now)
                 ? interest.getBoostedUntil()
                 : now;
-        Instant boostedUntil = currentExpiration.plus(product.getDurationDays(), ChronoUnit.DAYS);
+        int durationDays = Optional.ofNullable(product.getDurationDays()).orElse(0);
+        if (durationDays <= 0) {
+            throw new BusinessException("Configure a duracao deste boost no CRM.");
+        }
+        Instant boostedUntil = currentExpiration.plus(durationDays, ChronoUnit.DAYS);
 
         InterestPost saved = interestGateway.save(interest.toBuilder()
                 .boostedUntil(boostedUntil)

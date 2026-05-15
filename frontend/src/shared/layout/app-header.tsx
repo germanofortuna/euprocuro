@@ -43,6 +43,7 @@ export function AppHeader() {
   const [isThemeAnimating, setIsThemeAnimating] = useState(false);
   const notificationButtonRef = useRef<HTMLButtonElement | null>(null);
   const credits = monetization?.sellerCredits ?? currentUser?.sellerCredits ?? currentUser?.credits ?? 0;
+  const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
   const notifications = buildOfferNotifications(dashboard?.receivedOffers, dashboard?.sentOffers);
   const messageSeenKey = currentUser?.id ? `eu-procuro-message-seen:${currentUser.id}` : null;
   const unreadCount = notifications.filter((notification) => !seenNotifications.includes(notification.id)).length;
@@ -110,7 +111,7 @@ export function AppHeader() {
           </button>
           {currentUser?.id ? (
             <>
-              <Link className="credit-chip" href="/comprar-creditos">{credits} creditos</Link>
+              {creditPurchasesEnabled ? <Link className="credit-chip" href="/comprar-creditos">{credits} creditos</Link> : null}
               <button ref={notificationButtonRef} type="button" className="icon-button notification-trigger" onClick={openNotifications} aria-label="Abrir notificacoes">
                 <Bell size={18} />
                 {unreadCount ? <span className="notification-badge">{unreadCount}</span> : null}

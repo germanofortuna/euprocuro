@@ -1,13 +1,15 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Copy, Flag, MapPin, MessageSquare, Pencil, RefreshCw, Send, Share2, Tag } from "lucide-react";
+import { ArrowLeft, Copy, CreditCard, Flag, MapPin, MessageSquare, Pencil, RefreshCw, Send, Share2, Sparkles, Tag } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ComponentProps } from "react";
+import mercadoPagoLogo from "@/assets/mercado-pago.svg";
 import { usePlatform } from "@/features/platform/platform-context";
 import { fetchInterest } from "@/shared/api/client";
-import type { Interest } from "@/shared/api/types";
-import { budgetLabel, categoryLabel, listingExpirationLabel, locationLabel } from "@/shared/lib/format";
+import type { Interest, MonetizationProduct } from "@/shared/api/types";
+import { budgetLabel, categoryLabel, listingExpirationLabel, locationLabel, statusTone } from "@/shared/lib/format";
 import { referenceImageSrc } from "@/shared/lib/images";
 import { readInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { Button } from "@/shared/ui/button";
@@ -17,6 +19,14 @@ import { trackEvent } from "@/features/analytics/analytics";
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 const REPORT_REASON_MAX_LENGTH = 120;
 const REPORT_MESSAGE_MAX_LENGTH = 600;
+
+function moneyLabel(value?: number | null) {
+  return Number(value ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function boostSort(left: MonetizationProduct, right: MonetizationProduct) {
+  return (left.sortOrder ?? left.durationDays ?? 0) - (right.sortOrder ?? right.durationDays ?? 0);
+}
 
 function WhatsAppIcon() {
   return (
@@ -43,7 +53,7 @@ function FacebookIcon() {
 }
 
 export function InterestDetailPage({ interestId, initialInterest }: { interestId: string; initialInterest?: Interest | null }) {
-  const { categories, dashboard, isLoadingPrivate, currentUser, submitOffer, submitReport, openAuthModal, setFeedback, closeOwnInterest, activateOwnInterest, renewOwnInterest } = usePlatform();
+  const { categories, dashboard, isLoadingPrivate, currentUser, monetization, submitOffer, submitReport, openAuthModal, setFeedback, closeOwnInterest, activateOwnInterest, renewOwnInterest, boostOwnInterest } = usePlatform();
   const [routeInterest, setRouteInterest] = useState<Interest | null>(null);
   const [isLoadingRouteInterest, setIsLoadingRouteInterest] = useState(false);
   const [isImageOpen, setIsImageOpen] = useState(false);
@@ -59,6 +69,7 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isOfferSubmitting, setIsOfferSubmitting] = useState(false);
   const [isReportSubmitting, setIsReportSubmitting] = useState(false);
+  const [boostingKey, setBoostingKey] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState("");
 
   useEffect(() => {
@@ -119,10 +130,19 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
   }
 
   const resolvedInterest = detailInterest;
+  const isRejected = resolvedInterest.status === "REJECTED";
   const detailImageSrc = referenceImageSrc(resolvedInterest);
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`Olha esta procura no Eu Procuro: ${resolvedInterest.title} - ${shareUrl}`)}`;
   const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Olha esta procura no Eu Procuro: ${resolvedInterest.title}`)}&url=${encodeURIComponent(shareUrl)}`;
   const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+  const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
+  const boostPurchasesEnabled = Boolean(monetization?.settings?.boostPurchasesEnabled);
+  const sellerCredits = monetization?.sellerCredits ?? currentUser?.sellerCredits ?? currentUser?.credits ?? 0;
+  const boostProducts = (monetization?.products ?? [])
+    .filter((product) => String(product.type).toUpperCase() === "BOOST" && product.enabled !== false)
+    .sort(boostSort);
+  const boostedUntil = resolvedInterest.boostedUntil ? new Date(resolvedInterest.boostedUntil) : null;
+  const isBoostActive = Boolean(boostedUntil && boostedUntil.getTime() > Date.now());
 
   const submitOfferForm: FormSubmitHandler = async (event) => {
     event.preventDefault();
@@ -158,12 +178,24 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
     }
   };
 
+  async function handleBoost(product: MonetizationProduct, paymentMethod: "CREDITS" | "MERCADO_PAGO") {
+    const key = `${product.code}:${paymentMethod}`;
+    setBoostingKey(key);
+    try {
+      await boostOwnInterest(resolvedInterest.id, product.code, paymentMethod);
+    } catch (error) {
+      setFeedback({ type: "error", title: "Boost indisponivel", message: error instanceof Error ? error.message : "Nao foi possivel ativar o boost agora." });
+    } finally {
+      setBoostingKey(null);
+    }
+  }
+
   return (
     <section className="route-shell detail-route">
       <Link href={interestListHref} className="back-link"><ArrowLeft size={16} /> Voltar para as procuras</Link>
       <div className="detail-grid">
         <article className="detail-main">
-          <span className="pill">Procura publicada</span>
+          <span className={`pill pill--${statusTone(resolvedInterest.status)}`}>{isRejected ? "Procura rejeitada" : "Procura publicada"}</span>
           {detailImageSrc ? (
             <button type="button" className="detail-hero-image" onClick={() => setIsImageOpen(true)} aria-label="Ampliar imagem da procura">
               <img src={detailImageSrc} alt={`Imagem de referencia da procura ${resolvedInterest.title}`} />
@@ -190,12 +222,49 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
           </div>
           {isMine ? (
             <div className="notice-box">
-              <strong>Esta procura é sua</strong>
-              <p>Gerencie ajustes, renovacao e disponibilidade desta procura por aqui.</p>
-              <span className="detail-expiration">{listingExpirationLabel(resolvedInterest)}</span>
+              <strong>{isRejected ? "Sua procura foi rejeitada pela nossa moderação!" : "Esta procura é sua"}</strong>
+              <p>{isRejected ? "Você pode editá-la para que seja reavaliada." : "Gerencie ajustes, renovacao e disponibilidade desta procura por aqui."}</p>
+              {!isRejected ? <span className="detail-expiration">{listingExpirationLabel(resolvedInterest)}</span> : null}
+              {!isRejected && boostPurchasesEnabled && boostProducts.length ? (
+                <div className="boost-panel">
+                  <div className="boost-panel__header">
+                    <strong><Sparkles size={16} /> Impulsionar procura</strong>
+                    {isBoostActive && boostedUntil ? <span>Boost ativo ate {boostedUntil.toLocaleDateString("pt-BR")}</span> : null}
+                  </div>
+                  <div className="boost-product-list">
+                    {boostProducts.map((product) => {
+                      const creditCost = Number(product.credits ?? 0);
+                      const canUseCredits = creditPurchasesEnabled && creditCost > 0;
+                      const hasEnoughCredits = sellerCredits >= creditCost;
+                      return (
+                        <article className="boost-product-card" key={product.code}>
+                          <div>
+                            <strong>{product.name}</strong>
+                            <span>{product.durationDays ? `${product.durationDays} dias` : "Duracao configuravel"} - {moneyLabel(product.price)}</span>
+                            {canUseCredits ? <small>{creditCost} creditos no CRM</small> : null}
+                          </div>
+                          <div className="boost-action-row">
+                            {canUseCredits ? (
+                              hasEnoughCredits ? (
+                                <Button type="button" variant="outline" disabled={boostingKey === `${product.code}:CREDITS`} onClick={() => handleBoost(product, "CREDITS")}><CreditCard size={15} /> {boostingKey === `${product.code}:CREDITS` ? "Ativando..." : `Usar ${creditCost} creditos`}</Button>
+                              ) : (
+                                <Link className="button button--outline button--sm" href="/comprar-creditos"><CreditCard size={15} /> Adicionar creditos</Link>
+                              )
+                            ) : null}
+                            <Button type="button" className="payment-button payment-button--compact" disabled={boostingKey === `${product.code}:MERCADO_PAGO`} onClick={() => handleBoost(product, "MERCADO_PAGO")}>
+                              <Image className="payment-gateway-icon" src={mercadoPagoLogo} alt="" width={54} height={36} aria-hidden="true" />
+                              <span>{boostingKey === `${product.code}:MERCADO_PAGO` ? "Abrindo..." : "Pagar Mercado Pago"}</span>
+                            </Button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
               <div className="owner-action-grid">
                 <Link className="button button--primary" href={`/cadastrar-interesse?editar=${resolvedInterest.id}`}><Pencil size={16} /> Editar</Link>
-                <Button type="button" variant="outline" onClick={() => renewOwnInterest(resolvedInterest.id)} title="Usa 1 credito para adicionar mais 30 dias a procura"><RefreshCw size={16} /> Renovar por 1 credito</Button>
+                {!isRejected ? <Button type="button" variant="outline" onClick={() => renewOwnInterest(resolvedInterest.id)} title="Usa 1 credito para adicionar mais 30 dias a procura"><RefreshCw size={16} /> Renovar por 1 credito</Button> : null}
                 {resolvedInterest.status === "CLOSED" ? (
                   <Button type="button" variant="outline" onClick={() => activateOwnInterest(resolvedInterest.id)}>Ativar</Button>
                 ) : (

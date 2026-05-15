@@ -21,7 +21,13 @@ export function PrivateLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { currentUser, monetization, openAuthModal, adminModeration, sellerItems } = usePlatform();
   const credits = monetization?.sellerCredits ?? currentUser?.sellerCredits ?? currentUser?.credits ?? 0;
-  const visibleNavItems = navItems.filter((item) => item.href !== "/admin" || pathname === "/admin" || isAdminUser(currentUser, Boolean(adminModeration)));
+  const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.href === "/comprar-creditos" && !creditPurchasesEnabled) {
+      return false;
+    }
+    return item.href !== "/admin" || pathname === "/admin" || isAdminUser(currentUser, Boolean(adminModeration));
+  });
 
   return (
     <div className="app-shell private-shell">
@@ -48,20 +54,20 @@ export function PrivateLayout({ children }: { children: React.ReactNode }) {
             <strong>Ações rápidas</strong>
             <Link href="/categorias"><Search size={17} /><span>Explorar procuras</span></Link>
             <Link href="/meus-itens"><Sparkles size={17} /><span>Meus matches</span><small>{sellerItems.length} itens</small></Link>
-            <Link href="/comprar-creditos"><CreditCard size={17} /><span>Créditos e plano</span></Link>
+            {creditPurchasesEnabled ? <Link href="/comprar-creditos"><CreditCard size={17} /><span>Créditos e plano</span></Link> : null}
           </div>
-          <div className="sidebar-credit-card">
+          {creditPurchasesEnabled ? <div className="sidebar-credit-card">
             <span>Saldo Atual</span>
             <strong>{credits} Créditos</strong>
             <Link href="/comprar-creditos">Comprar mais</Link>
-          </div>
+          </div> : null}
         </aside>
         <main className="private-content">
           {!currentUser?.id ? (
             <section className="auth-gate">
               <span className="pill">Área logada</span>
               <h1>Entre para continuar</h1>
-              <p>Use sua conta para gerenciar procuras, propostas, itens, créditos e administração.</p>
+              <p>{creditPurchasesEnabled ? "Use sua conta para gerenciar procuras, propostas, itens, créditos e administração." : "Use sua conta para gerenciar procuras, propostas, itens e administração."}</p>
               <button type="button" className="button button--primary" onClick={() => openAuthModal("login")}>Entrar</button>
             </section>
           ) : children}

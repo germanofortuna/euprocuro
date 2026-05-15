@@ -516,6 +516,21 @@ button:disabled {
   color: var(--primary-strong);
 }
 
+.pill--danger {
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface-raised));
+  color: var(--danger);
+}
+
+.pill--warning {
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface-raised));
+  color: var(--warning);
+}
+
+.pill--success {
+  background: color-mix(in srgb, var(--success) 14%, var(--surface-raised));
+  color: var(--success);
+}
+
 .hero-section h1 {
   margin: 22px 0 18px;
   font-size: clamp(2.4rem, 6vw, 4.2rem);
@@ -1042,6 +1057,71 @@ select:focus {
 
 .owner-action-grid .button {
   width: 100%;
+}
+
+.boost-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.boost-panel__header {
+  display: grid;
+  gap: 5px;
+}
+
+.boost-panel__header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  font-size: 0.98rem;
+}
+
+.boost-panel__header span,
+.boost-product-card small,
+.boost-product-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.boost-product-list {
+  display: grid;
+  gap: 10px;
+}
+
+.boost-product-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.boost-product-card > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.boost-product-card strong {
+  margin: 0;
+  padding: 0;
+  font-size: 0.92rem;
+}
+
+.boost-action-row {
+  display: grid;
+  gap: 8px;
+}
+
+.payment-button--compact {
+  min-height: 42px;
+  padding: 7px 10px;
 }
 
 .share-grid,

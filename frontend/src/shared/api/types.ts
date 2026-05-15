@@ -146,8 +146,23 @@ export type MonetizationProduct = {
 
 export type MonetizationAccount = {
   sellerCredits?: number;
+  purchasedCreditsTotal?: number;
+  subscriptionPlan?: string | null;
+  subscriptionActiveUntil?: string | null;
+  subscriptionActive?: boolean;
   proSubscriptionActive?: boolean;
+  creditPurchasesEnabled?: boolean;
+  boostPurchasesEnabled?: boolean;
   products?: MonetizationProduct[];
+  paymentHistory?: Array<{
+    id?: string;
+    productName?: string;
+    productCode?: string;
+    status?: string;
+    paymentMethod?: string;
+    amount?: number;
+    createdAt?: string;
+  }>;
   payments?: Array<{
     id?: string;
     productName?: string;

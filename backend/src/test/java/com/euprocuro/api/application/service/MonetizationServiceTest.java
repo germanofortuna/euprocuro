@@ -123,6 +123,7 @@ class MonetizationServiceTest {
                         .description("Impulsiona o interesse na busca e na home.")
                         .type(MonetizationProductType.BOOST)
                         .price(new BigDecimal("9.90"))
+                        .credits(2)
                         .durationDays(3)
                         .enabled(true)
                         .build()
@@ -655,6 +656,47 @@ class MonetizationServiceTest {
         verify(paymentOrderGateway).save(org.mockito.ArgumentMatchers.argThat(order ->
                 "interest-1".equals(order.getBoostInterestId()) && order.getStatus() == PaymentOrderStatus.CREATED
         ));
+    }
+
+    @Test
+    void boostInterestShouldActivateUsingCreditsWhenConfigured() {
+        InterestPost interest = baseInterest();
+        UserProfile user = baseUser().toBuilder()
+                .sellerCredits(5)
+                .build();
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CheckoutView result = monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+                .boostCode("BOOST_3_DAYS")
+                .paymentMethod("CREDITS")
+                .build());
+
+        assertThat(result.getStatus()).isEqualTo("APPROVED");
+        assertThat(result.getCheckoutUrl()).isEqualTo("local://credits");
+        verify(userGateway).save(org.mockito.ArgumentMatchers.argThat(savedUser -> savedUser.getSellerCredits() == 3));
+        verify(interestGateway).save(org.mockito.ArgumentMatchers.argThat(savedInterest ->
+                savedInterest.getBoostedUntil().isAfter(Instant.now())
+        ));
+        verify(paymentOrderGateway, never()).save(any(PaymentOrder.class));
+    }
+
+    @Test
+    void boostInterestShouldRejectCreditsWhenCreditPurchasesAreDisabled() {
+        when(monetizationCatalog.creditPurchasesEnabled()).thenReturn(false);
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser().toBuilder().sellerCredits(5).build()));
+
+        assertThatThrownBy(() -> monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+                .boostCode("BOOST_3_DAYS")
+                .paymentMethod("CREDITS")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("creditos");
+        verify(interestGateway, never()).save(any(InterestPost.class));
+        verify(paymentOrderGateway, never()).save(any(PaymentOrder.class));
     }
 
     @Test
