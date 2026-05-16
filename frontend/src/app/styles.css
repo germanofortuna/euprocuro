@@ -1151,6 +1151,19 @@ select:focus {
   grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
 }
 
+.boost-select-field {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.boost-select-field > span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .boost-option-list label,
 .boost-payment-choice label {
   min-height: 42px;
@@ -1174,6 +1187,11 @@ select:focus {
 .boost-payment-choice label.is-selected {
   border-color: color-mix(in srgb, var(--primary) 54%, var(--border));
   background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+.boost-payment-choice--compact label {
+  min-height: 40px;
+  padding: 8px 10px;
 }
 
 .boost-option-list input {
@@ -1201,7 +1219,10 @@ select:focus {
 
 .payment-button--compact {
   min-height: 42px;
-  padding: 7px 10px;
+  padding: 6px 12px;
+  width: auto;
+  justify-self: end;
+  font-size: 0.84rem;
 }
 
 .share-grid,
@@ -1966,6 +1987,21 @@ small {
   height: 32px;
   object-fit: contain;
   flex: 0 0 50px;
+}
+
+.payment-button--compact {
+  width: auto;
+  min-height: 40px;
+  justify-self: end;
+  padding: 6px 12px;
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.payment-button--compact .payment-gateway-icon--inline {
+  width: 34px;
+  height: 20px;
+  flex-basis: 34px;
 }
 
 .auth-gate,

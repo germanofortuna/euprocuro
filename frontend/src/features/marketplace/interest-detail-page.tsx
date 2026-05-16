@@ -7,9 +7,9 @@ import { useEffect, useState } from "react";
 import type { ComponentProps } from "react";
 import mercadoPagoLogo from "@/assets/mercado-pago.svg";
 import { usePlatform } from "@/features/platform/platform-context";
-import { fetchInterest } from "@/shared/api/client";
-import type { Interest, MonetizationProduct } from "@/shared/api/types";
-import { budgetLabel, categoryLabel, listingExpirationLabel, locationLabel, statusLabel, statusTone } from "@/shared/lib/format";
+import { fetchInterest, fetchOfferConversation, sendOfferMessage } from "@/shared/api/client";
+import type { Interest, MonetizationProduct, Offer, OfferConversation } from "@/shared/api/types";
+import { budgetLabel, categoryLabel, formatDateTime, listingExpirationLabel, locationLabel, statusLabel, statusTone } from "@/shared/lib/format";
 import { referenceImageSrc } from "@/shared/lib/images";
 import { readInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { Button } from "@/shared/ui/button";
@@ -69,6 +69,13 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isOfferSubmitting, setIsOfferSubmitting] = useState(false);
   const [isReportSubmitting, setIsReportSubmitting] = useState(false);
+  const [conversation, setConversation] = useState<{ visible: boolean; offer: Offer | null; data: OfferConversation | null; message: string; loading: boolean }>({
+    visible: false,
+    offer: null,
+    data: null,
+    message: "",
+    loading: false
+  });
   const [boostingKey, setBoostingKey] = useState<string | null>(null);
   const [selectedBoostCode, setSelectedBoostCode] = useState("");
   const [selectedBoostPayment, setSelectedBoostPayment] = useState<"CREDITS" | "MERCADO_PAGO">("MERCADO_PAGO");
@@ -153,6 +160,8 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
   const interestStatus = String(resolvedInterest.status ?? "OPEN").toUpperCase();
   const isPublishedInterest = ["OPEN", "APPROVED"].includes(interestStatus);
   const shouldShowBoostWaitMessage = isMine && ["PENDING", "REVIEW_REQUIRED", "IN_REVIEW"].includes(interestStatus);
+  const existingSentOffer = (dashboard?.sentOffers ?? dashboard?.offersSent ?? []).find((offer) => (offer.interestPostId ?? offer.interestId) === resolvedInterest.id) ?? null;
+  const shouldWaitForSentOfferCheck = Boolean(currentUser?.id && !isMine && !dashboard && isLoadingPrivate);
 
   const submitOfferForm: FormSubmitHandler = async (event) => {
     event.preventDefault();
@@ -187,6 +196,37 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
       setIsReportSubmitting(false);
     }
   };
+
+  async function openConversation(offer: Offer) {
+    setConversation({ visible: true, offer, data: null, message: "", loading: true });
+    try {
+      const data = await fetchOfferConversation(offer.id);
+      setConversation({ visible: true, offer, data, message: "", loading: false });
+    } catch (error) {
+      setConversation({ visible: true, offer, data: { ...offer, messages: [] }, message: "", loading: false });
+      setFeedback({ type: "error", title: "Conversa indisponivel", message: error instanceof Error ? error.message : "Nao foi possivel carregar a conversa." });
+    }
+  }
+
+  const submitConversationMessage: FormSubmitHandler = async (event) => {
+    event.preventDefault();
+    if (!conversation.offer?.id || !conversation.message.trim()) {
+      return;
+    }
+    setConversation((current) => ({ ...current, loading: true }));
+    try {
+      await sendOfferMessage(conversation.offer.id, { content: conversation.message.trim() });
+      const data = await fetchOfferConversation(conversation.offer.id);
+      setConversation((current) => ({ ...current, data, message: "", loading: false }));
+    } catch (error) {
+      setConversation((current) => ({ ...current, loading: false }));
+      setFeedback({ type: "error", title: "Mensagem nao enviada", message: error instanceof Error ? error.message : "Tente novamente em instantes." });
+    }
+  };
+
+  function closeConversation() {
+    setConversation({ visible: false, offer: null, data: null, message: "", loading: false });
+  }
 
   async function handleBoost(product: MonetizationProduct, paymentMethod: "CREDITS" | "MERCADO_PAGO") {
     const key = `${product.code}:${paymentMethod}`;
@@ -254,16 +294,17 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
                     <strong><Sparkles size={16} /> Impulsionar procura</strong>
                     {isBoostActive && boostedUntil ? <span>Boost ativo ate {boostedUntil.toLocaleDateString("pt-BR")}</span> : null}
                   </div>
-                  <div className="boost-option-list" role="radiogroup" aria-label="Escolha o boost">
-                    {boostProducts.map((product) => (
-                      <label key={product.code} className={selectedBoostProduct?.code === product.code ? "is-selected" : ""}>
-                        <input type="radio" name="boost-code" checked={selectedBoostProduct?.code === product.code} onChange={() => setSelectedBoostCode(product.code)} />
-                        <span>{product.name}</span>
-                        <small>{product.durationDays ? `${product.durationDays} dias` : "Configuravel"} - {moneyLabel(product.price)}</small>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="boost-payment-choice" role="radiogroup" aria-label="Forma de pagamento do boost">
+                  <label className="boost-select-field">
+                    <span>Plano de boost</span>
+                    <select value={selectedBoostProduct?.code ?? ""} onChange={(event) => setSelectedBoostCode(event.target.value)}>
+                      {boostProducts.map((product) => (
+                        <option key={product.code} value={product.code}>
+                          {product.name} - {product.durationDays ? `${product.durationDays} dias` : "Configuravel"} - {moneyLabel(product.price)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="boost-payment-choice boost-payment-choice--compact" role="radiogroup" aria-label="Forma de pagamento do boost">
                     {selectedBoostCanUseCredits ? (
                       <label className={selectedBoostPayment === "CREDITS" ? "is-selected" : ""}>
                         <input type="radio" name="boost-payment" checked={selectedBoostPayment === "CREDITS"} onChange={() => setSelectedBoostPayment("CREDITS")} />
@@ -280,12 +321,12 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
                   ) : (
                     <Button
                       type="button"
-                      className="payment-button"
+                      className="payment-button payment-button--compact"
                       disabled={!selectedBoostProduct || Boolean(boostingKey)}
                       onClick={handleSelectedBoost}
                     >
-                      {selectedBoostPaymentMethod === "MERCADO_PAGO" ? <Image className="payment-gateway-icon" src={mercadoPagoLogo} alt="" width={54} height={36} aria-hidden="true" /> : <CreditCard size={17} />}
-                      <span>{boostingKey ? "Ativando..." : selectedBoostPaymentMethod === "CREDITS" ? `Impulsionar com ${selectedBoostCreditCost} créditos` : "Pagar boost com Mercado Pago"}</span>
+                      {selectedBoostPaymentMethod === "MERCADO_PAGO" ? <Image className="payment-gateway-icon payment-gateway-icon--inline" src={mercadoPagoLogo} alt="" width={42} height={26} aria-hidden="true" /> : <CreditCard size={17} />}
+                      <span>{boostingKey ? "Ativando..." : selectedBoostPaymentMethod === "CREDITS" ? `Impulsionar com ${selectedBoostCreditCost} créditos` : "Pagar com Mercado Pago"}</span>
                     </Button>
                   )}
                 </div>
@@ -302,6 +343,18 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
               </div>
             </div>
           ) : currentUser?.id ? (
+            shouldWaitForSentOfferCheck ? (
+              <div className="notice-box" role="status">
+                <strong>Verificando suas propostas...</strong>
+                <p>Estamos carregando seus dados antes de liberar a acao correta para esta procura.</p>
+              </div>
+            ) : existingSentOffer ? (
+              <div className="notice-box">
+                <strong>Voce ja enviou uma proposta</strong>
+                <p>Continue a negociacao pelo chat da plataforma.</p>
+                <Button type="button" onClick={() => openConversation(existingSentOffer)}><MessageSquare size={16} /> Abrir conversa</Button>
+              </div>
+            ) : (
             <form className="stack-form" onSubmit={submitOfferForm}>
               <label>Valor da proposta<input type="number" min="0" value={offerForm.offeredPrice} onChange={(event) => setOfferForm((current) => ({ ...current, offeredPrice: event.target.value }))} /></label>
               <label>Telefone ou WhatsApp<input value={offerForm.sellerPhone} onChange={(event) => setOfferForm((current) => ({ ...current, sellerPhone: event.target.value }))} /></label>
@@ -309,6 +362,7 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
               <label>Destaques<input value={offerForm.highlights} onChange={(event) => setOfferForm((current) => ({ ...current, highlights: event.target.value }))} placeholder="Entrega, garantia, disponibilidade" /></label>
               <Button type="submit" disabled={isOfferSubmitting}><Send size={16} /> {isOfferSubmitting ? "Enviando..." : "Enviar proposta"}</Button>
             </form>
+            )
           ) : (
             <div className="notice-box">
               <strong>Tem algo para atender esta procura?</strong>
@@ -339,6 +393,40 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
               <Button type="submit" disabled={isReportSubmitting}><MessageSquare size={16} /> {isReportSubmitting ? "Enviando..." : "Enviar denuncia"}</Button>
             </div>
           </form>
+        </div>
+      ) : null}
+      {conversation.visible ? (
+        <div className="modal-overlay" role="presentation" onClick={closeConversation}>
+          <section className="modal-card conversation-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <span className={`status-pill status-pill--${statusTone(conversation.offer?.status)}`}>{statusLabel(conversation.offer?.status)}</span>
+                <h2>{conversation.offer?.interestTitle ?? resolvedInterest.title}</h2>
+              </div>
+              <button type="button" className="icon-button" onClick={closeConversation} aria-label="Fechar conversa">x</button>
+            </div>
+            <div className="conversation-list" aria-live="polite">
+              {conversation.loading && !conversation.data ? <p className="muted-text">Carregando conversa...</p> : null}
+              {(conversation.data?.messages ?? []).length ? (
+                conversation.data?.messages?.map((message) => (
+                  <article className={message.senderId === currentUser?.id ? "chat-message chat-message--mine" : "chat-message"} key={message.id}>
+                    <strong>{message.senderName ?? (message.senderId === currentUser?.id ? "Voce" : "Contato")}</strong>
+                    <p>{message.content}</p>
+                    <small>{formatDateTime(message.createdAt)}</small>
+                  </article>
+                ))
+              ) : !conversation.loading ? (
+                <p className="muted-text">Ainda nao ha mensagens nesta conversa.</p>
+              ) : null}
+            </div>
+            <form className="conversation-form" onSubmit={submitConversationMessage}>
+              <textarea rows={3} value={conversation.message} onChange={(event) => setConversation((current) => ({ ...current, message: event.target.value }))} placeholder="Digite sua mensagem" />
+              <div className="modal-actions">
+                <Button type="button" variant="outline" onClick={closeConversation}>Fechar</Button>
+                <Button type="submit" disabled={conversation.loading || !conversation.message.trim()}>Enviar mensagem</Button>
+              </div>
+            </form>
+          </section>
         </div>
       ) : null}
       {isImageOpen && detailImageSrc ? (
