@@ -28,7 +28,7 @@ export function AppFooter() {
           <Link href="/">Home</Link>
           <Link href="/categorias">Explorar categorias</Link>
           <Link href="/como-funciona">Como funciona</Link>
-          <AuthIntentLink className="footer-link-button" href="/cadastrar-interesse">Publicar procura</AuthIntentLink>
+          <AuthIntentLink className="footer-link-button" href="/cadastrar-interesse" mode="login">Publicar procura</AuthIntentLink>
           <Link href="/ouvidoria">Ouvidoria</Link>
         </nav>
         <nav aria-label="Categorias">

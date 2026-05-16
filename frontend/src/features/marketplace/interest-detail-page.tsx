@@ -304,16 +304,16 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
                       ))}
                     </select>
                   </label>
-                  <div className="boost-payment-choice boost-payment-choice--compact" role="radiogroup" aria-label="Forma de pagamento do boost">
+                  <div className="boost-payment-row" role="radiogroup" aria-label="Forma de pagamento do boost">
                     {selectedBoostCanUseCredits ? (
                       <label className={selectedBoostPayment === "CREDITS" ? "is-selected" : ""}>
                         <input type="radio" name="boost-payment" checked={selectedBoostPayment === "CREDITS"} onChange={() => setSelectedBoostPayment("CREDITS")} />
-                        <span><CreditCard size={15} /> Usar {selectedBoostCreditCost} créditos</span>
+                        <span><CreditCard size={14} /> {selectedBoostCreditCost} créditos</span>
                       </label>
                     ) : null}
                     <label className={selectedBoostPaymentMethod === "MERCADO_PAGO" ? "is-selected" : ""}>
                       <input type="radio" name="boost-payment" checked={selectedBoostPaymentMethod === "MERCADO_PAGO"} onChange={() => setSelectedBoostPayment("MERCADO_PAGO")} />
-                      <span><Image className="payment-gateway-icon payment-gateway-icon--inline" src={mercadoPagoLogo} alt="" width={42} height={26} aria-hidden="true" /> Mercado Pago</span>
+                      <span><Image className="payment-gateway-icon payment-gateway-icon--tiny" src={mercadoPagoLogo} alt="" width={36} height={22} aria-hidden="true" /> Mercado Pago</span>
                     </label>
                   </div>
                   {selectedBoostPaymentMethod === "CREDITS" && selectedBoostCanUseCredits && !selectedBoostHasEnoughCredits ? (
@@ -321,12 +321,12 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
                   ) : (
                     <Button
                       type="button"
-                      className="payment-button payment-button--compact"
+                      className="boost-submit-button"
                       disabled={!selectedBoostProduct || Boolean(boostingKey)}
                       onClick={handleSelectedBoost}
                     >
-                      {selectedBoostPaymentMethod === "MERCADO_PAGO" ? <Image className="payment-gateway-icon payment-gateway-icon--inline" src={mercadoPagoLogo} alt="" width={42} height={26} aria-hidden="true" /> : <CreditCard size={17} />}
-                      <span>{boostingKey ? "Ativando..." : selectedBoostPaymentMethod === "CREDITS" ? `Impulsionar com ${selectedBoostCreditCost} créditos` : "Pagar com Mercado Pago"}</span>
+                      {selectedBoostPaymentMethod === "CREDITS" ? <CreditCard size={16} /> : null}
+                      <span>{boostingKey ? "Ativando..." : selectedBoostPaymentMethod === "CREDITS" ? `Impulsionar por ${selectedBoostCreditCost} créditos` : "Pagar e impulsionar"}</span>
                     </Button>
                   )}
                 </div>

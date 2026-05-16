@@ -28,7 +28,7 @@ export function PublicHome() {
           <h1>O que você procura hoje?</h1>
           <p>Diga o que você precisa. Receba propostas de quem tem o que você procura. Simples, rápido e direto ao ponto.</p>
           <div className="hero-actions">
-            <AuthIntentLink className="button button--secondary button--lg" href="/cadastrar-interesse">Publicar uma procura</AuthIntentLink>
+            <AuthIntentLink className="button button--secondary button--lg" href="/cadastrar-interesse" mode="login">Publicar uma procura</AuthIntentLink>
             <Button variant="primary" size="lg" type="button" onClick={() => openAuthModal("register")}>Responder procuras</Button>
           </div>
         </div>
@@ -96,7 +96,7 @@ export function CategoryLanding({ categorySlug }: { categorySlug?: string }) {
             ? `Pessoas estão procurando ${currentCategory.label.toLowerCase()} agora mesmo. Encontre demandas reais e envie propostas relevantes.`
             : "Explore categorias ativas do Eu Procuro e encontre pessoas declarando exatamente o que precisam."}
         </p>
-        <AuthIntentLink className="button button--primary" href="/cadastrar-interesse">
+        <AuthIntentLink className="button button--primary" href="/cadastrar-interesse" mode="login">
           {currentCategory ? `Publicar procura em ${currentCategory.label}` : "Publicar uma procura"}
         </AuthIntentLink>
       </section>

@@ -123,7 +123,7 @@ export function AppHeader() {
           ) : (
             <>
               <Button variant="ghost" size="sm" type="button" onClick={() => openAuthModal("login")}>Entrar</Button>
-              <AuthIntentLink className="button button--primary button--sm" href="/cadastrar-interesse">Publicar Procura</AuthIntentLink>
+              <AuthIntentLink className="button button--primary button--sm" href="/cadastrar-interesse" mode="login">Publicar Procura</AuthIntentLink>
             </>
           )}
           <button type="button" className="icon-button mobile-menu-button" onClick={() => setIsMenuOpen((current) => !current)} aria-label="Abrir menu">
@@ -147,7 +147,7 @@ export function AppHeader() {
           ) : (
             <button type="button" className="mobile-menu-action" onClick={() => { setIsMenuOpen(false); openAuthModal("login"); }}>Entrar</button>
           )}
-          <AuthIntentLink className="mobile-menu-cta" href="/cadastrar-interesse" onClick={() => setIsMenuOpen(false)}>Publicar procura</AuthIntentLink>
+          <AuthIntentLink className="mobile-menu-cta" href="/cadastrar-interesse" mode="login" onClick={() => setIsMenuOpen(false)}>Publicar procura</AuthIntentLink>
         </div>
       ) : null}
       <NotificationModal

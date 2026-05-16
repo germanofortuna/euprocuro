@@ -190,7 +190,7 @@ export function AuthModal() {
 
   return (
     <>
-      <div className="modal-overlay" role="presentation" onClick={closeAuthModal}>
+      <div className="modal-overlay modal-overlay--auth" role="presentation" onClick={closeAuthModal}>
         <div className={`modal-card auth-modal auth-modal--${authModal.mode}`} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
           <div className="modal-header">
             <div>

@@ -1164,6 +1164,12 @@ select:focus {
   text-transform: uppercase;
 }
 
+.boost-select-field select {
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: 0.86rem;
+}
+
 .boost-option-list label,
 .boost-payment-choice label {
   min-height: 42px;
@@ -1194,6 +1200,45 @@ select:focus {
   padding: 8px 10px;
 }
 
+.boost-payment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.boost-payment-row label {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.boost-payment-row label.is-selected {
+  border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
+  color: var(--text);
+}
+
+.boost-payment-row input {
+  width: 14px;
+  min-height: 14px;
+  margin: 0;
+}
+
+.boost-payment-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .boost-option-list input {
   grid-row: span 2;
 }
@@ -1215,6 +1260,13 @@ select:focus {
 .payment-gateway-icon--inline {
   width: 36px;
   height: 22px;
+}
+
+.boost-submit-button {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 14px;
+  font-size: 0.86rem;
 }
 
 .payment-button--compact {
@@ -1989,6 +2041,12 @@ small {
   flex: 0 0 50px;
 }
 
+.payment-gateway-icon--tiny {
+  width: 30px;
+  height: 18px;
+  flex: 0 0 30px;
+}
+
 .payment-button--compact {
   width: auto;
   min-height: 40px;
@@ -2207,6 +2265,10 @@ small {
 .modal-overlay--plain {
   background: rgba(2, 6, 23, 0.22);
   backdrop-filter: blur(8px);
+}
+
+.modal-overlay--auth {
+  place-items: center;
 }
 
 .modal-card {
@@ -2601,6 +2663,12 @@ small {
   .modal-overlay {
     padding: 10px;
     align-items: end;
+  }
+
+  .modal-overlay--auth {
+    align-items: center;
+    place-items: center;
+    padding: max(12px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom));
   }
 
   .modal-overlay--topbar {

@@ -29,7 +29,7 @@ export default function HowItWorksPage() {
                 <div><h3>{title}</h3><p>{index === 0 ? "Descreva o que você precisa, onde está e qual é seu orçamento." : index === 1 ? "Vendedores encontram sua procura e enviam propostas relevantes." : "Compare propostas, converse pelo chat e decida com segurança."}</p></div>
               </div>
             ))}
-            <AuthIntentLink className="button button--primary" href="/cadastrar-interesse">Publicar uma Procura</AuthIntentLink>
+            <AuthIntentLink className="button button--primary" href="/cadastrar-interesse" mode="login">Publicar uma Procura</AuthIntentLink>
           </article>
           <article>
             <h2><Zap size={24} /> Para quem quer vender</h2>
