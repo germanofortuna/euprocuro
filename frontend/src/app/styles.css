@@ -807,14 +807,15 @@ select:focus {
 
 .owner-ribbon {
   position: absolute;
-  left: 0;
+  left: auto;
+  right: 0;
   top: 0;
   z-index: 2;
   padding: 8px 14px;
-  border-bottom-right-radius: var(--radius);
+  border-bottom-left-radius: var(--radius);
   background: color-mix(in srgb, var(--success) 18%, var(--surface-raised));
   color: var(--success);
-  border-right: 1px solid color-mix(in srgb, var(--success) 28%, var(--border));
+  border-left: 1px solid color-mix(in srgb, var(--success) 28%, var(--border));
   border-bottom: 1px solid color-mix(in srgb, var(--success) 28%, var(--border));
   font-size: 0.72rem;
   font-weight: 900;
