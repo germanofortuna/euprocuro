@@ -68,6 +68,7 @@ application:
       domain: ${APP_AUTH_COOKIE_DOMAIN:}
   email:
     provider: ${APP_EMAIL_PROVIDER:SMTP}
+    fail-open: ${APP_EMAIL_FAIL_OPEN:false}
     from: ${APP_EMAIL_FROM:no-reply@euprocuro.local}
     from-name: ${APP_EMAIL_FROM_NAME:Eu Procuro}
     app-url: ${APP_EMAIL_APP_URL:${APP_RESET_BASE_URL:http://localhost:5173}}

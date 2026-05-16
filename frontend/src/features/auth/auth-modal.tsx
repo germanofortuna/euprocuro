@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ComponentProps } from "react";
 import { X } from "lucide-react";
 import { useLegalContent } from "@/features/legal/use-legal-content";
@@ -8,6 +8,7 @@ import { usePlatform } from "@/features/platform/platform-context";
 import { formatCep, formatCpfCnpj } from "@/shared/lib/format";
 import { Button } from "@/shared/ui/button";
 import { LegalModal } from "@/features/legal/legal-modal";
+import { lookupAddressByPostalCode } from "@/shared/api/client";
 
 type LoginForm = {
   email: string;
@@ -68,6 +69,25 @@ export function AuthModal() {
   const [resetForm, setResetForm] = useState({ token: "", newPassword: "", confirmPassword: "" });
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lookupState, setLookupState] = useState<{ loading: boolean; message: string; tone: "muted" | "success" | "error" }>({
+    loading: false,
+    message: "",
+    tone: "muted"
+  });
+
+  useEffect(() => {
+    if (!authModal.visible || authModal.mode !== "register") {
+      return;
+    }
+    const normalizedPostalCode = registerForm.postalCode.replace(/\D/g, "");
+    if (normalizedPostalCode.length !== 8) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      handlePostalCodeLookup(normalizedPostalCode);
+    }, 380);
+    return () => window.clearTimeout(timer);
+  }, [authModal.mode, authModal.visible, registerForm.postalCode]);
 
   if (!authModal.visible) {
     return null;
@@ -134,6 +154,33 @@ export function AuthModal() {
     setIsTermsOpen(true);
   }
 
+  async function handlePostalCodeLookup(postalCode = registerForm.postalCode) {
+    const normalizedPostalCode = String(postalCode).replace(/\D/g, "");
+    if (!normalizedPostalCode) {
+      setLookupState({ loading: false, message: "", tone: "muted" });
+      return;
+    }
+    if (normalizedPostalCode.length !== 8) {
+      setLookupState({ loading: false, message: "Digite um CEP com 8 numeros.", tone: "error" });
+      return;
+    }
+    setLookupState({ loading: true, message: "Buscando endereco pelo CEP...", tone: "muted" });
+    try {
+      const address = await lookupAddressByPostalCode(normalizedPostalCode);
+      setRegisterForm((current) => ({
+        ...current,
+        postalCode: formatCep(String(address.postalCode ?? current.postalCode)),
+        city: String(address.city ?? current.city ?? ""),
+        state: String(address.state ?? current.state ?? "").toUpperCase().slice(0, 2),
+        neighborhood: String(address.neighborhood ?? current.neighborhood ?? ""),
+        country: String(address.country ?? current.country ?? "Brasil")
+      }));
+      setLookupState({ loading: false, message: "Endereco preenchido pelo CEP.", tone: "success" });
+    } catch (error) {
+      setLookupState({ loading: false, message: error instanceof Error ? error.message : "Nao encontramos esse CEP. Preencha cidade e UF manualmente.", tone: "error" });
+    }
+  }
+
   const title = {
     login: "Acesse sua conta",
     register: "Crie sua conta",
@@ -184,10 +231,11 @@ export function AuthModal() {
               <label>CPF ou CNPJ<input value={registerForm.documentNumber} onChange={(event) => setRegisterForm((current) => ({ ...current, documentNumber: formatCpfCnpj(event.target.value) }))} maxLength={18} required /></label>
               <label>Senha<input type="password" value={registerForm.password} onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))} required /><small>{passwordStatus(registerForm.password)}</small></label>
               <div className="form-grid form-grid--3">
-                <label>CEP<input inputMode="numeric" value={registerForm.postalCode} onChange={(event) => setRegisterForm((current) => ({ ...current, postalCode: formatCep(event.target.value) }))} /></label>
+                <label>CEP<input inputMode="numeric" value={registerForm.postalCode} onChange={(event) => setRegisterForm((current) => ({ ...current, postalCode: formatCep(event.target.value) }))} onBlur={() => handlePostalCodeLookup()} /></label>
                 <label>Cidade<input value={registerForm.city} onChange={(event) => setRegisterForm((current) => ({ ...current, city: event.target.value }))} required /></label>
                 <label>UF<input value={registerForm.state} onChange={(event) => setRegisterForm((current) => ({ ...current, state: event.target.value.toUpperCase().slice(0, 2) }))} required /></label>
               </div>
+              {lookupState.message ? <span className={`address-lookup-note address-lookup-note--${lookupState.tone}`} role="status" aria-live="polite" aria-busy={lookupState.loading}>{lookupState.message}</span> : null}
               <div className="form-grid">
                 <label>Bairro<input value={registerForm.neighborhood} onChange={(event) => setRegisterForm((current) => ({ ...current, neighborhood: event.target.value }))} /></label>
                 <label>País<input value={registerForm.country} onChange={(event) => setRegisterForm((current) => ({ ...current, country: event.target.value }))} /></label>

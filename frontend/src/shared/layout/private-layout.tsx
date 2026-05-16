@@ -21,14 +21,14 @@ const navItems = [
 export function PrivateLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser, monetization, isSessionReady, adminModeration, sellerItems } = usePlatform();
+  const { currentUser, monetization, isSessionReady, hasAdminAccess, sellerItems } = usePlatform();
   const credits = monetization?.sellerCredits ?? currentUser?.sellerCredits ?? currentUser?.credits ?? 0;
   const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
   const visibleNavItems = navItems.filter((item) => {
     if (item.href === "/comprar-creditos" && !creditPurchasesEnabled) {
       return false;
     }
-    return item.href !== "/admin" || pathname === "/admin" || isAdminUser(currentUser, Boolean(adminModeration));
+    return item.href !== "/admin" || pathname === "/admin" || isAdminUser(currentUser, hasAdminAccess);
   });
 
   useEffect(() => {
@@ -59,6 +59,7 @@ export function PrivateLayout({ children }: { children: React.ReactNode }) {
           <div className="sidebar-title">
             <span>Painel do usuário</span>
             <strong>{currentUser.name || "Sua conta"}</strong>
+            {currentUser.email ? <small className="sidebar-user-email">{currentUser.email}</small> : null}
           </div>
           <nav>
             {visibleNavItems.map((item) => {

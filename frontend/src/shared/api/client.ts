@@ -147,16 +147,8 @@ function buildInFlightGetKey(url: string, headers: Headers) {
   return [url, headers.get("Authorization") ?? ""].join("|");
 }
 
-function isPersonalizedPublicGetRequest(path: string) {
-  return /^\/interests(?:\?|$)/.test(path) || /^\/interests\/[^/]+$/.test(path);
-}
-
-function isPublicGetRequest(path: string, method: string, session: StoredSession | null) {
+function isPublicGetRequest(path: string, method: string) {
   if (method.toUpperCase() !== "GET") {
-    return false;
-  }
-
-  if (session?.user?.id && isPersonalizedPublicGetRequest(path)) {
     return false;
   }
 
@@ -167,7 +159,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const session = getStoredSession();
   const headers = new Headers(options.headers ?? {});
   const method = options.method ?? "GET";
-  const publicRead = isPublicGetRequest(path, method, session);
+  const publicRead = isPublicGetRequest(path, method);
   const sendAuth = Boolean(session?.token) && !publicRead;
 
   if (!headers.has("Content-Type") && options.body !== undefined) {

@@ -4,6 +4,8 @@ spring:
       uri: mongodb://localhost:27017/euprocuro
 
 application:
+  email:
+    fail-open: ${APP_EMAIL_FAIL_OPEN:true}
   auth:
     email-verification-required: ${APP_AUTH_EMAIL_VERIFICATION_REQUIRED:false}
     expose-reset-preview: ${APP_AUTH_EXPOSE_RESET_PREVIEW:true}

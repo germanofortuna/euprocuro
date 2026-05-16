@@ -61,6 +61,7 @@ type PlatformContextValue = {
   monetization: MonetizationAccount | null;
   sellerItems: SellerItemGroup[];
   adminModeration: AdminModeration | null;
+  hasAdminAccess: boolean;
   isLoadingPublic: boolean;
   isLoadingPrivate: boolean;
   isSessionReady: boolean;
@@ -162,6 +163,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const [monetization, setMonetization] = useState<MonetizationAccount | null>(null);
   const [sellerItems, setSellerItems] = useState<SellerItemGroup[]>([]);
   const [adminModeration, setAdminModeration] = useState<AdminModeration | null>(null);
+  const [hasAdminAccess, setHasAdminAccess] = useState(false);
   const [isLoadingPublic, setIsLoadingPublic] = useState(false);
   const [isLoadingPrivate, setIsLoadingPrivate] = useState(false);
   const [isSessionReady, setIsSessionReady] = useState(false);
@@ -171,7 +173,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
 
   const currentUser = session?.user ?? null;
   const shouldLoadSellerItems = pathname === "/meus-itens";
-  const shouldLoadAdminModeration = pathname === "/admin" || isAdminUser(currentUser);
+  const shouldLoadAdminModeration = pathname === "/admin" || isAdminUser(currentUser) || hasAdminAccess;
 
   const refreshPublicData = useCallback(async (filters: Record<string, string | number | undefined | null> = {}) => {
     setIsLoadingPublic(true);
@@ -196,12 +198,15 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     }
     setIsLoadingPrivate(true);
     try {
-      const adminRequest = shouldLoadAdminModeration ? fetchAdminModeration() : Promise.resolve(null);
-      if (shouldLoadAdminModeration) {
+      const shouldProbeAdmin = Boolean(currentUser?.id) && !isAdminUser(currentUser) && !hasAdminAccess;
+      const shouldFetchAdminModeration = shouldLoadAdminModeration || shouldProbeAdmin;
+      const adminRequest = shouldFetchAdminModeration ? fetchAdminModeration() : Promise.resolve(null);
+      if (shouldFetchAdminModeration) {
         adminRequest
           .then((value) => {
             if (value) {
               setAdminModeration(value);
+              setHasAdminAccess(true);
             }
           })
           .catch(() => {});
@@ -222,6 +227,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
         setMonetization(null);
         setSellerItems([]);
         setAdminModeration(null);
+        setHasAdminAccess(false);
         return;
       }
 
@@ -236,6 +242,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       }
       if (adminResult.status === "fulfilled" && adminResult.value) {
         setAdminModeration(adminResult.value);
+        setHasAdminAccess(true);
       } else if (!shouldLoadAdminModeration) {
         setAdminModeration(null);
       }
@@ -243,11 +250,12 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       if (isAuthError(error)) {
         clearSession();
         setSession(null);
+        setHasAdminAccess(false);
       }
     } finally {
       setIsLoadingPrivate(false);
     }
-  }, [shouldLoadAdminModeration, shouldLoadSellerItems]);
+  }, [currentUser?.id, hasAdminAccess, shouldLoadAdminModeration, shouldLoadSellerItems]);
 
   const recoverSession = useCallback(async () => {
     const stored = getStoredSession();
@@ -345,6 +353,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       setMonetization(null);
       setSellerItems([]);
       setAdminModeration(null);
+      setHasAdminAccess(false);
     }
   }, []);
 
@@ -455,6 +464,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     monetization,
     sellerItems,
     adminModeration,
+    hasAdminAccess,
     isLoadingPublic,
     isLoadingPrivate,
     isSessionReady,
@@ -513,6 +523,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     selectedInterest,
     sellerItems,
     session,
+    hasAdminAccess,
     setAuthMode,
     signIn,
     signOut,

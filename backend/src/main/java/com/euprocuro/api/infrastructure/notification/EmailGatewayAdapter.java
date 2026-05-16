@@ -49,6 +49,7 @@ public class EmailGatewayAdapter implements EmailGateway {
     private final String termsUrl;
     private final String privacyUrl;
     private final String supportUrl;
+    private final boolean failOpen;
 
     public EmailGatewayAdapter(
             ObjectProvider<JavaMailSender> mailSenderProvider,
@@ -69,7 +70,8 @@ public class EmailGatewayAdapter implements EmailGateway {
             @Value("${application.email.app-url:${application.auth.reset-base-url:http://localhost:5173}}") String appUrl,
             @Value("${application.email.terms-url:http://localhost:5173#termos-de-uso}") String termsUrl,
             @Value("${application.email.privacy-url:http://localhost:5173#politica-de-privacidade}") String privacyUrl,
-            @Value("${application.email.support-url:mailto:suporte@euprocuro.com}") String supportUrl
+            @Value("${application.email.support-url:mailto:suporte@euprocuro.com}") String supportUrl,
+            @Value("${application.email.fail-open:false}") boolean failOpen
     ) {
         this.mailSenderProvider = mailSenderProvider;
         this.restTemplate = restTemplateBuilder.build();
@@ -90,6 +92,7 @@ public class EmailGatewayAdapter implements EmailGateway {
         this.termsUrl = termsUrl;
         this.privacyUrl = privacyUrl;
         this.supportUrl = supportUrl;
+        this.failOpen = failOpen;
     }
 
     @Override
@@ -348,7 +351,7 @@ public class EmailGatewayAdapter implements EmailGateway {
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
         if (mailSender == null) {
             LOGGER.info("SMTP nao configurado. E-mail para {}: {}", user.getEmail(), fallbackLog);
-            return false;
+            return failOpen;
         }
 
         try {
@@ -360,14 +363,23 @@ public class EmailGatewayAdapter implements EmailGateway {
             mailSender.send(message);
             return true;
         } catch (Exception exception) {
-            LOGGER.warn(
-                    "Falha ao enviar e-mail para {}. Assunto: {}. Motivo: {}",
-                    user.getEmail(),
-                    subject,
-                    exception.getMessage(),
-                    exception
-            );
-            return false;
+            if (failOpen) {
+                LOGGER.warn(
+                        "Falha ao enviar e-mail para {}. Assunto: {}. Motivo: {}",
+                        user.getEmail(),
+                        subject,
+                        exception.getMessage()
+                );
+            } else {
+                LOGGER.warn(
+                        "Falha ao enviar e-mail para {}. Assunto: {}. Motivo: {}",
+                        user.getEmail(),
+                        subject,
+                        exception.getMessage(),
+                        exception
+                );
+            }
+            return failOpen;
         }
     }
 
@@ -381,7 +393,7 @@ public class EmailGatewayAdapter implements EmailGateway {
         String templateId = templateIdFor(kind);
         if (!StringUtils.hasText(mailerSendApiKey) || !StringUtils.hasText(templateId)) {
             LOGGER.warn("MailerSend API nao configurada. E-mail para {}: {}", user.getEmail(), fallbackLog);
-            return false;
+            return failOpen;
         }
 
         try {
@@ -413,14 +425,23 @@ public class EmailGatewayAdapter implements EmailGateway {
             ).getStatusCode();
             return status.is2xxSuccessful();
         } catch (RestClientException exception) {
-            LOGGER.warn(
-                    "Falha ao enviar e-mail via MailerSend API para {}. Assunto: {}. Motivo: {}",
-                    user.getEmail(),
-                    subject,
-                    exception.getMessage(),
-                    exception
-            );
-            return false;
+            if (failOpen) {
+                LOGGER.warn(
+                        "Falha ao enviar e-mail via MailerSend API para {}. Assunto: {}. Motivo: {}",
+                        user.getEmail(),
+                        subject,
+                        exception.getMessage()
+                );
+            } else {
+                LOGGER.warn(
+                        "Falha ao enviar e-mail via MailerSend API para {}. Assunto: {}. Motivo: {}",
+                        user.getEmail(),
+                        subject,
+                        exception.getMessage(),
+                        exception
+                );
+            }
+            return failOpen;
         }
     }
 
