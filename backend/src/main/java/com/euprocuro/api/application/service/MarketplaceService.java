@@ -409,6 +409,19 @@ public class MarketplaceService implements MarketplaceUseCase {
             throw new BusinessException("O mesmo usuario nao pode ofertar para si.");
         }
 
+        String sellerPhone = trimToNull(command.getSellerPhone());
+        String message = trimToNull(command.getMessage());
+        String offerImageUrl = normalizeReferenceImage(command.getOfferImageUrl());
+        if (command.getOfferedPrice() == null || command.getOfferedPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException("Informe o valor da proposta.");
+        }
+        if (!StringUtils.hasText(sellerPhone)) {
+            throw new BusinessException("Informe um telefone ou WhatsApp para contato.");
+        }
+        if (!StringUtils.hasText(message)) {
+            throw new BusinessException("A mensagem nao pode estar em branco.");
+        }
+
         boolean hasActivePlan = seller.getSubscriptionActiveUntil() != null
                 && seller.getSubscriptionActiveUntil().isAfter(Instant.now());
         if (!hasActivePlan) {
@@ -421,18 +434,12 @@ public class MarketplaceService implements MarketplaceUseCase {
                     .build());
         }
 
-        String message = trimToNull(command.getMessage());
-        String offerImageUrl = normalizeReferenceImage(command.getOfferImageUrl());
-        if (!StringUtils.hasText(message) && !StringUtils.hasText(offerImageUrl)) {
-            throw new BusinessException("A mensagem nao pode estar em branco.");
-        }
-
         Offer offer = Offer.builder()
                 .interestPostId(interestId)
                 .sellerId(seller.getId())
                 .sellerName(seller.getName())
                 .sellerEmail(seller.getEmail())
-                .sellerPhone(trimToNull(command.getSellerPhone()))
+                .sellerPhone(sellerPhone)
                 .offeredPrice(command.getOfferedPrice())
                 .message(message)
                 .offerImageUrl(offerImageUrl)

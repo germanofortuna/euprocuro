@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 
@@ -17,9 +18,11 @@ public class CreateOfferRequest {
     private BigDecimal offeredPrice;
 
     @Size(max = 40)
+    @NotBlank
     private String sellerPhone;
 
     @Size(max = 1000)
+    @NotBlank
     private String message;
 
     @Size(max = 1500000)

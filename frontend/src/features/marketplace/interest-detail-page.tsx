@@ -182,8 +182,16 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
 
   const submitOfferForm: FormSubmitHandler = async (event) => {
     event.preventDefault();
-    if (!offerForm.message.trim() && !offerForm.offerImageUrl) {
-      setFeedback({ type: "error", title: "Mensagem obrigatoria", message: "Escreva uma mensagem ou anexe uma imagem para enviar a proposta." });
+    if (!offerForm.offeredPrice || Number(offerForm.offeredPrice) < 0) {
+      setFeedback({ type: "error", title: "Valor obrigatorio", message: "Informe o valor da proposta antes de enviar." });
+      return;
+    }
+    if (!offerForm.sellerPhone.trim()) {
+      setFeedback({ type: "error", title: "Contato obrigatorio", message: "Informe seu telefone ou WhatsApp para o comprador falar com voce." });
+      return;
+    }
+    if (!offerForm.message.trim()) {
+      setFeedback({ type: "error", title: "Mensagem obrigatoria", message: "Escreva uma mensagem explicando como voce pode atender esta procura." });
       return;
     }
     setIsOfferSubmitting(true);
@@ -196,6 +204,8 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
         highlights: offerForm.highlights.split(",").map((item) => item.trim()).filter(Boolean)
       });
       setOfferForm({ offeredPrice: "", sellerPhone: "", message: "", highlights: "", offerImageUrl: "" });
+    } catch (error) {
+      setFeedback({ type: "error", title: "Nao foi possivel enviar", message: error instanceof Error ? error.message : "Revise os campos obrigatorios e tente novamente." });
     } finally {
       setIsOfferSubmitting(false);
     }
@@ -404,9 +414,9 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
               </div>
             ) : (
             <form className="stack-form" onSubmit={submitOfferForm}>
-              <label>Valor da proposta<input type="number" min="0" value={offerForm.offeredPrice} onChange={(event) => setOfferForm((current) => ({ ...current, offeredPrice: event.target.value }))} /></label>
-              <label>Telefone ou WhatsApp<input value={offerForm.sellerPhone} onChange={(event) => setOfferForm((current) => ({ ...current, sellerPhone: event.target.value }))} /></label>
-              <label>Mensagem<textarea rows={4} value={offerForm.message} onChange={(event) => setOfferForm((current) => ({ ...current, message: event.target.value }))} placeholder="Conte como voce pode atender esta procura" /></label>
+              <label>Valor da proposta<input type="number" min="0" required value={offerForm.offeredPrice} onChange={(event) => setOfferForm((current) => ({ ...current, offeredPrice: event.target.value }))} /></label>
+              <label>Telefone ou WhatsApp<input required value={offerForm.sellerPhone} onChange={(event) => setOfferForm((current) => ({ ...current, sellerPhone: event.target.value }))} /></label>
+              <label>Mensagem<textarea rows={4} required value={offerForm.message} onChange={(event) => setOfferForm((current) => ({ ...current, message: event.target.value }))} placeholder="Conte como voce pode atender esta procura" /></label>
               {offerForm.offerImageUrl ? (
                 <div className="conversation-image-preview offer-image-preview">
                   <img src={offerForm.offerImageUrl} alt="Previa da imagem da proposta" />

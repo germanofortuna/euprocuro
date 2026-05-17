@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -556,6 +557,7 @@ class MarketplaceServiceTest {
 
         assertThatThrownBy(() -> marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
                 .message("Tenho um item")
+                .sellerPhone("11999999999")
                 .offeredPrice(new BigDecimal("400"))
                 .build()))
                 .isInstanceOf(BusinessException.class)
@@ -584,6 +586,7 @@ class MarketplaceServiceTest {
 
         Offer result = marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
                 .message("Tenho um item")
+                .sellerPhone("11999999999")
                 .offeredPrice(new BigDecimal("400"))
                 .build());
 
@@ -624,7 +627,7 @@ class MarketplaceServiceTest {
     }
 
     @Test
-    void createOfferShouldAllowImageOnlyOffer() {
+    void createOfferShouldRejectImageOnlyOfferWithoutMessageAndPhone() {
         InterestPost interest = baseInterest();
         UserProfile seller = UserProfile.builder()
                 .id("seller-1")
@@ -635,24 +638,16 @@ class MarketplaceServiceTest {
 
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
         when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
-        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(offerGateway.save(any(Offer.class))).thenAnswer(invocation -> {
-            Offer offer = invocation.getArgument(0);
-            offer.setId("offer-image");
-            return offer;
-        });
 
-        Offer result = marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
+        assertThatThrownBy(() -> marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
                 .offeredPrice(new BigDecimal("450"))
                 .message("   ")
                 .offerImageUrl("  data:image/png;base64,aGVsbG8=  ")
-                .build());
-
-        assertThat(result.getId()).isEqualTo("offer-image");
-        assertThat(result.getMessage()).isNull();
-        assertThat(result.getOfferImageUrl()).isEqualTo("data:image/png;base64,aGVsbG8=");
-        verify(eventPublisherGateway).publish(eq("offer.created"), any(Map.class));
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("telefone");
+        verify(userGateway, never()).save(any(UserProfile.class));
+        verify(offerGateway, never()).save(any(Offer.class));
     }
 
     @Test
@@ -667,18 +662,18 @@ class MarketplaceServiceTest {
 
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
         when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
         assertThatThrownBy(() -> marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
                 .offeredPrice(new BigDecimal("450"))
+                .sellerPhone("11999999999")
                 .message("   ")
                 .build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("mensagem");
+        verify(userGateway, never()).save(any(UserProfile.class));
     }
 
     @Test
-    void createOfferShouldAllowMissingSellerPhone() {
+    void createOfferShouldRejectMissingSellerPhone() {
         InterestPost interest = baseInterest();
         UserProfile seller = UserProfile.builder()
                 .id("seller-1")
@@ -689,22 +684,16 @@ class MarketplaceServiceTest {
 
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
         when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
-        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(offerGateway.save(any(Offer.class))).thenAnswer(invocation -> {
-            Offer offer = invocation.getArgument(0);
-            offer.setId("offer-1");
-            return offer;
-        });
 
-        Offer result = marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
+        assertThatThrownBy(() -> marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
                 .offeredPrice(new BigDecimal("450"))
                 .sellerPhone("   ")
                 .message("Tenho um violao nessa faixa")
-                .build());
-
-        assertThat(result.getSellerPhone()).isNull();
-        verify(offerGateway).save(argThat(offer -> offer.getSellerPhone() == null));
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("telefone");
+        verify(userGateway, never()).save(any(UserProfile.class));
+        verify(offerGateway, never()).save(any(Offer.class));
     }
 
     @Test
