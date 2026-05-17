@@ -98,57 +98,57 @@ public class EmailGatewayAdapter implements EmailGateway {
     @Override
     public boolean sendEmailVerificationEmail(UserProfile user, String verificationLink) {
         String subject = "Eu Procuro - confirme seu e-mail";
-        String text = "Ola, " + user.getName() + "!\n\n"
-                + "Confirme seu e-mail para aumentar a seguranca da sua conta.\n"
+        String text = "Olá, " + user.getName() + "!\n\n"
+                + "Confirme seu e-mail para aumentar a segurança da sua conta.\n"
                 + "Use o link abaixo para verificar seu cadastro:\n"
                 + verificationLink + "\n\n"
-                + "Se voce nao criou essa conta, ignore este e-mail.";
+                + "Se você não criou essa conta, ignore este e-mail.";
         return sendEmail(
                 EmailKind.EMAIL_VERIFICATION,
                 user,
                 subject,
                 text,
-                "Link de verificacao: " + verificationLink,
+                "Link de verificação: " + verificationLink,
                 variables(
                         subject,
                         "Confirme seu cadastro no Eu Procuro.",
-                        "Seguranca da conta",
+                        "Segurança da conta",
                         "Confirme seu e-mail",
-                        "Use o botao abaixo para verificar seu cadastro e liberar o acesso com seguranca.",
-                        "Acao necessaria",
-                        "A verificacao protege sua conta e ajuda a manter a plataforma confiavel.",
+                        "Use o botão abaixo para verificar seu cadastro e liberar o acesso com segurança.",
+                        "Ação necessária",
+                        "A verificação protege sua conta e ajuda a manter a plataforma confiável.",
                         "Confirmar e-mail",
                         verificationLink,
-                        "Se voce nao criou essa conta, ignore este e-mail."
+                        "Se você não criou essa conta, ignore este e-mail."
                 )
         );
     }
 
     @Override
     public boolean sendPasswordResetEmail(UserProfile user, String resetLink) {
-        String subject = "Eu Procuro - redefinicao de senha";
-        String text = "Ola, " + user.getName() + "!\n\n"
+        String subject = "Eu Procuro - redefinição de senha";
+        String text = "Olá, " + user.getName() + "!\n\n"
                 + "Recebemos um pedido para redefinir sua senha.\n"
                 + "Use o link abaixo para continuar:\n"
                 + resetLink + "\n\n"
-                + "Se voce nao solicitou essa alteracao, ignore este e-mail.";
+                + "Se você não solicitou essa alteração, ignore este e-mail.";;
         return sendEmail(
                 EmailKind.PASSWORD_RESET,
                 user,
                 subject,
                 text,
-                "Link de redefinicao: " + resetLink,
+                "Link de redefinição: " + resetLink,
                 variables(
                         subject,
-                        "Solicitacao de redefinicao de senha.",
+                        "Solicitação de redefinição de senha.",
                         "Acesso",
                         "Redefina sua senha",
                         "Recebemos um pedido para alterar a senha da sua conta.",
                         "Link seguro",
-                        "Este link expira em breve. Use-o apenas se voce solicitou a redefinicao.",
+                        "Este link expira em breve. Use-o apenas se você solicitou a redefinição.",
                         "Redefinir senha",
                         resetLink,
-                        "Se voce nao solicitou essa alteracao, ignore este e-mail."
+                        "Se você não solicitou essa alteração, ignore este e-mail."
                 )
         );
     }
@@ -156,10 +156,10 @@ public class EmailGatewayAdapter implements EmailGateway {
     @Override
     public boolean sendOfferReceivedEmail(UserProfile buyer, String interestTitle, String sellerName) {
         String subject = "Eu Procuro - nova proposta recebida";
-        String text = "Ola, " + buyer.getName() + "!\n\n"
+        String text = "Olá, " + buyer.getName() + "!\n\n"
                 + sellerName + " enviou uma proposta para o seu interesse:\n"
                 + interestTitle + "\n\n"
-                + "Acesse a plataforma para conversar e negociar com seguranca.";
+                + "Acesse a plataforma para conversar e negociar com segurança.";
         return sendEmail(
                 EmailKind.OFFER_RECEIVED,
                 buyer,
@@ -168,15 +168,15 @@ public class EmailGatewayAdapter implements EmailGateway {
                 "Nova proposta para: " + interestTitle,
                 variables(
                         subject,
-                        "Voce recebeu uma nova proposta.",
+                        "Você recebeu uma nova proposta.",
                         "Nova proposta",
                         "Seu interesse recebeu uma proposta",
-                        sellerName + " enviou uma proposta para um interesse publicado por voce.",
+                        sellerName + " enviou uma proposta para um interesse publicado por você.",
                         "Interesse",
                         interestTitle,
                         "Ver proposta",
                         appUrl,
-                        "Negocie pela plataforma e evite compartilhar dados sensiveis fora do contexto da proposta."
+                        "Negocie pela plataforma e evite compartilhar dados sensíveis fora do contexto da proposta."
                 )
         );
     }
@@ -189,7 +189,7 @@ public class EmailGatewayAdapter implements EmailGateway {
             String messagePreview
     ) {
         String subject = "Eu Procuro - nova mensagem";
-        String text = "Ola, " + recipient.getName() + "!\n\n"
+        String text = "Olá, " + recipient.getName() + "!\n\n"
                 + senderName + " enviou uma nova mensagem sobre:\n"
                 + interestTitle + "\n\n"
                 + messagePreview + "\n\n"
@@ -202,15 +202,15 @@ public class EmailGatewayAdapter implements EmailGateway {
                 "Nova mensagem: " + messagePreview,
                 variables(
                         subject,
-                        "Voce recebeu uma nova mensagem.",
+                        "Você recebeu uma nova mensagem.",
                         "Mensagem",
                         "Nova mensagem recebida",
                         senderName + " enviou uma mensagem sobre " + interestTitle + ".",
-                        "Previa",
+                        "Prévia",
                         messagePreview,
                         "Abrir conversa",
                         appUrl,
-                        "Nunca informe senhas, codigos ou dados financeiros por mensagem."
+                        "Nunca informe senhas, códigos ou dados financeiros por mensagem."
                 )
         );
     }
@@ -218,11 +218,11 @@ public class EmailGatewayAdapter implements EmailGateway {
     @Override
     public boolean sendPurchaseConfirmationEmail(UserProfile user, String productName, String paymentMethod) {
         String subject = "Eu Procuro - compra confirmada";
-        String text = "Ola, " + user.getName() + "!\n\n"
+        String text = "Olá, " + user.getName() + "!\n\n"
                 + "Sua compra foi confirmada:\n"
                 + productName + "\n"
                 + "Forma de pagamento: " + paymentMethod + "\n\n"
-                + "Seu saldo ou plano ja esta disponivel na plataforma.";
+                + "Seu saldo ou plano ja esta disponível na plataforma.";
         return sendEmail(
                 EmailKind.PURCHASE_CONFIRMATION,
                 user,
@@ -234,12 +234,12 @@ public class EmailGatewayAdapter implements EmailGateway {
                         "Pagamento confirmado no Eu Procuro.",
                         "Pagamento",
                         "Compra confirmada",
-                        "Seu saldo ou plano ja esta disponivel na plataforma.",
+                        "Seu saldo ou plano ja esta disponível na plataforma.",
                         "Produto",
                         productName + " - " + paymentMethod,
                         "Abrir plataforma",
                         appUrl,
-                        "Se voce nao reconhece esta compra, entre em contato com o suporte."
+                        "Se você não reconhece esta compra, entre em contato com o suporte."
                 )
         );
     }
@@ -247,17 +247,17 @@ public class EmailGatewayAdapter implements EmailGateway {
     @Override
     public boolean sendBoostActivatedEmail(UserProfile user, String interestTitle, String boostedUntil) {
         String subject = "Eu Procuro - boost ativado";
-        String text = "Ola, " + user.getName() + "!\n\n"
+        String text = "Olá, " + user.getName() + "!\n\n"
                 + "O boost do seu interesse foi ativado:\n"
                 + interestTitle + "\n"
-                + "Destaque ativo ate: " + boostedUntil + "\n\n"
+                + "Destaque ativo até: " + boostedUntil + "\n\n"
                 + "Agora ele ganha prioridade na busca e na home.";
         return sendEmail(
                 EmailKind.BOOST_ACTIVATED,
                 user,
                 subject,
                 text,
-                "Boost ativado ate: " + boostedUntil,
+                "Boost ativado até: " + boostedUntil,
                 variables(
                         subject,
                         "Seu interesse agora esta em destaque.",
@@ -265,7 +265,7 @@ public class EmailGatewayAdapter implements EmailGateway {
                         "Boost ativado",
                         "O boost do seu interesse foi ativado e ele ganhou prioridade na busca e na home.",
                         "Interesse",
-                        interestTitle + " - destaque ativo ate " + boostedUntil,
+                        interestTitle + " - destaque ativo até " + boostedUntil,
                         "Ver interesse",
                         appUrl,
                         "Acompanhe as propostas recebidas pela plataforma."
@@ -276,12 +276,12 @@ public class EmailGatewayAdapter implements EmailGateway {
     @Override
     public boolean sendOmbudsmanConfirmationEmail(String name, String email, String protocol, String subjectText) {
         UserProfile recipient = emailRecipient(name, email);
-        String subject = "Eu Procuro - manifestacao recebida";
-        String text = "Ola, " + recipient.getName() + "!\n\n"
-                + "Recebemos sua manifestacao na Ouvidoria.\n"
+        String subject = "Eu Procuro - manifestação recebida";
+        String text = "Olá, " + recipient.getName() + "!\n\n"
+                + "Recebemos sua manifestação na Ouvidoria.\n"
                 + "Protocolo: " + protocol + "\n"
                 + "Assunto: " + subjectText + "\n\n"
-                + "Responderemos assim que a analise for concluida.";
+                + "Responderemos assim que a analise for concluída.";
         return sendEmail(
                 EmailKind.OMBUDSMAN,
                 recipient,
@@ -290,10 +290,10 @@ public class EmailGatewayAdapter implements EmailGateway {
                 "Ouvidoria recebida. Protocolo: " + protocol,
                 variables(
                         subject,
-                        "Recebemos sua manifestacao na Ouvidoria.",
+                        "Recebemos sua manifestação na Ouvidoria.",
                         "Ouvidoria",
-                        "Manifestacao recebida",
-                        "Seu relato foi registrado e sera analisado pela equipe responsavel.",
+                        "Manifestação recebida",
+                         "Seu relato foi registrado e será analisado pela equipe responsável.",
                         "Protocolo",
                         protocol + " - " + subjectText,
                         "Abrir plataforma",
@@ -307,8 +307,8 @@ public class EmailGatewayAdapter implements EmailGateway {
     public boolean sendOmbudsmanResponseEmail(String name, String email, String protocol, String subjectText, String response) {
         UserProfile recipient = emailRecipient(name, email);
         String subject = "Eu Procuro - resposta da Ouvidoria";
-        String text = "Ola, " + recipient.getName() + "!\n\n"
-                + "Sua manifestacao recebeu uma resposta.\n"
+        String text = "Olá, " + recipient.getName() + "!\n\n"
+                + "Sua manifestação recebeu uma resposta.\n"
                 + "Protocolo: " + protocol + "\n"
                 + "Assunto: " + subjectText + "\n\n"
                 + response;
@@ -320,7 +320,7 @@ public class EmailGatewayAdapter implements EmailGateway {
                 "Resposta da Ouvidoria. Protocolo: " + protocol,
                 variables(
                         subject,
-                        "Sua manifestacao recebeu uma resposta.",
+                        "Sua manifestação recebeu uma resposta.",
                         "Ouvidoria",
                         "Resposta da Ouvidoria",
                         response,
@@ -350,7 +350,7 @@ public class EmailGatewayAdapter implements EmailGateway {
     private boolean sendSmtpTextEmail(UserProfile user, String subject, String text, String fallbackLog) {
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
         if (mailSender == null) {
-            LOGGER.info("SMTP nao configurado. E-mail para {}: {}", user.getEmail(), fallbackLog);
+            LOGGER.info("SMTP não configurado. E-mail para {}: {}", user.getEmail(), fallbackLog);
             return failOpen;
         }
 
@@ -392,7 +392,7 @@ public class EmailGatewayAdapter implements EmailGateway {
     ) {
         String templateId = templateIdFor(kind);
         if (!StringUtils.hasText(mailerSendApiKey) || !StringUtils.hasText(templateId)) {
-            LOGGER.warn("MailerSend API nao configurada. E-mail para {}: {}", user.getEmail(), fallbackLog);
+            LOGGER.warn("MailerSend API não configurada. E-mail para {}: {}", user.getEmail(), fallbackLog);
             return failOpen;
         }
 
