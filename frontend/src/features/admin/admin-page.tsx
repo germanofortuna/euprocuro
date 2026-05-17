@@ -30,6 +30,8 @@ import { EmptyState } from "@/shared/ui/empty-state";
 type AdminCatalog = {
   monetizationSettings?: { creditPurchasesEnabled?: boolean; boostPurchasesEnabled?: boolean };
   moderationSettings?: { userBlockListEnabled?: boolean };
+  featureFlags?: { stickersPageEnabled?: boolean };
+  operationalFields?: { initialFreeCredits?: number };
   categories?: Array<Record<string, unknown>>;
   products?: Array<Record<string, unknown>>;
   updatedAt?: string;
@@ -65,8 +67,27 @@ function normalizeAdminContent(payload: AdminContent | null): AdminContent {
   return { entries: Array.from(entriesByKey.values()).sort((left, right) => String(left.key ?? "").localeCompare(String(right.key ?? ""))) };
 }
 
+function normalizeAdminCatalog(payload: AdminCatalog | null): AdminCatalog | null {
+  if (!payload) {
+    return null;
+  }
+  return {
+    ...payload,
+    categories: (payload.categories ?? []).map((category) => ({
+      ...category,
+      code: String(category.code ?? category.value ?? "").trim().toUpperCase()
+    })),
+    featureFlags: {
+      stickersPageEnabled: payload.featureFlags?.stickersPageEnabled ?? true
+    },
+    operationalFields: {
+      initialFreeCredits: payload.operationalFields?.initialFreeCredits ?? 15
+    }
+  };
+}
+
 export function AdminPage() {
-  const { adminModeration, isLoadingPrivate, refreshPrivateData, setFeedback } = usePlatform();
+  const { adminModeration, isLoadingPrivate, refreshPrivateData, refreshPublicData, refreshOperationalSettings, setFeedback } = usePlatform();
   const [localAdminModeration, setLocalAdminModeration] = useState<AdminModeration | null>(null);
   const [isAdminModerationLoading, setIsAdminModerationLoading] = useState(true);
   const [adminLoadError, setAdminLoadError] = useState<string | null>(null);
@@ -105,7 +126,7 @@ export function AdminPage() {
         fetchAdminCatalog().catch(() => null),
         fetchAdminOmbudsman(ombudsmanStatusFilter === "ALL" ? "" : ombudsmanStatusFilter).catch(() => [])
       ]);
-      setCatalog(catalogPayload as AdminCatalog | null);
+      setCatalog(normalizeAdminCatalog(catalogPayload as AdminCatalog | null));
       setOmbudsman(ombudsmanPayload);
     } finally {
       setIsAdminDataLoading(false);
@@ -209,13 +230,17 @@ export function AdminPage() {
     }
     setBusyAction("catalog:save");
     const payload = {
-      categories: (nextCatalog.categories ?? []).filter((cat) => String(cat.code ?? "").trim()),
+      categories: (nextCatalog.categories ?? [])
+        .map((cat) => ({ ...cat, code: String(cat.code ?? cat.value ?? "").trim().toUpperCase() }))
+        .filter((cat) => String(cat.code ?? "").trim()),
       products: (nextCatalog.products ?? []).filter((prod) => String(prod.code ?? "").trim())
     };
     try {
       const saved = await saveAdminCatalog(payload);
-      setCatalog(saved as AdminCatalog);
+      const normalizedSaved = normalizeAdminCatalog(saved as AdminCatalog);
+      setCatalog(normalizedSaved);
       setFeedback({ type: "success", title: "Catalogo salvo", message: "Produtos e categorias foram atualizados." });
+      await Promise.all([refreshPublicData(), refreshPrivateData()]);
     } finally {
       setBusyAction(null);
     }
@@ -229,17 +254,25 @@ export function AdminPage() {
     try {
       const saved = await saveOperationalFlags({
         monetizationSettings: nextCatalog.monetizationSettings ?? {},
-        moderationSettings: nextCatalog.moderationSettings ?? {}
+        moderationSettings: nextCatalog.moderationSettings ?? {},
+        featureFlags: nextCatalog.featureFlags ?? {},
+        operationalFields: nextCatalog.operationalFields ?? {}
       });
-      setCatalog(saved as AdminCatalog);
+      const normalizedSaved = normalizeAdminCatalog(saved as AdminCatalog);
+      setCatalog(normalizedSaved);
       setFeedback({ type: "success", title: "Flags salvas", message: "As flags operacionais foram atualizadas." });
+      await Promise.all([refreshPublicData(), refreshOperationalSettings()]);
     } finally {
       setBusyAction(null);
     }
   }
 
-  function updateCatalogFlag(group: "monetizationSettings" | "moderationSettings", key: string, checked: boolean) {
+  function updateCatalogFlag(group: "monetizationSettings" | "moderationSettings" | "featureFlags", key: string, checked: boolean) {
     setCatalog((current) => current ? { ...current, [group]: { ...(current[group] ?? {}), [key]: checked } } : current);
+  }
+
+  function updateOperationalField(key: string, value: number) {
+    setCatalog((current) => current ? { ...current, operationalFields: { ...(current.operationalFields ?? {}), [key]: value } } : current);
   }
 
   function updateCatalogArrayItem(group: "products" | "categories", index: number, key: string, value: unknown) {
@@ -346,6 +379,9 @@ export function AdminPage() {
     }
     return [entry.key, entry.value, entry.defaultValue, entry.status, entry.type].join(" ").toLowerCase().includes(query);
   });
+  const catalogProductEntries = (catalog?.products ?? []).map((product, index) => ({ product, index }));
+  const boostProductEntries = catalogProductEntries.filter(({ product }) => String(product.type ?? "").toUpperCase() === "BOOST");
+  const creditProductEntries = catalogProductEntries.filter(({ product }) => String(product.type ?? "").toUpperCase() !== "BOOST");
 
   return (
     <div className="dashboard-page admin-page">
@@ -383,6 +419,9 @@ export function AdminPage() {
                 <label className="checkbox-row"><input type="checkbox" checked={Boolean(catalog.monetizationSettings?.creditPurchasesEnabled)} onChange={(event) => updateCatalogFlag("monetizationSettings", "creditPurchasesEnabled", event.target.checked)} /><span>Ativar compra de creditos</span></label>
                 <label className="checkbox-row"><input type="checkbox" checked={Boolean(catalog.monetizationSettings?.boostPurchasesEnabled)} onChange={(event) => updateCatalogFlag("monetizationSettings", "boostPurchasesEnabled", event.target.checked)} /><span>Ativar boost de procuras</span></label>
                 <label className="checkbox-row"><input type="checkbox" checked={Boolean(catalog.moderationSettings?.userBlockListEnabled)} onChange={(event) => updateCatalogFlag("moderationSettings", "userBlockListEnabled", event.target.checked)} /><span>Ativar block list de usuarios</span></label>
+                <label className="checkbox-row"><input type="checkbox" checked={catalog.featureFlags?.stickersPageEnabled !== false} onChange={(event) => updateCatalogFlag("featureFlags", "stickersPageEnabled", event.target.checked)} /><span>Exibir pagina de figurinhas</span></label>
+                <h3>Campos Operacionais</h3>
+                <label>Creditos iniciais gratis<input type="number" min="0" max="1000" value={Number(catalog.operationalFields?.initialFreeCredits ?? 15)} onChange={(event) => updateOperationalField("initialFreeCredits", Number(event.target.value))} /></label>
                 <Button onClick={() => saveOperationalFlagSettings()} disabled={busyAction === "flags:save"}><Save size={16} /> {busyAction === "flags:save" ? "Salvando..." : "Salvar flags"}</Button>
               </div>
             ) : <EmptyState title="Catalogo indisponivel" description="Nao foi possivel carregar as flags operacionais." />}
@@ -417,15 +456,15 @@ export function AdminPage() {
             <h2>Produtos e categorias</h2>
             {catalog ? (
               <div className="admin-edit-list">
-                <article><strong>{catalog.products?.length ?? 0} produtos</strong><span>Credito, assinatura e boost</span></article>
+                <article><strong>{catalog.products?.length ?? 0} produtos</strong><span>{creditProductEntries.length} creditos/planos e {boostProductEntries.length} boosts</span></article>
                 <article><strong>{catalog.categories?.length ?? 0} categorias</strong><span>Rotas SEO e filtros publicos</span></article>
-                <h3>Produtos</h3>
+                <h3>Boosts</h3>
                 {!(catalog.products ?? []).some((product) => String(product.code ?? "").toUpperCase() === "BOOST_9_DAYS") ? (
-                  <Button type="button" variant="outline" onClick={() => addCatalogProduct({ code: "BOOST_9_DAYS", name: "Boost 9 dias", description: "Destaque prolongado para procuras prioritarias.", type: "BOOST", price: 24.9, credits: 8, durationDays: 9, enabled: true, sortOrder: 60 })}>
+                  <Button type="button" variant="outline" onClick={() => addCatalogProduct({ code: "BOOST_9_DAYS", name: "Boost 9 dias", description: "Destaque prolongado para procuras prioritarias.", type: "BOOST", price: 24.9, credits: 15, durationDays: 9, enabled: true, sortOrder: 60 })}>
                     <Plus size={16} /> Adicionar boost 9 dias
                   </Button>
                 ) : null}
-                {(catalog.products ?? []).map((product, index) => (
+                {boostProductEntries.length ? boostProductEntries.map(({ product, index }) => (
                   <article key={String(product.code ?? product.name ?? index)} className="admin-edit-row">
                     <label>Nome<input value={String(product.name ?? "")} onChange={(event) => updateCatalogArrayItem("products", index, "name", event.target.value)} /></label>
                     <label>Codigo<input value={String(product.code ?? "")} onChange={(event) => updateCatalogArrayItem("products", index, "code", event.target.value)} /></label>
@@ -436,7 +475,20 @@ export function AdminPage() {
                     <label>Ordem<input type="number" value={Number(product.sortOrder ?? index)} onChange={(event) => updateCatalogArrayItem("products", index, "sortOrder", Number(event.target.value))} /></label>
                     <label className="checkbox-row"><input type="checkbox" checked={product.enabled !== false} onChange={(event) => updateCatalogArrayItem("products", index, "enabled", event.target.checked)} /><span>Ativo</span></label>
                   </article>
-                ))}
+                )) : <p className="admin-help-text">Nenhum boost cadastrado.</p>}
+                <h3>Creditos e planos</h3>
+                {creditProductEntries.length ? creditProductEntries.map(({ product, index }) => (
+                  <article key={String(product.code ?? product.name ?? index)} className="admin-edit-row">
+                    <label>Nome<input value={String(product.name ?? "")} onChange={(event) => updateCatalogArrayItem("products", index, "name", event.target.value)} /></label>
+                    <label>Codigo<input value={String(product.code ?? "")} onChange={(event) => updateCatalogArrayItem("products", index, "code", event.target.value)} /></label>
+                    <label>Tipo<select value={String(product.type ?? "")} onChange={(event) => updateCatalogArrayItem("products", index, "type", event.target.value)}><option value="CREDIT_PACK">CREDIT_PACK</option><option value="SUBSCRIPTION">SUBSCRIPTION</option><option value="BOOST">BOOST</option></select></label>
+                    <label>Preco<input type="number" min="0" step="0.01" value={Number(product.price ?? 0)} onChange={(event) => updateCatalogArrayItem("products", index, "price", Number(event.target.value))} /></label>
+                    <label>Preco em creditos<input type="number" min="0" value={product.credits == null ? "" : Number(product.credits)} onChange={(event) => updateCatalogArrayItem("products", index, "credits", event.target.value === "" ? null : Number(event.target.value))} /></label>
+                    <label>Dias de duracao<input type="number" min="0" value={product.durationDays == null ? "" : Number(product.durationDays)} onChange={(event) => updateCatalogArrayItem("products", index, "durationDays", event.target.value === "" ? null : Number(event.target.value))} /></label>
+                    <label>Ordem<input type="number" value={Number(product.sortOrder ?? index)} onChange={(event) => updateCatalogArrayItem("products", index, "sortOrder", Number(event.target.value))} /></label>
+                    <label className="checkbox-row"><input type="checkbox" checked={product.enabled !== false} onChange={(event) => updateCatalogArrayItem("products", index, "enabled", event.target.checked)} /><span>Ativo</span></label>
+                  </article>
+                )) : <p className="admin-help-text">Nenhum pacote de credito ou plano cadastrado.</p>}
                 <h3>Categorias</h3>
                 {(catalog.categories ?? []).map((category, index) => (
                   <article key={String(category.code ?? category.value ?? category.label ?? index)} className="admin-edit-row">

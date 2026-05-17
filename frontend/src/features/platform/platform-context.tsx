@@ -22,6 +22,7 @@ import {
   fetchInterest,
   fetchInterests,
   fetchMe,
+  fetchOperationalSettings,
   fetchMonetizationAccount,
   fetchSellerItems,
   getStoredSession,
@@ -42,6 +43,7 @@ import type {
   Dashboard,
   Interest,
   MonetizationAccount,
+  OperationalSettings,
   SellerItemGroup,
   StoredSession,
   User
@@ -61,6 +63,7 @@ type PlatformContextValue = {
   dashboard: Dashboard | null;
   monetization: MonetizationAccount | null;
   sellerItems: SellerItemGroup[];
+  operationalSettings: OperationalSettings;
   adminModeration: AdminModeration | null;
   hasAdminAccess: boolean;
   isLoadingPublic: boolean;
@@ -77,6 +80,7 @@ type PlatformContextValue = {
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   recoverSession: () => Promise<void>;
+  refreshOperationalSettings: () => Promise<void>;
   refreshPublicData: (filters?: Record<string, string | number | undefined | null>) => Promise<void>;
   selectInterest: (interestId: string) => Promise<void>;
   refreshPrivateData: () => Promise<void>;
@@ -95,6 +99,10 @@ type PlatformContextValue = {
 };
 
 const PlatformContext = createContext<PlatformContextValue | null>(null);
+const DEFAULT_OPERATIONAL_SETTINGS: OperationalSettings = {
+  featureFlags: { stickersPageEnabled: true },
+  operationalFields: { initialFreeCredits: 15 }
+};
 
 function normalizeMe(me: Record<string, unknown>, previousSession: StoredSession | null): StoredSession {
   const user = {
@@ -164,6 +172,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [monetization, setMonetization] = useState<MonetizationAccount | null>(null);
   const [sellerItems, setSellerItems] = useState<SellerItemGroup[]>([]);
+  const [operationalSettings, setOperationalSettings] = useState<OperationalSettings>(DEFAULT_OPERATIONAL_SETTINGS);
   const [adminModeration, setAdminModeration] = useState<AdminModeration | null>(null);
   const [hasAdminAccess, setHasAdminAccess] = useState(false);
   const [isLoadingPublic, setIsLoadingPublic] = useState(false);
@@ -192,6 +201,18 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoadingPublic(false);
     }
+  }, []);
+
+  const refreshOperationalSettings = useCallback(async () => {
+    const settings = await fetchOperationalSettings().catch(() => DEFAULT_OPERATIONAL_SETTINGS);
+    setOperationalSettings({
+      featureFlags: {
+        stickersPageEnabled: settings.featureFlags?.stickersPageEnabled ?? true
+      },
+      operationalFields: {
+        initialFreeCredits: settings.operationalFields?.initialFreeCredits ?? 15
+      }
+    });
   }, []);
 
   const refreshPrivateData = useCallback(async () => {
@@ -283,8 +304,9 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     recoverSession().catch(() => {});
+    refreshOperationalSettings().catch(() => {});
     refreshPublicData().catch(() => {});
-  }, [recoverSession, refreshPublicData]);
+  }, [recoverSession, refreshOperationalSettings, refreshPublicData]);
 
   useEffect(() => {
     if (!session?.user?.id) {
@@ -478,6 +500,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     dashboard,
     monetization,
     sellerItems,
+    operationalSettings,
     adminModeration,
     hasAdminAccess,
     isLoadingPublic,
@@ -494,6 +517,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     signOut,
     deleteAccount,
     recoverSession,
+    refreshOperationalSettings,
     refreshPublicData,
     selectInterest,
     refreshPrivateData,
@@ -539,6 +563,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     selectInterest,
     selectedInterest,
     sellerItems,
+    operationalSettings,
     session,
     hasAdminAccess,
     setAuthMode,

@@ -16,16 +16,21 @@ import org.springframework.util.StringUtils;
 
 import com.euprocuro.api.application.command.CatalogCategoryCommand;
 import com.euprocuro.api.application.command.CatalogProductCommand;
+import com.euprocuro.api.application.command.FeatureFlagsCommand;
 import com.euprocuro.api.application.command.ModerationSettingsCommand;
 import com.euprocuro.api.application.command.MonetizationSettingsCommand;
 import com.euprocuro.api.application.command.OperationalFlagsCommand;
+import com.euprocuro.api.application.command.OperationalFieldsCommand;
 import com.euprocuro.api.application.command.SaveOperationalCatalogCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.view.AdminOperationalCatalogView;
 import com.euprocuro.api.application.view.CatalogCategoryView;
+import com.euprocuro.api.application.view.FeatureFlagsView;
 import com.euprocuro.api.application.view.ModerationSettingsView;
 import com.euprocuro.api.application.view.MonetizationProductView;
 import com.euprocuro.api.application.view.MonetizationSettingsView;
+import com.euprocuro.api.application.view.OperationalFieldsView;
+import com.euprocuro.api.application.view.PublicOperationalSettingsView;
 import com.euprocuro.api.domain.gateway.ContentEntryGateway;
 import com.euprocuro.api.domain.gateway.ContentRevisionGateway;
 import com.euprocuro.api.domain.model.ContentEntry;
@@ -47,7 +52,10 @@ public class OperationalCatalogService {
     private static final String PRODUCT_KEY = "catalog.monetization.products";
     private static final String MONETIZATION_SETTINGS_KEY = "catalog.monetization.settings";
     private static final String MODERATION_SETTINGS_KEY = "catalog.moderation.settings";
-    private static final String CODE_PATTERN = "[A-Z0-9][A-Z0-9_-]{1,48}";
+    private static final String FEATURE_FLAGS_KEY = "catalog.feature-flags";
+    private static final String OPERATIONAL_FIELDS_KEY = "catalog.operational-fields";
+    public static final String STICKERS_CATEGORY_CODE = "FIGURINHAS";
+    private static final String CODE_PATTERN = "[A-Z0-9_-]{1,50}";
 
     private final AdminAccessService adminAccessService;
     private final ContentEntryGateway contentEntryGateway;
@@ -66,6 +74,7 @@ public class OperationalCatalogService {
                 catalogCacheTtlSeconds,
                 () -> listCategories().stream()
                         .filter(CatalogCategoryView::isActive)
+                        .filter(category -> stickersPageEnabled() || !STICKERS_CATEGORY_CODE.equals(category.getCode()))
                         .collect(Collectors.toList())
         );
     }
@@ -97,8 +106,44 @@ public class OperationalCatalogService {
                 .orElseGet(this::defaultModerationSettings);
     }
 
+    public FeatureFlagsView getFeatureFlags() {
+        ensureDefaultsSeeded();
+        return loadEntry(FEATURE_FLAGS_KEY)
+                .map(ContentEntry::getPublishedValue)
+                .filter(StringUtils::hasText)
+                .map(this::readFeatureFlags)
+                .orElseGet(this::defaultFeatureFlags);
+    }
+
+    public OperationalFieldsView getOperationalFields() {
+        ensureDefaultsSeeded();
+        return loadEntry(OPERATIONAL_FIELDS_KEY)
+                .map(ContentEntry::getPublishedValue)
+                .filter(StringUtils::hasText)
+                .map(this::readOperationalFields)
+                .orElseGet(this::defaultOperationalFields);
+    }
+
+    public PublicOperationalSettingsView getPublicOperationalSettings() {
+        return PublicOperationalSettingsView.builder()
+                .featureFlags(getFeatureFlags())
+                .operationalFields(getOperationalFields())
+                .build();
+    }
+
+    public boolean stickersPageEnabled() {
+        return getFeatureFlags().isStickersPageEnabled();
+    }
+
+    public int initialFreeCredits() {
+        return getOperationalFields().getInitialFreeCredits();
+    }
+
     public String requireActiveCategory(String code) {
         String normalizedCode = normalizeCode(code);
+        if (STICKERS_CATEGORY_CODE.equals(normalizedCode) && !stickersPageEnabled()) {
+            throw new BusinessException("Pagina de figurinhas esta temporariamente desabilitada.");
+        }
         boolean active = listActiveCategories().stream()
                 .anyMatch(category -> category.getCode().equals(normalizedCode));
         if (!active) {
@@ -135,9 +180,13 @@ public class OperationalCatalogService {
 
         MonetizationSettingsView monetizationSettings = validateMonetizationSettings(command.getMonetizationSettings());
         ModerationSettingsView moderationSettings = validateModerationSettings(command.getModerationSettings());
+        FeatureFlagsView featureFlags = validateFeatureFlags(command.getFeatureFlags());
+        OperationalFieldsView operationalFields = validateOperationalFields(command.getOperationalFields());
 
         saveCatalogEntry(MONETIZATION_SETTINGS_KEY, "Configuracao de monetizacao", monetizationSettings, admin.getId());
         saveCatalogEntry(MODERATION_SETTINGS_KEY, "Configuracao de moderacao", moderationSettings, admin.getId());
+        saveCatalogEntry(FEATURE_FLAGS_KEY, "Flags de experiencias publicas", featureFlags, admin.getId());
+        saveCatalogEntry(OPERATIONAL_FIELDS_KEY, "Campos operacionais", operationalFields, admin.getId());
         publicCacheService.invalidate(PublicCacheService.CATALOG);
         return buildAdminView();
     }
@@ -148,7 +197,9 @@ public class OperationalCatalogService {
                         loadEntry(CATEGORY_KEY),
                         loadEntry(PRODUCT_KEY),
                         loadEntry(MONETIZATION_SETTINGS_KEY),
-                        loadEntry(MODERATION_SETTINGS_KEY)
+                        loadEntry(MODERATION_SETTINGS_KEY),
+                        loadEntry(FEATURE_FLAGS_KEY),
+                        loadEntry(OPERATIONAL_FIELDS_KEY)
                 )
                 .flatMap(Optional::stream)
                 .map(ContentEntry::getUpdatedAt)
@@ -159,6 +210,8 @@ public class OperationalCatalogService {
         return AdminOperationalCatalogView.builder()
                 .monetizationSettings(getMonetizationSettings())
                 .moderationSettings(getModerationSettings())
+                .featureFlags(getFeatureFlags())
+                .operationalFields(getOperationalFields())
                 .categories(listCategories())
                 .products(listProducts())
                 .updatedAt(updatedAt)
@@ -215,6 +268,22 @@ public class OperationalCatalogService {
         }
     }
 
+    private FeatureFlagsView readFeatureFlags(String value) {
+        try {
+            return objectMapper.readValue(value, FeatureFlagsRecord.class).toView();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Configuracao de features invalida.", exception);
+        }
+    }
+
+    private OperationalFieldsView readOperationalFields(String value) {
+        try {
+            return objectMapper.readValue(value, OperationalFieldsRecord.class).toView();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Campos operacionais invalidos.", exception);
+        }
+    }
+
     private Optional<ContentEntry> loadEntry(String key) {
         ensureDefaultsSeeded();
         return contentEntryGateway.findByKeyAndLocale(key, DEFAULT_LOCALE);
@@ -228,6 +297,26 @@ public class OperationalCatalogService {
         seedCatalogEntry(PRODUCT_KEY, "Produtos, planos e promocoes", defaultProducts());
         seedCatalogEntry(MONETIZATION_SETTINGS_KEY, "Configuracao de monetizacao", defaultMonetizationSettings());
         seedCatalogEntry(MODERATION_SETTINGS_KEY, "Configuracao de moderacao", defaultModerationSettings());
+        seedCatalogEntry(FEATURE_FLAGS_KEY, "Flags de experiencias publicas", defaultFeatureFlags());
+        seedCatalogEntry(OPERATIONAL_FIELDS_KEY, "Campos operacionais", defaultOperationalFields());
+        ensureDefaultStickersCategoryPresent();
+    }
+
+    private void ensureDefaultStickersCategoryPresent() {
+        Optional<ContentEntry> existing = contentEntryGateway.findByKeyAndLocale(CATEGORY_KEY, DEFAULT_LOCALE);
+        if (existing.isEmpty() || !StringUtils.hasText(existing.get().getPublishedValue())) {
+            return;
+        }
+        List<CatalogCategoryView> categories = readList(existing.get().getPublishedValue(), new TypeReference<List<CatalogCategoryRecord>>() {})
+                .stream()
+                .map(CatalogCategoryRecord::toView)
+                .collect(Collectors.toCollection(ArrayList::new));
+        boolean hasStickers = categories.stream().anyMatch(category -> STICKERS_CATEGORY_CODE.equals(category.getCode()));
+        if (hasStickers) {
+            return;
+        }
+        categories.add(category(STICKERS_CATEGORY_CODE, "Figurinhas", 70));
+        saveCatalogEntry(CATEGORY_KEY, "Categorias de anuncios", categories, null);
     }
 
     private void seedCatalogEntry(String key, String description, Object value) {
@@ -370,6 +459,27 @@ public class OperationalCatalogService {
                 .build();
     }
 
+    private FeatureFlagsView validateFeatureFlags(FeatureFlagsCommand command) {
+        if (command == null || command.getStickersPageEnabled() == null) {
+            return defaultFeatureFlags();
+        }
+        return FeatureFlagsView.builder()
+                .stickersPageEnabled(command.getStickersPageEnabled())
+                .build();
+    }
+
+    private OperationalFieldsView validateOperationalFields(OperationalFieldsCommand command) {
+        int initialFreeCredits = command == null || command.getInitialFreeCredits() == null
+                ? defaultOperationalFields().getInitialFreeCredits()
+                : command.getInitialFreeCredits();
+        if (initialFreeCredits < 0 || initialFreeCredits > 1000) {
+            throw new BusinessException("Creditos iniciais devem ficar entre 0 e 1000.");
+        }
+        return OperationalFieldsView.builder()
+                .initialFreeCredits(initialFreeCredits)
+                .build();
+    }
+
     private List<MonetizationProductView> filterProductsForSettings(
             List<MonetizationProductView> products,
             MonetizationSettingsView settings
@@ -404,6 +514,18 @@ public class OperationalCatalogService {
                 .build();
     }
 
+    private FeatureFlagsView defaultFeatureFlags() {
+        return FeatureFlagsView.builder()
+                .stickersPageEnabled(true)
+                .build();
+    }
+
+    private OperationalFieldsView defaultOperationalFields() {
+        return OperationalFieldsView.builder()
+                .initialFreeCredits(15)
+                .build();
+    }
+
     private List<CatalogCategoryView> defaultCategories() {
         return List.of(
                 category("AUTOMOVEIS", "Automoveis", 10),
@@ -411,7 +533,8 @@ public class OperationalCatalogService {
                 category("SERVICOS", "Servicos", 30),
                 category("ELETRONICOS", "Eletronicos", 40),
                 category("INSTRUMENTOS", "Instrumentos", 50),
-                category("OUTROS", "Outros", 60)
+                category("OUTROS", "Outros", 60),
+                category(STICKERS_CATEGORY_CODE, "Figurinhas", 70)
         );
     }
 
@@ -433,11 +556,11 @@ public class OperationalCatalogService {
                 product("SELLER_PRO", "Plano vendedor Pro", "Propostas ilimitadas por 30 dias neste MVP.",
                         MonetizationProductType.SUBSCRIPTION, new BigDecimal("49.90"), null, 30, 30),
                 product("BOOST_3_DAYS", "Boost 3 dias", "Impulsiona o interesse na busca e na home.",
-                        MonetizationProductType.BOOST, new BigDecimal("9.90"), 3, 3, 40),
+                        MonetizationProductType.BOOST, new BigDecimal("9.90"), 7, 3, 40),
                 product("BOOST_7_DAYS", "Boost 7 dias", "Mais tempo em destaque para receber propostas.",
-                        MonetizationProductType.BOOST, new BigDecimal("19.90"), 6, 7, 50),
+                        MonetizationProductType.BOOST, new BigDecimal("19.90"), 10, 7, 50),
                 product("BOOST_9_DAYS", "Boost 9 dias", "Destaque prolongado para procuras prioritarias.",
-                        MonetizationProductType.BOOST, new BigDecimal("24.90"), 8, 9, 60)
+                        MonetizationProductType.BOOST, new BigDecimal("24.90"), 15, 9, 60)
         );
     }
 
@@ -475,13 +598,15 @@ public class OperationalCatalogService {
     @Data
     private static class CatalogCategoryRecord {
         private String code;
+        private String value;
         private String label;
         private boolean active;
         private Integer sortOrder;
 
         private CatalogCategoryView toView() {
+            String normalizedCode = StringUtils.hasText(code) ? code : value;
             return CatalogCategoryView.builder()
-                    .code(code)
+                    .code(normalizedCode)
                     .label(label)
                     .active(active)
                     .sortOrder(sortOrder)
@@ -542,6 +667,28 @@ public class OperationalCatalogService {
         private ModerationSettingsView toView() {
             return ModerationSettingsView.builder()
                     .userBlockListEnabled(userBlockListEnabled)
+                    .build();
+        }
+    }
+
+    @Data
+    private static class FeatureFlagsRecord {
+        private boolean stickersPageEnabled = true;
+
+        private FeatureFlagsView toView() {
+            return FeatureFlagsView.builder()
+                    .stickersPageEnabled(stickersPageEnabled)
+                    .build();
+        }
+    }
+
+    @Data
+    private static class OperationalFieldsRecord {
+        private int initialFreeCredits = 15;
+
+        private OperationalFieldsView toView() {
+            return OperationalFieldsView.builder()
+                    .initialFreeCredits(initialFreeCredits < 0 ? 15 : initialFreeCredits)
                     .build();
         }
     }

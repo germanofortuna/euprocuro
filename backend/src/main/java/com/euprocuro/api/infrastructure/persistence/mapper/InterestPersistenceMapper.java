@@ -5,9 +5,11 @@ import java.util.ArrayList;
 import com.euprocuro.api.domain.model.InterestModeration;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.LocationInfo;
+import com.euprocuro.api.domain.model.StickerDetails;
 import com.euprocuro.api.infrastructure.persistence.document.InterestModerationDocument;
 import com.euprocuro.api.infrastructure.persistence.document.InterestPostDocument;
 import com.euprocuro.api.infrastructure.persistence.document.LocationDocument;
+import com.euprocuro.api.infrastructure.persistence.document.StickerDetailsDocument;
 
 public final class InterestPersistenceMapper {
 
@@ -31,6 +33,7 @@ public final class InterestPersistenceMapper {
                 .budgetMax(document.getBudgetMax())
                 .location(toDomain(document.getLocation()))
                 .tags(document.getTags() == null ? new ArrayList<>() : document.getTags())
+                .stickerDetails(toDomain(document.getStickerDetails()))
                 .desiredRadiusKm(document.getDesiredRadiusKm())
                 .allowsWhatsappContact(document.isAllowsWhatsappContact())
                 .whatsappContact(document.getWhatsappContact())
@@ -62,6 +65,7 @@ public final class InterestPersistenceMapper {
                 .budgetMax(domain.getBudgetMax())
                 .location(toDocument(domain.getLocation()))
                 .tags(domain.getTags())
+                .stickerDetails(toDocument(domain.getStickerDetails()))
                 .desiredRadiusKm(domain.getDesiredRadiusKm())
                 .allowsWhatsappContact(domain.isAllowsWhatsappContact())
                 .whatsappContact(domain.getWhatsappContact())
@@ -139,6 +143,32 @@ public final class InterestPersistenceMapper {
                 .neighborhood(domain.getNeighborhood())
                 .country(domain.getCountry())
                 .remote(domain.isRemote())
+                .build();
+    }
+
+    private static StickerDetails toDomain(StickerDetailsDocument document) {
+        if (document == null) {
+            return null;
+        }
+
+        return StickerDetails.builder()
+                .type(document.getType())
+                .group(document.getGroup())
+                .selection(document.getSelection())
+                .numbers(document.getNumbers() == null ? new ArrayList<>() : document.getNumbers())
+                .build();
+    }
+
+    private static StickerDetailsDocument toDocument(StickerDetails domain) {
+        if (domain == null) {
+            return null;
+        }
+
+        return StickerDetailsDocument.builder()
+                .type(domain.getType())
+                .group(domain.getGroup())
+                .selection(domain.getSelection())
+                .numbers(domain.getNumbers())
                 .build();
     }
 }

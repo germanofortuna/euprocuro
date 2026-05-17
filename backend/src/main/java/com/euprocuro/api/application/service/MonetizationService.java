@@ -191,6 +191,9 @@ public class MonetizationService implements MonetizationUseCase {
         if (!Objects.equals(interest.getOwnerId(), userId)) {
             throw new ForbiddenException("Apenas o dono do interesse pode impulsionar este anuncio.");
         }
+        if (isBoostActive(interest, Instant.now())) {
+            throw new BusinessException("Esta procura ja possui um boost ativo. Aguarde o termino para impulsionar novamente.");
+        }
 
         MonetizationProductView product = requireProduct(command.getBoostCode());
         if (product.getType() != MonetizationProductType.BOOST) {
@@ -209,10 +212,11 @@ public class MonetizationService implements MonetizationUseCase {
         return createPendingCheckout(owner, product, paymentMethod, interestId);
     }
 
+    private boolean isBoostActive(InterestPost interest, Instant now) {
+        return interest.getBoostedUntil() != null && interest.getBoostedUntil().isAfter(now);
+    }
+
     private CheckoutView activateBoostWithCredits(UserProfile owner, String interestId, MonetizationProductView product) {
-        if (!monetizationCatalog.creditPurchasesEnabled()) {
-            throw new BusinessException("Uso de creditos para boost esta temporariamente desabilitado.");
-        }
         int creditCost = Optional.ofNullable(product.getCredits()).orElse(0);
         if (creditCost <= 0) {
             throw new BusinessException("Configure o custo em creditos deste boost no CRM.");
@@ -481,14 +485,11 @@ public class MonetizationService implements MonetizationUseCase {
         }
 
         Instant now = Instant.now();
-        Instant currentExpiration = interest.getBoostedUntil() != null && interest.getBoostedUntil().isAfter(now)
-                ? interest.getBoostedUntil()
-                : now;
         int durationDays = Optional.ofNullable(product.getDurationDays()).orElse(0);
         if (durationDays <= 0) {
             throw new BusinessException("Configure a duracao deste boost no CRM.");
         }
-        Instant boostedUntil = currentExpiration.plus(durationDays, ChronoUnit.DAYS);
+        Instant boostedUntil = now.plus(durationDays, ChronoUnit.DAYS);
 
         InterestPost saved = interestGateway.save(interest.toBuilder()
                 .boostedUntil(boostedUntil)

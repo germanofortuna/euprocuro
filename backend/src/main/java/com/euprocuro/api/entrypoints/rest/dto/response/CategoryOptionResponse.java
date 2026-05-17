@@ -6,6 +6,7 @@ import lombok.Value;
 @Value
 @Builder
 public class CategoryOptionResponse {
+    String code;
     String value;
     String label;
     boolean active;

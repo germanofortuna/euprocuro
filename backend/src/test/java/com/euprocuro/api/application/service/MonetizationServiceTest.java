@@ -613,15 +613,16 @@ class MonetizationServiceTest {
                 .boostedUntil(Instant.now().plus(2, ChronoUnit.DAYS))
                 .build();
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
-        when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser()));
-        when(paymentOrderGateway.save(any(PaymentOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+        assertThatThrownBy(() -> monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
                 .boostCode("BOOST_3_DAYS")
                 .paymentMethod("PIX")
-                .build());
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("boost ativo");
 
         verify(interestGateway, never()).save(any(InterestPost.class));
+        verify(paymentOrderGateway, never()).save(any(PaymentOrder.class));
     }
 
     @Test
@@ -664,6 +665,7 @@ class MonetizationServiceTest {
         UserProfile user = baseUser().toBuilder()
                 .sellerCredits(5)
                 .build();
+        Instant beforeActivation = Instant.now();
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
         when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
         when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -678,24 +680,26 @@ class MonetizationServiceTest {
         assertThat(result.getCheckoutUrl()).isEqualTo("local://credits");
         verify(userGateway).save(org.mockito.ArgumentMatchers.argThat(savedUser -> savedUser.getSellerCredits() == 3));
         verify(interestGateway).save(org.mockito.ArgumentMatchers.argThat(savedInterest ->
-                savedInterest.getBoostedUntil().isAfter(Instant.now())
+                !savedInterest.getBoostedUntil().isBefore(beforeActivation.plus(3, ChronoUnit.DAYS))
+                        && !savedInterest.getBoostedUntil().isAfter(Instant.now().plus(3, ChronoUnit.DAYS).plus(2, ChronoUnit.SECONDS))
         ));
         verify(paymentOrderGateway, never()).save(any(PaymentOrder.class));
     }
 
     @Test
-    void boostInterestShouldRejectCreditsWhenCreditPurchasesAreDisabled() {
-        when(monetizationCatalog.creditPurchasesEnabled()).thenReturn(false);
+    void boostInterestShouldUseCreditsEvenWhenCreditPurchasesAreDisabled() {
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
         when(userGateway.findById("user-1")).thenReturn(Optional.of(baseUser().toBuilder().sellerCredits(5).build()));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThatThrownBy(() -> monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
+        CheckoutView result = monetizationService.boostInterest("user-1", "interest-1", BoostInterestCommand.builder()
                 .boostCode("BOOST_3_DAYS")
                 .paymentMethod("CREDITS")
-                .build()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("creditos");
-        verify(interestGateway, never()).save(any(InterestPost.class));
+                .build());
+
+        assertThat(result.getStatus()).isEqualTo("APPROVED");
+        verify(interestGateway).save(any(InterestPost.class));
         verify(paymentOrderGateway, never()).save(any(PaymentOrder.class));
     }
 

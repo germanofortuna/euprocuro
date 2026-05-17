@@ -1,48 +1,52 @@
 "use client";
 
 import { useState } from "react";
-import type { ComponentProps } from "react";
+import { ImagePlus, X } from "lucide-react";
+import type { ChangeEvent, ComponentProps } from "react";
 import { fetchOfferConversation, sendOfferMessage } from "@/shared/api/client";
 import type { Offer, OfferConversation } from "@/shared/api/types";
 import { formatDateTime, statusLabel, statusTone } from "@/shared/lib/format";
+import { readImageFile } from "@/shared/lib/image-upload";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { usePlatform } from "@/features/platform/platform-context";
 
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
+const CHAT_IMAGE_OPTIONS = { maxBytes: 3 * 1024 * 1024, maxSide: 960, quality: 0.76, maxOutputLength: 1_000_000 } as const;
 
 export function OffersPage({ type }: { type: "sent" | "received" }) {
   const { dashboard, currentUser, refreshPrivateData, setFeedback } = usePlatform();
   const offers = type === "sent" ? dashboard?.sentOffers ?? [] : dashboard?.receivedOffers ?? [];
-  const [conversation, setConversation] = useState<{ visible: boolean; offer: Offer | null; data: OfferConversation | null; message: string; loading: boolean }>({
+  const [conversation, setConversation] = useState<{ visible: boolean; offer: Offer | null; data: OfferConversation | null; message: string; imageUrl: string; loading: boolean }>({
     visible: false,
     offer: null,
     data: null,
     message: "",
+    imageUrl: "",
     loading: false
   });
 
   async function openConversation(offer: Offer) {
-    setConversation({ visible: true, offer, data: null, message: "", loading: true });
+    setConversation({ visible: true, offer, data: null, message: "", imageUrl: "", loading: true });
     try {
       const data = await fetchOfferConversation(offer.id);
-      setConversation({ visible: true, offer, data, message: "", loading: false });
+      setConversation({ visible: true, offer, data, message: "", imageUrl: "", loading: false });
     } catch (error) {
-      setConversation({ visible: true, offer, data: { ...offer, messages: [] }, message: "", loading: false });
+      setConversation({ visible: true, offer, data: { ...offer, messages: [] }, message: "", imageUrl: "", loading: false });
       setFeedback({ type: "error", title: "Conversa indisponivel", message: error instanceof Error ? error.message : "Nao foi possivel carregar a conversa." });
     }
   }
 
   const submitConversationMessage: FormSubmitHandler = async (event) => {
     event.preventDefault();
-    if (!conversation.offer?.id || !conversation.message.trim()) {
+    if (!conversation.offer?.id || (!conversation.message.trim() && !conversation.imageUrl)) {
       return;
     }
     setConversation((current) => ({ ...current, loading: true }));
     try {
-      await sendOfferMessage(conversation.offer.id, { content: conversation.message.trim() });
+      await sendOfferMessage(conversation.offer.id, { content: conversation.message.trim(), imageUrl: conversation.imageUrl || null });
       const data = await fetchOfferConversation(conversation.offer.id);
-      setConversation((current) => ({ ...current, data, message: "", loading: false }));
+      setConversation((current) => ({ ...current, data, message: "", imageUrl: "", loading: false }));
       await refreshPrivateData();
     } catch (error) {
       setConversation((current) => ({ ...current, loading: false }));
@@ -50,8 +54,22 @@ export function OffersPage({ type }: { type: "sent" | "received" }) {
     }
   };
 
+  async function handleConversationImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+    try {
+      const imageUrl = await readImageFile(file, CHAT_IMAGE_OPTIONS);
+      setConversation((current) => ({ ...current, imageUrl }));
+    } catch (error) {
+      setFeedback({ type: "error", title: "Imagem invalida", message: error instanceof Error ? error.message : "Selecione outra imagem." });
+    }
+  }
+
   function closeConversation() {
-    setConversation({ visible: false, offer: null, data: null, message: "", loading: false });
+    setConversation({ visible: false, offer: null, data: null, message: "", imageUrl: "", loading: false });
   }
 
   return (
@@ -85,7 +103,8 @@ export function OffersPage({ type }: { type: "sent" | "received" }) {
                 conversation.data?.messages?.map((message) => (
                   <article className={message.senderId === currentUser?.id ? "chat-message chat-message--mine" : "chat-message"} key={message.id}>
                     <strong>{message.senderName ?? (message.senderId === currentUser?.id ? "Voce" : "Contato")}</strong>
-                    <p>{message.content}</p>
+                    {message.content ? <p>{message.content}</p> : null}
+                    {message.imageUrl ? <a href={message.imageUrl} target="_blank" rel="noreferrer"><img className="chat-message__image" src={message.imageUrl} alt="Imagem enviada no chat" /></a> : null}
                     <small>{formatDateTime(message.createdAt)}</small>
                   </article>
                 ))
@@ -95,9 +114,20 @@ export function OffersPage({ type }: { type: "sent" | "received" }) {
             </div>
             <form className="conversation-form" onSubmit={submitConversationMessage}>
               <textarea rows={3} value={conversation.message} onChange={(event) => setConversation((current) => ({ ...current, message: event.target.value }))} placeholder="Digite sua mensagem" />
+              {conversation.imageUrl ? (
+                <div className="conversation-image-preview">
+                  <img src={conversation.imageUrl} alt="Previa da imagem do chat" />
+                  <button type="button" className="icon-button" onClick={() => setConversation((current) => ({ ...current, imageUrl: "" }))} aria-label="Remover imagem"><X size={16} /></button>
+                </div>
+              ) : null}
               <div className="modal-actions">
+                <label className="button button--outline conversation-file-button">
+                  <ImagePlus size={16} />
+                  Anexar imagem
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleConversationImageChange} />
+                </label>
                 <Button type="button" variant="outline" onClick={closeConversation}>Fechar</Button>
-                <Button type="submit" disabled={conversation.loading || !conversation.message.trim()}>Enviar mensagem</Button>
+                <Button type="submit" disabled={conversation.loading || (!conversation.message.trim() && !conversation.imageUrl)}>Enviar mensagem</Button>
               </div>
             </form>
           </section>

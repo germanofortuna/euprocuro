@@ -2,14 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Copy, CreditCard, Flag, MapPin, MessageSquare, Pencil, RefreshCw, Send, Share2, Sparkles, Tag } from "lucide-react";
+import { ArrowLeft, Copy, CreditCard, Flag, ImagePlus, MapPin, MessageSquare, Pencil, RefreshCw, Send, Share2, Sparkles, Tag, X, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { ComponentProps } from "react";
+import type { ChangeEvent, ComponentProps } from "react";
 import mercadoPagoLogo from "@/assets/mercado-pago.svg";
 import { usePlatform } from "@/features/platform/platform-context";
 import { fetchInterest, fetchOfferConversation, sendOfferMessage } from "@/shared/api/client";
 import type { Interest, MonetizationProduct, Offer, OfferConversation } from "@/shared/api/types";
 import { budgetLabel, categoryLabel, formatDateTime, listingExpirationLabel, locationLabel, statusLabel, statusTone } from "@/shared/lib/format";
+import { readImageFile } from "@/shared/lib/image-upload";
 import { referenceImageSrc } from "@/shared/lib/images";
 import { readInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { Button } from "@/shared/ui/button";
@@ -19,6 +20,7 @@ import { trackEvent } from "@/features/analytics/analytics";
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 const REPORT_REASON_MAX_LENGTH = 120;
 const REPORT_MESSAGE_MAX_LENGTH = 600;
+const CHAT_IMAGE_OPTIONS = { maxBytes: 3 * 1024 * 1024, maxSide: 960, quality: 0.76, maxOutputLength: 1_000_000 } as const;
 
 function moneyLabel(value?: number | null) {
   return Number(value ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -26,6 +28,22 @@ function moneyLabel(value?: number | null) {
 
 function boostSort(left: MonetizationProduct, right: MonetizationProduct) {
   return (left.sortOrder ?? left.durationDays ?? 0) - (right.sortOrder ?? right.durationDays ?? 0);
+}
+
+function boostRemainingLabel(boostedUntil: Date) {
+  const diffMs = boostedUntil.getTime() - Date.now();
+  if (diffMs <= 0) {
+    return "Seu boost terminou.";
+  }
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  if (diffMs < oneDayMs) {
+    return "Seu boost termina em menos de 1 dia.";
+  }
+  const diffDays = Math.ceil(diffMs / oneDayMs);
+  if (diffDays === 1) {
+    return "Seu boost termina em 1 dia.";
+  }
+  return `Seu boost termina em ${diffDays} dias.`;
 }
 
 function WhatsAppIcon() {
@@ -69,16 +87,16 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isOfferSubmitting, setIsOfferSubmitting] = useState(false);
   const [isReportSubmitting, setIsReportSubmitting] = useState(false);
-  const [conversation, setConversation] = useState<{ visible: boolean; offer: Offer | null; data: OfferConversation | null; message: string; loading: boolean }>({
+  const [conversation, setConversation] = useState<{ visible: boolean; offer: Offer | null; data: OfferConversation | null; message: string; imageUrl: string; loading: boolean }>({
     visible: false,
     offer: null,
     data: null,
     message: "",
+    imageUrl: "",
     loading: false
   });
   const [boostingKey, setBoostingKey] = useState<string | null>(null);
   const [selectedBoostCode, setSelectedBoostCode] = useState("");
-  const [selectedBoostPayment, setSelectedBoostPayment] = useState<"CREDITS" | "MERCADO_PAGO">("MERCADO_PAGO");
   const [shareUrl, setShareUrl] = useState("");
 
   useEffect(() => {
@@ -144,7 +162,6 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`Olha esta procura no Eu Procuro: ${resolvedInterest.title} - ${shareUrl}`)}`;
   const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Olha esta procura no Eu Procuro: ${resolvedInterest.title}`)}&url=${encodeURIComponent(shareUrl)}`;
   const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
-  const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
   const boostPurchasesEnabled = Boolean(monetization?.settings?.boostPurchasesEnabled);
   const sellerCredits = monetization?.sellerCredits ?? currentUser?.sellerCredits ?? currentUser?.credits ?? 0;
   const boostProducts = (monetization?.products ?? [])
@@ -152,9 +169,9 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
     .sort(boostSort);
   const selectedBoostProduct = boostProducts.find((product) => product.code === selectedBoostCode) ?? boostProducts[0] ?? null;
   const selectedBoostCreditCost = Number(selectedBoostProduct?.credits ?? 0);
-  const selectedBoostCanUseCredits = creditPurchasesEnabled && selectedBoostCreditCost > 0;
+  const selectedBoostCanUseCredits = selectedBoostCreditCost > 0;
   const selectedBoostHasEnoughCredits = selectedBoostCanUseCredits && sellerCredits >= selectedBoostCreditCost;
-  const selectedBoostPaymentMethod = selectedBoostCanUseCredits ? selectedBoostPayment : "MERCADO_PAGO";
+  const selectedBoostPaymentMethod = selectedBoostHasEnoughCredits ? "CREDITS" : "MERCADO_PAGO";
   const boostedUntil = resolvedInterest.boostedUntil ? new Date(resolvedInterest.boostedUntil) : null;
   const isBoostActive = Boolean(boostedUntil && boostedUntil.getTime() > Date.now());
   const interestStatus = String(resolvedInterest.status ?? "OPEN").toUpperCase();
@@ -198,34 +215,48 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
   };
 
   async function openConversation(offer: Offer) {
-    setConversation({ visible: true, offer, data: null, message: "", loading: true });
+    setConversation({ visible: true, offer, data: null, message: "", imageUrl: "", loading: true });
     try {
       const data = await fetchOfferConversation(offer.id);
-      setConversation({ visible: true, offer, data, message: "", loading: false });
+      setConversation({ visible: true, offer, data, message: "", imageUrl: "", loading: false });
     } catch (error) {
-      setConversation({ visible: true, offer, data: { ...offer, messages: [] }, message: "", loading: false });
+      setConversation({ visible: true, offer, data: { ...offer, messages: [] }, message: "", imageUrl: "", loading: false });
       setFeedback({ type: "error", title: "Conversa indisponivel", message: error instanceof Error ? error.message : "Nao foi possivel carregar a conversa." });
     }
   }
 
   const submitConversationMessage: FormSubmitHandler = async (event) => {
     event.preventDefault();
-    if (!conversation.offer?.id || !conversation.message.trim()) {
+    if (!conversation.offer?.id || (!conversation.message.trim() && !conversation.imageUrl)) {
       return;
     }
     setConversation((current) => ({ ...current, loading: true }));
     try {
-      await sendOfferMessage(conversation.offer.id, { content: conversation.message.trim() });
+      await sendOfferMessage(conversation.offer.id, { content: conversation.message.trim(), imageUrl: conversation.imageUrl || null });
       const data = await fetchOfferConversation(conversation.offer.id);
-      setConversation((current) => ({ ...current, data, message: "", loading: false }));
+      setConversation((current) => ({ ...current, data, message: "", imageUrl: "", loading: false }));
     } catch (error) {
       setConversation((current) => ({ ...current, loading: false }));
       setFeedback({ type: "error", title: "Mensagem nao enviada", message: error instanceof Error ? error.message : "Tente novamente em instantes." });
     }
   };
 
+  async function handleConversationImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+    try {
+      const imageUrl = await readImageFile(file, CHAT_IMAGE_OPTIONS);
+      setConversation((current) => ({ ...current, imageUrl }));
+    } catch (error) {
+      setFeedback({ type: "error", title: "Imagem invalida", message: error instanceof Error ? error.message : "Selecione outra imagem." });
+    }
+  }
+
   function closeConversation() {
-    setConversation({ visible: false, offer: null, data: null, message: "", loading: false });
+    setConversation({ visible: false, offer: null, data: null, message: "", imageUrl: "", loading: false });
   }
 
   async function handleBoost(product: MonetizationProduct, paymentMethod: "CREDITS" | "MERCADO_PAGO") {
@@ -258,7 +289,10 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
               <img src={detailImageSrc} alt={`Imagem de referencia da procura ${resolvedInterest.title}`} />
             </button>
           ) : null}
-          <h1>{resolvedInterest.title}</h1>
+          <h1 className="detail-title">
+            {resolvedInterest.title}
+            {isBoostActive ? <span className="detail-title__boost" title="Boost ativo"><Zap size={20} aria-hidden="true" /></span> : null}
+          </h1>
           <div className="interest-meta interest-meta--large">
             <span><Tag size={16} /> {categoryLabel(categories, resolvedInterest.category)}</span>
             <span><MapPin size={16} /> {locationLabel(resolvedInterest)}</span>
@@ -280,7 +314,7 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
           {isMine ? (
             <div className="notice-box">
               <strong>{isRejected ? "Sua procura foi rejeitada pela nossa moderação!" : "Esta procura é sua"}</strong>
-              <p>{isRejected ? "Você pode editá-la para que seja reavaliada." : "Gerencie ajustes, renovacao e disponibilidade desta procura por aqui."}</p>
+              <p>{isRejected ? "Você pode editá-la para que seja reavaliada." : "Gerencie ajustes, renovação e disponibilidade desta procura por aqui."}</p>
               {!isRejected ? <span className="detail-expiration">{listingExpirationLabel(resolvedInterest)}</span> : null}
               {shouldShowBoostWaitMessage ? (
                 <div className="boost-wait-message">
@@ -288,11 +322,15 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
                   <p>O boost ficará disponível depois que sua procura for aprovada e publicada pela moderação.</p>
                 </div>
               ) : null}
-              {isPublishedInterest && boostPurchasesEnabled && boostProducts.length ? (
+              {isBoostActive && boostedUntil ? (
+                <div className="boost-active-message">
+                  <strong><Zap size={16} /> Boost ativo</strong>
+                  <p>{boostRemainingLabel(boostedUntil)} As opções para impulsionar novamente serão exibidas quando ele terminar.</p>
+                </div>
+              ) : isPublishedInterest && boostPurchasesEnabled && boostProducts.length ? (
                 <div className="boost-panel">
                   <div className="boost-panel__header">
                     <strong><Sparkles size={16} /> Impulsionar procura</strong>
-                    {isBoostActive && boostedUntil ? <span>Boost ativo ate {boostedUntil.toLocaleDateString("pt-BR")}</span> : null}
                   </div>
                   <label className="boost-select-field">
                     <span>Plano de boost</span>
@@ -304,31 +342,22 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
                       ))}
                     </select>
                   </label>
-                  <div className="boost-payment-row" role="radiogroup" aria-label="Forma de pagamento do boost">
-                    {selectedBoostCanUseCredits ? (
-                      <label className={selectedBoostPayment === "CREDITS" ? "is-selected" : ""}>
-                        <input type="radio" name="boost-payment" checked={selectedBoostPayment === "CREDITS"} onChange={() => setSelectedBoostPayment("CREDITS")} />
-                        <span><CreditCard size={14} /> {selectedBoostCreditCost} créditos</span>
-                      </label>
-                    ) : null}
-                    <label className={selectedBoostPaymentMethod === "MERCADO_PAGO" ? "is-selected" : ""}>
-                      <input type="radio" name="boost-payment" checked={selectedBoostPaymentMethod === "MERCADO_PAGO"} onChange={() => setSelectedBoostPayment("MERCADO_PAGO")} />
-                      <span><Image className="payment-gateway-icon payment-gateway-icon--tiny" src={mercadoPagoLogo} alt="" width={36} height={22} aria-hidden="true" /> Mercado Pago</span>
-                    </label>
+                  <div className="boost-payment-row" aria-label="Forma de pagamento do boost">
+                    {selectedBoostPaymentMethod === "CREDITS" ? (
+                      <span className="is-selected"><CreditCard size={14} /> Usar {selectedBoostCreditCost} créditos da conta</span>
+                    ) : (
+                      <span className="is-selected"><Image className="payment-gateway-icon payment-gateway-icon--tiny" src={mercadoPagoLogo} alt="" width={36} height={22} aria-hidden="true" /> Mercado Pago</span>
+                    )}
                   </div>
-                  {selectedBoostPaymentMethod === "CREDITS" && selectedBoostCanUseCredits && !selectedBoostHasEnoughCredits ? (
-                    <Link className="button button--outline" href="/comprar-creditos"><CreditCard size={15} /> Adicionar créditos</Link>
-                  ) : (
-                    <Button
-                      type="button"
-                      className="boost-submit-button"
-                      disabled={!selectedBoostProduct || Boolean(boostingKey)}
-                      onClick={handleSelectedBoost}
-                    >
-                      {selectedBoostPaymentMethod === "CREDITS" ? <CreditCard size={16} /> : null}
-                      <span>{boostingKey ? "Ativando..." : selectedBoostPaymentMethod === "CREDITS" ? `Impulsionar por ${selectedBoostCreditCost} créditos` : "Pagar e impulsionar"}</span>
-                    </Button>
-                  )}
+                  <Button
+                    type="button"
+                    className="boost-submit-button"
+                    disabled={!selectedBoostProduct || Boolean(boostingKey)}
+                    onClick={handleSelectedBoost}
+                  >
+                    {selectedBoostPaymentMethod === "CREDITS" ? <CreditCard size={16} /> : null}
+                    {boostingKey || selectedBoostPaymentMethod !== "CREDITS" ? <span>{boostingKey ? "Ativando..." : "Pagar e impulsionar"}</span> : null}
+                  </Button>
                 </div>
               ) : null}
               <div className="owner-action-grid">
@@ -411,7 +440,8 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
                 conversation.data?.messages?.map((message) => (
                   <article className={message.senderId === currentUser?.id ? "chat-message chat-message--mine" : "chat-message"} key={message.id}>
                     <strong>{message.senderName ?? (message.senderId === currentUser?.id ? "Voce" : "Contato")}</strong>
-                    <p>{message.content}</p>
+                    {message.content ? <p>{message.content}</p> : null}
+                    {message.imageUrl ? <a href={message.imageUrl} target="_blank" rel="noreferrer"><img className="chat-message__image" src={message.imageUrl} alt="Imagem enviada no chat" /></a> : null}
                     <small>{formatDateTime(message.createdAt)}</small>
                   </article>
                 ))
@@ -421,9 +451,20 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
             </div>
             <form className="conversation-form" onSubmit={submitConversationMessage}>
               <textarea rows={3} value={conversation.message} onChange={(event) => setConversation((current) => ({ ...current, message: event.target.value }))} placeholder="Digite sua mensagem" />
+              {conversation.imageUrl ? (
+                <div className="conversation-image-preview">
+                  <img src={conversation.imageUrl} alt="Previa da imagem do chat" />
+                  <button type="button" className="icon-button" onClick={() => setConversation((current) => ({ ...current, imageUrl: "" }))} aria-label="Remover imagem"><X size={16} /></button>
+                </div>
+              ) : null}
               <div className="modal-actions">
+                <label className="button button--outline conversation-file-button">
+                  <ImagePlus size={16} />
+                  Anexar imagem
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleConversationImageChange} />
+                </label>
                 <Button type="button" variant="outline" onClick={closeConversation}>Fechar</Button>
-                <Button type="submit" disabled={conversation.loading || !conversation.message.trim()}>Enviar mensagem</Button>
+                <Button type="submit" disabled={conversation.loading || (!conversation.message.trim() && !conversation.imageUrl)}>Enviar mensagem</Button>
               </div>
             </form>
           </section>

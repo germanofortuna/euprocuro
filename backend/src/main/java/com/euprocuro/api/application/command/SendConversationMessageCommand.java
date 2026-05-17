@@ -7,4 +7,5 @@ import lombok.Value;
 @Builder
 public class SendConversationMessageCommand {
     String content;
+    String imageUrl;
 }

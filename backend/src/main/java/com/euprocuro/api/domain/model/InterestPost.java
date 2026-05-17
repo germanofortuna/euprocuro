@@ -25,6 +25,7 @@ public class InterestPost {
     private BigDecimal budgetMax;
     private LocationInfo location;
     private List<String> tags;
+    private StickerDetails stickerDetails;
     private Integer desiredRadiusKm;
     private boolean allowsWhatsappContact;
     private String whatsappContact;

@@ -44,6 +44,7 @@ public class InterestPostDocument {
     private LocationDocument location;
     @TextIndexed(weight = 3)
     private List<String> tags;
+    private StickerDetailsDocument stickerDetails;
     private Integer desiredRadiusKm;
     private boolean allowsWhatsappContact;
     private String whatsappContact;

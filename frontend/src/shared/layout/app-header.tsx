@@ -13,8 +13,9 @@ import { useTheme } from "@/features/theme/theme-provider";
 import { Button } from "@/shared/ui/button";
 import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
 
-const navItems = [
+const baseNavItems = [
   { href: "/categorias", label: "Explorar" },
+  { href: "/figurinhas", label: "Figurinhas", feature: "stickers" },
   { href: "/como-funciona", label: "Como funciona" }
 ];
 
@@ -35,7 +36,7 @@ function readSeenNotificationIds(rawValue: string | null): string[] {
 export function AppHeader() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const { currentUser, openAuthModal, signOut, monetization, dashboard } = usePlatform();
+  const { currentUser, openAuthModal, signOut, monetization, dashboard, operationalSettings } = usePlatform();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [seenNotifications, setSeenNotifications] = useState<string[]>([]);
@@ -46,6 +47,7 @@ export function AppHeader() {
   const credits = monetization?.sellerCredits ?? currentUser?.sellerCredits ?? currentUser?.credits ?? 0;
   const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
   const notifications = buildOfferNotifications(dashboard?.receivedOffers, dashboard?.sentOffers);
+  const navItems = baseNavItems.filter((item) => item.feature !== "stickers" || operationalSettings.featureFlags?.stickersPageEnabled !== false);
   const messageSeenKey = currentUser?.id ? `eu-procuro-message-seen:${currentUser.id}` : null;
   const unreadCount = notifications.filter((notification) => !seenNotifications.includes(notification.id)).length;
 

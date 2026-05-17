@@ -11,8 +11,14 @@ import lombok.Value;
 public class InterestSearchFilter {
     String category;
     String city;
+    String state;
+    String neighborhood;
     BigDecimal maxBudget;
     String query;
+    String stickerType;
+    String stickerGroup;
+    String stickerSelection;
+    String stickerNumber;
     boolean openOnly;
     String currentUserId;
 }

@@ -15,5 +15,6 @@ public class ConversationMessageResponse {
     String recipientId;
     String recipientName;
     String content;
+    String imageUrl;
     Instant createdAt;
 }

@@ -11,12 +11,14 @@ import com.euprocuro.api.application.command.CreateSellerItemCommand;
 import com.euprocuro.api.application.command.BoostInterestCommand;
 import com.euprocuro.api.application.command.CatalogCategoryCommand;
 import com.euprocuro.api.application.command.CatalogProductCommand;
+import com.euprocuro.api.application.command.FeatureFlagsCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.ModerationDecisionCommand;
 import com.euprocuro.api.application.command.ModerationSettingsCommand;
 import com.euprocuro.api.application.command.MonetizationSettingsCommand;
 import com.euprocuro.api.application.command.OperationalFlagsCommand;
+import com.euprocuro.api.application.command.OperationalFieldsCommand;
 import com.euprocuro.api.application.command.PurchaseProductCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ReportInterestCommand;
@@ -26,8 +28,10 @@ import com.euprocuro.api.application.command.SaveModerationRuleCommand;
 import com.euprocuro.api.application.command.SaveOperationalCatalogCommand;
 import com.euprocuro.api.application.command.SendConversationMessageCommand;
 import com.euprocuro.api.application.command.ShareSellerItemCommand;
+import com.euprocuro.api.application.command.StickerDetailsCommand;
 import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.command.UpdateSellerItemCommand;
+import com.euprocuro.api.application.service.OperationalCatalogService;
 import com.euprocuro.api.application.view.AdminModerationView;
 import com.euprocuro.api.application.view.AdminOperationalCatalogView;
 import com.euprocuro.api.application.view.AddressLookupView;
@@ -49,6 +53,7 @@ import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.PaymentOrderView;
 import com.euprocuro.api.application.view.PersonalDashboardView;
 import com.euprocuro.api.application.view.PublicContentCatalogView;
+import com.euprocuro.api.application.view.PublicOperationalSettingsView;
 import com.euprocuro.api.application.view.RegistrationView;
 import com.euprocuro.api.application.view.SellerItemMatchesView;
 import com.euprocuro.api.domain.model.InterestModeration;
@@ -58,6 +63,7 @@ import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.ModerationRule;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.SellerItem;
+import com.euprocuro.api.domain.model.StickerDetails;
 import com.euprocuro.api.domain.model.UserProfile;
 import com.euprocuro.api.entrypoints.rest.dto.request.CreateInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.CreateOfferRequest;
@@ -126,6 +132,7 @@ public final class RestMapper {
     public static SendConversationMessageCommand toCommand(SendConversationMessageRequest request) {
         return SendConversationMessageCommand.builder()
                 .content(request.getContent())
+                .imageUrl(request.getImageUrl())
                 .build();
     }
 
@@ -186,8 +193,8 @@ public final class RestMapper {
                         .build())
                 .categories(Optional.ofNullable(request.getCategories()).orElse(List.of())
                         .stream()
-                        .map(category -> CatalogCategoryCommand.builder()
-                                .code(category.getCode())
+                                .map(category -> CatalogCategoryCommand.builder()
+                                .code(firstText(category.getCode(), category.getValue()))
                                 .label(category.getLabel())
                                 .active(category.isActive())
                                 .sortOrder(category.getSortOrder())
@@ -225,6 +232,16 @@ public final class RestMapper {
                         .userBlockListEnabled(request.getModerationSettings() == null
                                 || request.getModerationSettings().isUserBlockListEnabled())
                         .build())
+                .featureFlags(FeatureFlagsCommand.builder()
+                        .stickersPageEnabled(request.getFeatureFlags() == null
+                                ? null
+                                : request.getFeatureFlags().getStickersPageEnabled())
+                        .build())
+                .operationalFields(OperationalFieldsCommand.builder()
+                        .initialFreeCredits(request.getOperationalFields() == null
+                                ? null
+                                : request.getOperationalFields().getInitialFreeCredits())
+                        .build())
                 .build();
     }
 
@@ -249,6 +266,7 @@ public final class RestMapper {
                 .neighborhood(request.getNeighborhood())
                 .country(request.getCountry())
                 .desiredRadiusKm(request.getDesiredRadiusKm())
+                .stickerDetails(toCommand(request.getStickerDetails()))
                 .allowsWhatsappContact(request.isAllowsWhatsappContact())
                 .whatsappContact(request.getWhatsappContact())
                 .preferredCondition(request.getPreferredCondition())
@@ -271,6 +289,7 @@ public final class RestMapper {
                 .neighborhood(request.getNeighborhood())
                 .country(request.getCountry())
                 .desiredRadiusKm(request.getDesiredRadiusKm())
+                .stickerDetails(toCommand(request.getStickerDetails()))
                 .allowsWhatsappContact(request.isAllowsWhatsappContact())
                 .whatsappContact(request.getWhatsappContact())
                 .preferredCondition(request.getPreferredCondition())
@@ -469,6 +488,8 @@ public final class RestMapper {
         return AdminOperationalCatalogResponse.builder()
                 .monetizationSettings(toResponse(view.getMonetizationSettings()))
                 .moderationSettings(toResponse(view.getModerationSettings()))
+                .featureFlags(toResponse(view.getFeatureFlags()))
+                .operationalFields(toResponse(view.getOperationalFields()))
                 .categories(Optional.ofNullable(view.getCategories()).orElse(List.of())
                         .stream()
                         .map(RestMapper::toResponse)
@@ -502,6 +523,35 @@ public final class RestMapper {
                 .build();
     }
 
+    public static FeatureFlagsResponse toResponse(com.euprocuro.api.application.view.FeatureFlagsView view) {
+        if (view == null) {
+            return FeatureFlagsResponse.builder()
+                    .stickersPageEnabled(true)
+                    .build();
+        }
+        return FeatureFlagsResponse.builder()
+                .stickersPageEnabled(view.isStickersPageEnabled())
+                .build();
+    }
+
+    public static OperationalFieldsResponse toResponse(com.euprocuro.api.application.view.OperationalFieldsView view) {
+        if (view == null) {
+            return OperationalFieldsResponse.builder()
+                    .initialFreeCredits(15)
+                    .build();
+        }
+        return OperationalFieldsResponse.builder()
+                .initialFreeCredits(view.getInitialFreeCredits())
+                .build();
+    }
+
+    public static PublicOperationalSettingsResponse toResponse(PublicOperationalSettingsView view) {
+        return PublicOperationalSettingsResponse.builder()
+                .featureFlags(toResponse(view.getFeatureFlags()))
+                .operationalFields(toResponse(view.getOperationalFields()))
+                .build();
+    }
+
     public static InterestResponse toResponse(InterestPost domain) {
         return toResponse(domain, true);
     }
@@ -511,6 +561,9 @@ public final class RestMapper {
     }
 
     public static InterestResponse toResponse(InterestPost domain, boolean exposeRestrictedDetails) {
+        boolean exposeLocationDetails = exposeRestrictedDetails
+                || OperationalCatalogService.STICKERS_CATEGORY_CODE.equals(domain.getCategory());
+        boolean exposePostalCode = exposeRestrictedDetails;
         return InterestResponse.builder()
                 .id(domain.getId())
                 .ownerId(exposeRestrictedDetails ? domain.getOwnerId() : null)
@@ -521,8 +574,9 @@ public final class RestMapper {
                 .category(domain.getCategory())
                 .budgetMin(exposeRestrictedDetails ? domain.getBudgetMin() : null)
                 .budgetMax(exposeRestrictedDetails ? domain.getBudgetMax() : null)
-                .location(toResponse(domain.getLocation(), exposeRestrictedDetails))
+                .location(toResponse(domain.getLocation(), exposePostalCode, exposeLocationDetails))
                 .tags(Optional.ofNullable(domain.getTags()).orElse(List.of()))
+                .stickerDetails(toResponse(domain.getStickerDetails()))
                 .desiredRadiusKm(domain.getDesiredRadiusKm())
                 .allowsWhatsappContact(exposeRestrictedDetails && domain.isAllowsWhatsappContact())
                 .whatsappContact(exposeRestrictedDetails && domain.isAllowsWhatsappContact() ? domain.getWhatsappContact() : null)
@@ -840,12 +894,14 @@ public final class RestMapper {
                 .recipientId(view.getRecipientId())
                 .recipientName(view.getRecipientName())
                 .content(view.getContent())
+                .imageUrl(view.getImageUrl())
                 .createdAt(view.getCreatedAt())
                 .build();
     }
 
     public static CategoryOptionResponse toResponse(CatalogCategoryView category) {
         return CategoryOptionResponse.builder()
+                .code(category.getCode())
                 .value(category.getCode())
                 .label(category.getLabel())
                 .active(category.isActive())
@@ -853,20 +909,57 @@ public final class RestMapper {
                 .build();
     }
 
+    private static StickerDetailsCommand toCommand(com.euprocuro.api.entrypoints.rest.dto.request.StickerDetailsRequest request) {
+        if (request == null) {
+            return null;
+        }
+        return StickerDetailsCommand.builder()
+                .type(request.getType())
+                .group(request.getGroup())
+                .selection(request.getSelection())
+                .numbers(Optional.ofNullable(request.getNumbers()).orElse(List.of()))
+                .build();
+    }
+
+    private static StickerDetailsResponse toResponse(StickerDetails details) {
+        if (details == null) {
+            return null;
+        }
+        return StickerDetailsResponse.builder()
+                .type(details.getType())
+                .group(details.getGroup())
+                .selection(details.getSelection())
+                .numbers(Optional.ofNullable(details.getNumbers()).orElse(List.of()))
+                .build();
+    }
+
+    private static String firstText(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
     private static LocationResponse toResponse(LocationInfo location) {
         return toResponse(location, true);
     }
 
     private static LocationResponse toResponse(LocationInfo location, boolean exposeExactDetails) {
+        return toResponse(location, exposeExactDetails, exposeExactDetails);
+    }
+
+    private static LocationResponse toResponse(LocationInfo location, boolean exposePostalCode, boolean exposeNeighborhood) {
         if (location == null) {
             return null;
         }
 
         return LocationResponse.builder()
-                .postalCode(exposeExactDetails ? location.getPostalCode() : null)
+                .postalCode(exposePostalCode ? location.getPostalCode() : null)
                 .city(location.getCity())
                 .state(location.getState())
-                .neighborhood(exposeExactDetails ? location.getNeighborhood() : null)
+                .neighborhood(exposeNeighborhood ? location.getNeighborhood() : null)
                 .country(location.getCountry())
                 .remote(location.isRemote())
                 .build();

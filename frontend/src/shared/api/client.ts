@@ -7,6 +7,7 @@ import type {
   MonetizationAccount,
   OfferConversation,
   OmbudsmanRequest,
+  OperationalSettings,
   PublicContentCatalog,
   SellerItemGroup,
   StoredSession
@@ -35,6 +36,7 @@ const PUBLIC_GET_PATHS = [
   /^\/addresses\/postal-code\/[^/]+$/,
   /^\/categories$/,
   /^\/content\/public(?:\?|$)/,
+  /^\/operational\/public$/,
   /^\/interests(?:\?|$)/,
   /^\/interests\/[^/]+$/
 ];
@@ -280,6 +282,7 @@ export const fetchPublicContent = (keys: string[] = []) => {
   if (keys.length) params.set("keys", keys.join(","));
   return request<PublicContentCatalog>(`/content/public?${params}`);
 };
+export const fetchOperationalSettings = () => request<OperationalSettings>("/operational/public");
 export const fetchDashboard = () => request<Dashboard>("/dashboard");
 export const fetchMonetizationAccount = () => request<MonetizationAccount>("/monetization/account");
 export const cancelSubscription = () => request<MonetizationAccount>("/monetization/subscription", { method: "DELETE" });

@@ -79,6 +79,7 @@ public class AuthService implements AuthUseCase {
     private final EmailGateway emailGateway;
     private final EventPublisherGateway eventPublisherGateway;
     private final AuditLogService auditLogService;
+    private final OperationalCatalogService operationalCatalogService;
 
     @Value("${application.auth.session-hours:168}")
     private long sessionHours;
@@ -145,7 +146,7 @@ public class AuthService implements AuthUseCase {
                 .emailVerified(!emailVerificationRequired)
                 .buyerRating(4.8)
                 .sellerRating(4.8)
-                .sellerCredits(3)
+                .sellerCredits(operationalCatalogService.initialFreeCredits())
                 .purchasedCreditsTotal(0)
                 .ipAddress(command.getIpAddress())
                 .termsAccepted(true)

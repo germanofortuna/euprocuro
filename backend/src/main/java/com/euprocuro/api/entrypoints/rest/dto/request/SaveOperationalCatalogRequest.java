@@ -35,6 +35,7 @@ public class SaveOperationalCatalogRequest {
     @Data
     public static class CategoryRequest {
         private String code;
+        private String value;
         private String label;
         private boolean active;
         private Integer sortOrder;

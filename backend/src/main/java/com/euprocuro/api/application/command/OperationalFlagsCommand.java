@@ -8,4 +8,6 @@ import lombok.Value;
 public class OperationalFlagsCommand {
     MonetizationSettingsCommand monetizationSettings;
     ModerationSettingsCommand moderationSettings;
+    FeatureFlagsCommand featureFlags;
+    OperationalFieldsCommand operationalFields;
 }

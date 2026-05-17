@@ -71,13 +71,15 @@ class OperationalCatalogServiceIntegrationStyleTest {
         var products = service.listActiveProducts();
 
         assertThat(categories).extracting("code")
-                .containsExactly("AUTOMOVEIS", "IMOVEIS", "SERVICOS", "ELETRONICOS", "INSTRUMENTOS", "OUTROS");
+                .containsExactly("AUTOMOVEIS", "IMOVEIS", "SERVICOS", "ELETRONICOS", "INSTRUMENTOS", "OUTROS", "FIGURINHAS");
         assertThat(products).isEmpty();
         assertThat(service.getMonetizationSettings().isCreditPurchasesEnabled()).isFalse();
         assertThat(service.getMonetizationSettings().isBoostPurchasesEnabled()).isFalse();
         assertThat(service.getModerationSettings().isUserBlockListEnabled()).isTrue();
-        assertThat(contentEntryGateway.findAll()).hasSize(4);
-        assertThat(contentRevisionGateway.revisions).hasSize(4);
+        assertThat(service.getFeatureFlags().isStickersPageEnabled()).isTrue();
+        assertThat(service.getOperationalFields().getInitialFreeCredits()).isEqualTo(15);
+        assertThat(contentEntryGateway.findAll()).hasSize(6);
+        assertThat(contentRevisionGateway.revisions).hasSize(6);
     }
 
     @Test
@@ -141,8 +143,8 @@ class OperationalCatalogServiceIntegrationStyleTest {
 
         var adminCatalog = service.saveAdminCatalog("admin-1", command);
 
-        assertThat(adminCatalog.getCategories()).hasSize(2);
-        assertThat(service.listActiveCategories()).extracting("code").containsExactly("AUTO");
+        assertThat(adminCatalog.getCategories()).hasSize(3);
+        assertThat(service.listActiveCategories()).extracting("code").containsExactly("AUTO", "FIGURINHAS");
         assertThat(adminCatalog.getProducts()).extracting("code").containsExactly("CREDITS_10", "BOOST_3_DAYS");
         assertThat(adminCatalog.getProducts().get(0).getOriginalPrice()).isEqualByComparingTo("12.90");
         assertThat(adminCatalog.getProducts().get(0).getPromotionLabel()).isEqualTo("Oferta");
@@ -168,7 +170,7 @@ class OperationalCatalogServiceIntegrationStyleTest {
                 .build());
 
         assertThat(adminCatalog.getCategories()).extracting("code")
-                .containsExactly("AUTOMOVEIS", "IMOVEIS", "SERVICOS", "ELETRONICOS", "INSTRUMENTOS", "OUTROS");
+                .containsExactly("AUTOMOVEIS", "IMOVEIS", "SERVICOS", "ELETRONICOS", "INSTRUMENTOS", "OUTROS", "FIGURINHAS");
         assertThat(adminCatalog.getProducts()).extracting("code")
                 .contains("CREDITS_10", "BOOST_3_DAYS");
         assertThat(service.getMonetizationSettings().isCreditPurchasesEnabled()).isTrue();

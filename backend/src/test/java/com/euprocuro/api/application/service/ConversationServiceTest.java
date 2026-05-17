@@ -143,6 +143,43 @@ class ConversationServiceTest {
     }
 
     @Test
+    void sendMessageShouldAllowImageOnlyMessage() {
+        Offer offer = baseOffer();
+        InterestPost interest = baseInterest();
+        UserProfile seller = UserProfile.builder().id("seller-1").name("Carlos").build();
+        UserProfile buyer = UserProfile.builder().id("buyer-1").name("Ana").build();
+        String imageUrl = "data:image/png;base64,aGVsbG8=";
+
+        when(offerGateway.findById("offer-1")).thenReturn(Optional.of(offer));
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(buyer));
+        when(conversationMessageGateway.save(any(ConversationMessage.class))).thenAnswer(invocation -> {
+            ConversationMessage message = invocation.getArgument(0);
+            message.setId("msg-image");
+            return message;
+        });
+
+        ConversationMessageView result = conversationService.sendMessage("seller-1", "offer-1", SendConversationMessageCommand.builder()
+                .imageUrl(imageUrl)
+                .build());
+
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getImageUrl()).isEqualTo(imageUrl);
+        verify(eventPublisherGateway).publish(eq("conversation.message.created"), any());
+        verify(realtimeMessageGateway).publishConversationMessage(eq("buyer-1"), any(ConversationMessage.class));
+    }
+
+    @Test
+    void sendMessageShouldRejectInvalidImageType() {
+        assertThatThrownBy(() -> conversationService.sendMessage("buyer-1", "offer-1", SendConversationMessageCommand.builder()
+                .imageUrl("data:image/svg+xml;base64,PHN2Zy8+")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("JPG, PNG ou WebP");
+    }
+
+    @Test
     void sendMessageShouldAllowBuyerToReplyToSeller() {
         Offer offer = baseOffer();
         InterestPost interest = baseInterest();

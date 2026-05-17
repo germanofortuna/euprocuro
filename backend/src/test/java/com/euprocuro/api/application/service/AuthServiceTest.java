@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -63,6 +64,8 @@ class AuthServiceTest {
     private EventPublisherGateway eventPublisherGateway;
     @Mock
     private AuditLogService auditLogService;
+    @Mock
+    private OperationalCatalogService operationalCatalogService;
 
     @InjectMocks
     private AuthService authService;
@@ -78,6 +81,7 @@ class AuthServiceTest {
         ReflectionTestUtils.setField(authService, "hmlAccessEnabled", false);
         ReflectionTestUtils.setField(authService, "hmlAllowedEmails", "");
         ReflectionTestUtils.setField(authService, "emailVerificationRequired", true);
+        lenient().when(operationalCatalogService.initialFreeCredits()).thenReturn(15);
     }
 
     @Test

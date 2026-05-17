@@ -22,6 +22,7 @@ public class CreateInterestCommand {
     String neighborhood;
     String country;
     Integer desiredRadiusKm;
+    StickerDetailsCommand stickerDetails;
     boolean allowsWhatsappContact;
     String whatsappContact;
     String preferredCondition;

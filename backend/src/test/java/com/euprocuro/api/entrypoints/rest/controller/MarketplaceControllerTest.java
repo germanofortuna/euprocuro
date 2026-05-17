@@ -56,6 +56,13 @@ class MarketplaceControllerTest {
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
                 false,
                 0,
                 10
@@ -89,7 +96,14 @@ class MarketplaceControllerTest {
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 true,
+                false,
                 0,
                 10
         );

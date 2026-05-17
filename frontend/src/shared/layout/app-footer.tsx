@@ -6,15 +6,18 @@ import logoDark from "@/assets/eu-procuro-logo-dark.svg";
 import logoLight from "@/assets/eu-procuro-logo-light.svg";
 import { useLegalContent } from "@/features/legal/use-legal-content";
 import { usePlatform } from "@/features/platform/platform-context";
+import { STICKERS_CATEGORY } from "@/features/stickers/stickers-data";
 import { useTheme } from "@/features/theme/theme-provider";
 import { slugifyCategory } from "@/shared/lib/format";
 import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
 
 export function AppFooter() {
   const { theme } = useTheme();
-  const { categories } = usePlatform();
+  const { categories, operationalSettings } = usePlatform();
   const { navigation } = useLegalContent();
   const year = new Date().getFullYear();
+  const stickersEnabled = operationalSettings.featureFlags?.stickersPageEnabled !== false;
+  const footerCategories = categories.filter((category) => category.value !== STICKERS_CATEGORY).slice(0, 6);
 
   return (
     <footer className="site-footer">
@@ -33,9 +36,10 @@ export function AppFooter() {
         </nav>
         <nav aria-label="Categorias">
           <h2>Principais categorias</h2>
-          {categories.slice(0, 6).map((category) => (
+          {footerCategories.map((category) => (
             <Link key={category.value} href={`/categorias/${slugifyCategory(category.value)}`}>{category.label}</Link>
           ))}
+          {stickersEnabled ? <Link href="/figurinhas">Figurinhas</Link> : null}
         </nav>
         <nav aria-label="Politicas da plataforma">
           <h2>Legal</h2>

@@ -23,6 +23,7 @@ export type StoredSession = {
 };
 
 export type Category = {
+  code?: string;
   value: string;
   label: string;
   active?: boolean;
@@ -60,6 +61,12 @@ export type Interest = {
   budgetMax?: number | null;
   location?: LocationInfo | null;
   tags?: string[];
+  stickerDetails?: {
+    type?: "MISSING" | "AVAILABLE" | string;
+    group?: string | null;
+    selection?: string | null;
+    numbers?: string[];
+  } | null;
   desiredRadiusKm?: number | null;
   allowsWhatsappContact?: boolean;
   whatsappContact?: string | null;
@@ -102,6 +109,7 @@ export type ConversationMessage = {
   senderId?: string;
   senderName?: string;
   content: string;
+  imageUrl?: string | null;
   createdAt?: string;
 };
 
@@ -175,6 +183,15 @@ export type MonetizationAccount = {
   settings?: {
     creditPurchasesEnabled?: boolean;
     boostPurchasesEnabled?: boolean;
+  };
+};
+
+export type OperationalSettings = {
+  featureFlags?: {
+    stickersPageEnabled?: boolean;
+  };
+  operationalFields?: {
+    initialFreeCredits?: number;
   };
 };
 

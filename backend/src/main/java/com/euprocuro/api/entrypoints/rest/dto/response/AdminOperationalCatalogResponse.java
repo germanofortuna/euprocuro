@@ -11,6 +11,8 @@ import lombok.Value;
 public class AdminOperationalCatalogResponse {
     MonetizationSettingsResponse monetizationSettings;
     ModerationSettingsResponse moderationSettings;
+    FeatureFlagsResponse featureFlags;
+    OperationalFieldsResponse operationalFields;
     List<CategoryOptionResponse> categories;
     List<MonetizationProductResponse> products;
     Instant updatedAt;

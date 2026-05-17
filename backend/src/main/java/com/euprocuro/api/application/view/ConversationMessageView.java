@@ -15,5 +15,6 @@ public class ConversationMessageView {
     String recipientId;
     String recipientName;
     String content;
+    String imageUrl;
     Instant createdAt;
 }

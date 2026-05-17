@@ -184,7 +184,17 @@ public class InterestGatewayAdapter implements InterestGateway, InterestSearchGa
 
         if (searchCriteria.getCity() != null && !searchCriteria.getCity().isBlank()) {
             criteria.add(Criteria.where("location.city")
-                    .regex(exactRegex(searchCriteria.getCity()), "i"));
+                    .regex(containsRegex(searchCriteria.getCity()), "i"));
+        }
+
+        if (searchCriteria.getState() != null && !searchCriteria.getState().isBlank()) {
+            criteria.add(Criteria.where("location.state")
+                    .regex(exactRegex(searchCriteria.getState().trim().toUpperCase()), "i"));
+        }
+
+        if (searchCriteria.getNeighborhood() != null && !searchCriteria.getNeighborhood().isBlank()) {
+            criteria.add(Criteria.where("location.neighborhood")
+                    .regex(containsRegex(searchCriteria.getNeighborhood()), "i"));
         }
 
         if (searchCriteria.getMaxBudget() != null) {
@@ -204,7 +214,48 @@ public class InterestGatewayAdapter implements InterestGateway, InterestSearchGa
             ));
         }
 
+        if (searchCriteria.getStickerType() != null && !searchCriteria.getStickerType().isBlank()) {
+            String type = normalizeStickerType(searchCriteria.getStickerType());
+            if (type != null) {
+                criteria.add(Criteria.where("stickerDetails.type").is(type));
+            }
+        }
+
+        if (searchCriteria.getStickerGroup() != null && !searchCriteria.getStickerGroup().isBlank()) {
+            criteria.add(Criteria.where("stickerDetails.group")
+                    .regex(exactRegex(normalizeStickerGroup(searchCriteria.getStickerGroup())), "i"));
+        }
+
+        if (searchCriteria.getStickerSelection() != null && !searchCriteria.getStickerSelection().isBlank()) {
+            criteria.add(Criteria.where("stickerDetails.selection")
+                    .regex(exactRegex(searchCriteria.getStickerSelection()), "i"));
+        }
+
+        if (searchCriteria.getStickerNumber() != null && !searchCriteria.getStickerNumber().isBlank()) {
+            criteria.add(Criteria.where("stickerDetails.numbers").is(normalizeStickerNumber(searchCriteria.getStickerNumber())));
+        }
+
         return new Criteria().andOperator(criteria.toArray(new Criteria[0]));
+    }
+
+    private String normalizeStickerType(String value) {
+        String normalized = value.trim().toUpperCase();
+        if ("FALTANTES".equals(normalized) || "MISSING".equals(normalized)) {
+            return "MISSING";
+        }
+        if ("REPETIDAS".equals(normalized) || "AVAILABLE".equals(normalized)) {
+            return "AVAILABLE";
+        }
+        return null;
+    }
+
+    private String normalizeStickerGroup(String value) {
+        String normalized = value.trim().toUpperCase();
+        return "ESPECIAIS".equals(normalized) ? "SPECIAL" : normalized;
+    }
+
+    private String normalizeStickerNumber(String value) {
+        return value.trim().toUpperCase().replaceAll("\\s+", "");
     }
 
     private String exactRegex(String value) {
