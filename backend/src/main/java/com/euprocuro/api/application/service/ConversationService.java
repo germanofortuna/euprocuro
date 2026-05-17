@@ -136,7 +136,9 @@ public class ConversationService implements ConversationUseCase {
     }
 
     private Optional<ConversationMessageView> initialOfferMessage(Offer offer, InterestPost interest) {
-        if (!StringUtils.hasText(offer.getMessage())) {
+        String content = normalizeContent(offer.getMessage());
+        String imageUrl = normalizeImageUrl(offer.getOfferImageUrl());
+        if (!StringUtils.hasText(content) && !StringUtils.hasText(imageUrl)) {
             return Optional.empty();
         }
 
@@ -147,7 +149,8 @@ public class ConversationService implements ConversationUseCase {
                 .senderName(offer.getSellerName())
                 .recipientId(interest.getOwnerId())
                 .recipientName(interest.getOwnerName())
-                .content(offer.getMessage().trim())
+                .content(content)
+                .imageUrl(imageUrl)
                 .createdAt(offer.getCreatedAt())
                 .build());
     }

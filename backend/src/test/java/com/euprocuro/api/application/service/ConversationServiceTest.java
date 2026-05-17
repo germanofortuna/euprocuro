@@ -96,6 +96,26 @@ class ConversationServiceTest {
     }
 
     @Test
+    void getOfferConversationShouldIncludeInitialOfferImageWhenMessageIsBlank() {
+        String imageUrl = "data:image/png;base64,aGVsbG8=";
+        Offer offer = baseOffer().toBuilder()
+                .message(" ")
+                .offerImageUrl(imageUrl)
+                .build();
+
+        when(offerGateway.findById("offer-1")).thenReturn(Optional.of(offer));
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        when(conversationMessageGateway.findByOfferIdOrderByCreatedAtAsc("offer-1")).thenReturn(List.of());
+
+        OfferConversationView result = conversationService.getOfferConversation("buyer-1", "offer-1");
+
+        assertThat(result.getMessages()).hasSize(1);
+        assertThat(result.getMessages().get(0).getId()).isEqualTo("offer-initial-offer-1");
+        assertThat(result.getMessages().get(0).getContent()).isEmpty();
+        assertThat(result.getMessages().get(0).getImageUrl()).isEqualTo(imageUrl);
+    }
+
+    @Test
     void getOfferConversationShouldRejectNonParticipant() {
         when(offerGateway.findById("offer-1")).thenReturn(Optional.of(baseOffer()));
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));

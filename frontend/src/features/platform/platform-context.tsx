@@ -53,6 +53,8 @@ import { sampleInterests } from "@/shared/lib/sample-data";
 import type { FeedbackState } from "@/shared/ui/feedback-modal";
 
 type AuthMode = "login" | "register" | "forgot" | "reset";
+const PENDING_CREDIT_ONBOARDING_KEY = "euProcuro.pendingCreditOnboardingEmail";
+const SEEN_CREDIT_ONBOARDING_PREFIX = "euProcuro.seenCreditOnboarding:";
 
 type PlatformContextValue = {
   session: StoredSession | null;
@@ -67,6 +69,7 @@ type PlatformContextValue = {
   adminModeration: AdminModeration | null;
   hasAdminAccess: boolean;
   isLoadingPublic: boolean;
+  hasLoadedPublicData: boolean;
   isLoadingPrivate: boolean;
   isSessionReady: boolean;
   feedback: FeedbackState;
@@ -162,6 +165,69 @@ function normalizeMonetizationAccount(payload: MonetizationAccount | null): Mone
   };
 }
 
+function normalizedEmail(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function readPendingCreditOnboardingEmail() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return normalizedEmail(window.localStorage.getItem(PENDING_CREDIT_ONBOARDING_KEY));
+}
+
+function markPendingCreditOnboarding(email: unknown) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const normalized = normalizedEmail(email);
+  if (normalized) {
+    window.localStorage.setItem(PENDING_CREDIT_ONBOARDING_KEY, normalized);
+  }
+}
+
+function shouldShowCreditOnboarding(user: User | null | undefined) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const email = normalizedEmail(user?.email);
+  if (!email || readPendingCreditOnboardingEmail() !== email) {
+    return false;
+  }
+  return window.localStorage.getItem(`${SEEN_CREDIT_ONBOARDING_PREFIX}${email}`) !== "1";
+}
+
+function markCreditOnboardingSeen(user: User | null | undefined) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const email = normalizedEmail(user?.email);
+  if (!email) {
+    return;
+  }
+  window.localStorage.setItem(`${SEEN_CREDIT_ONBOARDING_PREFIX}${email}`, "1");
+  if (readPendingCreditOnboardingEmail() === email) {
+    window.localStorage.removeItem(PENDING_CREDIT_ONBOARDING_KEY);
+  }
+}
+
+function creditOnboardingMessage(
+  user: User | null | undefined,
+  monetizationAccount: MonetizationAccount | null,
+  settings: OperationalSettings
+) {
+  const balance = monetizationAccount?.sellerCredits ?? user?.sellerCredits ?? user?.credits ?? settings.operationalFields?.initialFreeCredits ?? 0;
+  const boostProducts = (monetizationAccount?.products ?? [])
+    .filter((product) => String(product.type).toUpperCase() === "BOOST" && product.enabled !== false && Number(product.credits ?? 0) > 0)
+    .sort((left, right) => Number(left.durationDays ?? 0) - Number(right.durationDays ?? 0));
+  const boostSummary = boostProducts.length
+    ? boostProducts
+        .map((product) => `${product.name}: ${Number(product.credits)} créditos${product.durationDays ? ` por ${product.durationDays} dias` : ""}`)
+        .join("; ")
+    : "os custos de boost aparecem na página de detalhes da sua procura";
+  return `Você tem ${balance} créditos disponíveis. Publicar uma procura não desconta créditos. Eles servem para manter suas procuras ativas e com mais destaque: renovar uma procura custa 1 crédito e os boosts seguem a configuração atual (${boostSummary}). Para comprar mais créditos ou consultar os planos, acesse "Créditos e Plano" no painel.`;
+}
+
 export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -176,6 +242,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const [adminModeration, setAdminModeration] = useState<AdminModeration | null>(null);
   const [hasAdminAccess, setHasAdminAccess] = useState(false);
   const [isLoadingPublic, setIsLoadingPublic] = useState(false);
+  const [hasLoadedPublicData, setHasLoadedPublicData] = useState(false);
   const [isLoadingPrivate, setIsLoadingPrivate] = useState(false);
   const [isSessionReady, setIsSessionReady] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
@@ -199,6 +266,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       setInterests(nextInterests);
       setSelectedInterest((current) => nextInterests.find((item) => item.id === current?.id) ?? nextInterests[0] ?? null);
     } finally {
+      setHasLoadedPublicData(true);
       setIsLoadingPublic(false);
     }
   }, []);
@@ -352,15 +420,28 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     const nextSession = auth?.user?.id ? auth : normalizeMe(await fetchMe(), auth);
     storeSession(nextSession);
     setSession(nextSession);
+    if (shouldShowCreditOnboarding(nextSession.user)) {
+      const monetizationAccount = normalizeMonetizationAccount(await fetchMonetizationAccount().catch(() => null));
+      if (monetizationAccount) {
+        setMonetization(monetizationAccount);
+      }
+      setFeedback({
+        type: "info",
+        title: "Seus créditos iniciais",
+        message: creditOnboardingMessage(nextSession.user, monetizationAccount, operationalSettings),
+        afterClose: () => markCreditOnboardingSeen(nextSession.user)
+      });
+    }
     const redirectTo = authModal.redirectTo;
     closeAuthModal();
     if (redirectTo) {
       router.push(redirectTo);
     }
-  }, [authModal.redirectTo, closeAuthModal, router]);
+  }, [authModal.redirectTo, closeAuthModal, operationalSettings, router]);
 
   const signUp = useCallback(async (payload: Record<string, unknown>) => {
     await register(payload);
+    markPendingCreditOnboarding(payload.email);
     setAuthModal((current) => ({ visible: true, mode: "login", redirectTo: current.redirectTo ?? null }));
     setFeedback({ type: "success", title: "Confirme seu e-mail", message: "Sua conta foi criada. Confirme seu e-mail para entrar." });
   }, []);
@@ -504,6 +585,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     adminModeration,
     hasAdminAccess,
     isLoadingPublic,
+    hasLoadedPublicData,
     isLoadingPrivate,
     isSessionReady,
     feedback,
@@ -549,6 +631,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     deleteAccount,
     feedback,
     interests,
+    hasLoadedPublicData,
     isLoadingPrivate,
     isLoadingPublic,
     isSessionReady,

@@ -1,5 +1,6 @@
 package com.euprocuro.api.entrypoints.rest.security;
 
+import java.io.IOException;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
@@ -30,7 +31,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor {
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
             @NonNull Object handler
-    ) {
+    ) throws IOException {
         if (shouldSkipAuthentication(request)) {
             return true;
         }
@@ -41,13 +42,19 @@ public class AuthTokenInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        String token = authTokenResolver.resolve(request)
-                .orElseThrow(() -> {
-                    recordMissingToken(request);
-                    return new UnauthorizedException("Sessao encerrada.");
-                });
+        String token = authTokenResolver.resolve(request).orElse(null);
+        if (token == null) {
+            recordMissingToken(request);
+            return rejectUnauthorized(response, "Sessao encerrada.");
+        }
 
-        AuthenticatedSessionView session = authUseCase.requireAuthenticatedSession(token);
+        AuthenticatedSessionView session;
+        try {
+            session = authUseCase.requireAuthenticatedSession(token);
+        } catch (UnauthorizedException exception) {
+            authCookieManager.clearSessionCookie(response);
+            return rejectUnauthorized(response, exception.getMessage());
+        }
 
         request.setAttribute(CurrentUserContext.USER_ID_ATTRIBUTE, session.getUser().getId());
         request.setAttribute(CurrentUserContext.SESSION_EXPIRES_AT_ATTRIBUTE, session.getExpiresAt());
@@ -117,5 +124,13 @@ public class AuthTokenInterceptor implements HandlerInterceptor {
                         "reason", "MISSING_TOKEN"
                 )
         );
+    }
+
+    private boolean rejectUnauthorized(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("application/json");
+        response.getWriter().write("{\"status\":401,\"error\":\"Unauthorized\",\"details\":[\"" + message + "\"]}");
+        return false;
     }
 }

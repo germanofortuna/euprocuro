@@ -1,6 +1,6 @@
 package com.euprocuro.api.entrypoints.rest.security;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-import com.euprocuro.api.application.exception.UnauthorizedException;
 import com.euprocuro.api.application.service.AuditLogService;
 import com.euprocuro.api.application.usecase.AuthUseCase;
 
@@ -32,14 +31,16 @@ class AuthTokenInterceptorTest {
     );
 
     @Test
-    void preHandleShouldAuditMissingTokenOnProtectedRoute() {
+    void preHandleShouldAuditMissingTokenOnProtectedRoute() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/dashboard");
         MockHttpServletResponse response = new MockHttpServletResponse();
         when(authTokenResolver.resolve(request)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object()))
-                .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("Sessao encerrada.");
+        boolean result = interceptor.preHandle(request, response, new Object());
+
+        assertThat(result).isFalse();
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(response.getContentAsString()).contains("Sessao encerrada.");
 
         verify(auditLogService).record(
                 eq("AUTH_MISSING_TOKEN"),

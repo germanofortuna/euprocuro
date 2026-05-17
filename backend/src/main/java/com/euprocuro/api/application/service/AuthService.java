@@ -189,11 +189,11 @@ public class AuthService implements AuthUseCase {
             }
         } catch (RuntimeException exception) {
             rollbackPendingRegistration(user, verificationToken);
-            throw new BusinessException("Nao foi possivel enviar o e-mail de confirmacao. Tente novamente mais tarde.");
+            throw new BusinessException("Não foi possível enviar o e-mail de confirmação. Tente novamente mais tarde.");
         }
 
         rollbackPendingRegistration(user, verificationToken);
-        throw new BusinessException("Nao foi possivel enviar o e-mail de confirmacao. Tente novamente mais tarde.");
+        throw new BusinessException("Não foi possível enviar o e-mail de confirmação. Tente novamente mais tarde.");
     }
 
     private EmailVerificationToken buildEmailVerificationToken(UserProfile user) {

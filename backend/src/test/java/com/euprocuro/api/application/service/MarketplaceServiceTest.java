@@ -31,6 +31,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.euprocuro.api.application.command.CreateInterestCommand;
 import com.euprocuro.api.application.command.CreateOfferCommand;
 import com.euprocuro.api.application.command.InterestSearchFilter;
+import com.euprocuro.api.application.command.StickerDetailsCommand;
 import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
@@ -51,6 +52,8 @@ import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.OfferStatus;
 import com.euprocuro.api.domain.model.SellerItem;
+import com.euprocuro.api.domain.model.StickerDetails;
+import com.euprocuro.api.domain.model.StickerListingType;
 import com.euprocuro.api.domain.model.UserProfile;
 
 @ExtendWith(MockitoExtension.class)
@@ -378,6 +381,49 @@ class MarketplaceServiceTest {
     }
 
     @Test
+    void listInterestsShouldFilterStickerListingsByDetails() {
+        InterestPost matching = stickerInterest(
+                "matching",
+                StickerListingType.AVAILABLE,
+                "SPECIAL",
+                "Mascotes",
+                List.of("FW26", "12")
+        );
+        InterestPost wrongType = stickerInterest(
+                "wrong-type",
+                StickerListingType.MISSING,
+                "SPECIAL",
+                "Mascotes",
+                List.of("FW26")
+        );
+        InterestPost wrongGroup = stickerInterest(
+                "wrong-group",
+                StickerListingType.AVAILABLE,
+                "A",
+                "Mascotes",
+                List.of("FW26")
+        );
+        InterestPost withoutStickerDetails = baseInterest().toBuilder()
+                .id("without-details")
+                .category(OperationalCatalogService.STICKERS_CATEGORY_CODE)
+                .stickerDetails(null)
+                .build();
+
+        when(operationalCatalogService.stickersPageEnabled()).thenReturn(true);
+        when(interestGateway.findAll()).thenReturn(List.of(withoutStickerDetails, wrongGroup, wrongType, matching));
+
+        List<InterestPost> results = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(true)
+                .stickerType("repetidas")
+                .stickerGroup("especiais")
+                .stickerSelection("mascotes")
+                .stickerNumber(" fw 26 ")
+                .build());
+
+        assertThat(results).extracting(InterestPost::getId).containsExactly("matching");
+    }
+
+    @Test
     void createInterestShouldNormalizePostalCodeWithDigitsOnly() {
         when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
         when(operationalCatalogService.requireActiveCategory("SERVICOS")).thenReturn("SERVICOS");
@@ -398,6 +444,58 @@ class MarketplaceServiceTest {
                 .build());
 
         assertThat(result.getLocation().getPostalCode()).isEqualTo("13010-111");
+    }
+
+    @Test
+    void createInterestShouldNormalizeStickerDetailsForStickerCategory() {
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(operationalCatalogService.requireActiveCategory(OperationalCatalogService.STICKERS_CATEGORY_CODE))
+                .thenReturn(OperationalCatalogService.STICKERS_CATEGORY_CODE);
+        when(operationalCatalogService.stickersPageEnabled()).thenReturn(true);
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> {
+            InterestPost interest = invocation.getArgument(0);
+            interest.setId("sticker-1");
+            return interest;
+        });
+
+        InterestPost result = marketplaceService.createInterest("buyer-1", CreateInterestCommand.builder()
+                .title("Tenho repetidas")
+                .description("Tenho figurinhas repetidas")
+                .category(OperationalCatalogService.STICKERS_CATEGORY_CODE)
+                .budgetMax(new BigDecimal("50"))
+                .city("Erechim")
+                .state("RS")
+                .stickerDetails(StickerDetailsCommand.builder()
+                        .type(StickerListingType.AVAILABLE)
+                        .group(null)
+                        .selection("Mascotes")
+                        .numbers(List.of(" 12 ", "12", "fw 26", ""))
+                        .build())
+                .build());
+
+        assertThat(result.getStickerDetails().getType()).isEqualTo(StickerListingType.AVAILABLE);
+        assertThat(result.getStickerDetails().getGroup()).isEqualTo("SPECIAL");
+        assertThat(result.getStickerDetails().getSelection()).isEqualTo("Mascotes");
+        assertThat(result.getStickerDetails().getNumbers()).containsExactly("12", "FW26");
+    }
+
+    @Test
+    void createInterestShouldRejectStickerCategoryWhenStickerPageIsDisabled() {
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(operationalCatalogService.requireActiveCategory(OperationalCatalogService.STICKERS_CATEGORY_CODE))
+                .thenReturn(OperationalCatalogService.STICKERS_CATEGORY_CODE);
+        when(operationalCatalogService.stickersPageEnabled()).thenReturn(false);
+
+        assertThatThrownBy(() -> marketplaceService.createInterest("buyer-1", CreateInterestCommand.builder()
+                .title("Tenho repetidas")
+                .category(OperationalCatalogService.STICKERS_CATEGORY_CODE)
+                .stickerDetails(StickerDetailsCommand.builder()
+                        .type(StickerListingType.AVAILABLE)
+                        .numbers(List.of("12"))
+                        .build())
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("figurinhas");
     }
 
     @Test
@@ -523,6 +621,60 @@ class MarketplaceServiceTest {
         assertThat(result.getId()).isEqualTo("offer-1");
         assertThat(result.getStatus()).isEqualTo(OfferStatus.SENT);
         verify(eventPublisherGateway).publish(eq("offer.created"), any(Map.class));
+    }
+
+    @Test
+    void createOfferShouldAllowImageOnlyOffer() {
+        InterestPost interest = baseInterest();
+        UserProfile seller = UserProfile.builder()
+                .id("seller-1")
+                .name("Carlos")
+                .email("carlos@teste.com")
+                .sellerCredits(5)
+                .build();
+
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(offerGateway.save(any(Offer.class))).thenAnswer(invocation -> {
+            Offer offer = invocation.getArgument(0);
+            offer.setId("offer-image");
+            return offer;
+        });
+
+        Offer result = marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
+                .offeredPrice(new BigDecimal("450"))
+                .message("   ")
+                .offerImageUrl("  data:image/png;base64,aGVsbG8=  ")
+                .build());
+
+        assertThat(result.getId()).isEqualTo("offer-image");
+        assertThat(result.getMessage()).isNull();
+        assertThat(result.getOfferImageUrl()).isEqualTo("data:image/png;base64,aGVsbG8=");
+        verify(eventPublisherGateway).publish(eq("offer.created"), any(Map.class));
+    }
+
+    @Test
+    void createOfferShouldRejectBlankMessageWithoutImage() {
+        InterestPost interest = baseInterest();
+        UserProfile seller = UserProfile.builder()
+                .id("seller-1")
+                .name("Carlos")
+                .email("carlos@teste.com")
+                .sellerCredits(5)
+                .build();
+
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThatThrownBy(() -> marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
+                .offeredPrice(new BigDecimal("450"))
+                .message("   ")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("mensagem");
     }
 
     @Test
@@ -835,6 +987,26 @@ class MarketplaceServiceTest {
                 .status(InterestStatus.OPEN)
                 .createdAt(Instant.now().minus(1, ChronoUnit.DAYS))
                 .updatedAt(Instant.now().minus(1, ChronoUnit.DAYS))
+                .build();
+    }
+
+    private InterestPost stickerInterest(
+            String id,
+            StickerListingType type,
+            String group,
+            String selection,
+            List<String> numbers
+    ) {
+        return baseInterest().toBuilder()
+                .id(id)
+                .category(OperationalCatalogService.STICKERS_CATEGORY_CODE)
+                .title("Figurinhas " + id)
+                .stickerDetails(StickerDetails.builder()
+                        .type(type)
+                        .group(group)
+                        .selection(selection)
+                        .numbers(numbers)
+                        .build())
                 .build();
     }
 }

@@ -2,6 +2,7 @@ package com.euprocuro.api.entrypoints.rest.handler;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,13 @@ import com.euprocuro.api.entrypoints.rest.dto.response.ErrorResponse;
 
 @RestControllerAdvice
 public class RestExceptionHandler {
+    private static final Map<String, String> FIELD_LABELS = Map.of(
+            "content", "Conteudo",
+            "message", "Mensagem",
+            "offerImageUrl", "Imagem",
+            "imageUrl", "Imagem",
+            "offeredPrice", "Valor da proposta"
+    );
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException exception) {
@@ -87,6 +95,6 @@ public class RestExceptionHandler {
     }
 
     private String formatFieldError(FieldError error) {
-        return error.getField() + ": " + error.getDefaultMessage();
+        return FIELD_LABELS.getOrDefault(error.getField(), error.getField()) + ": " + error.getDefaultMessage();
     }
 }

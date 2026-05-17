@@ -19,6 +19,10 @@ const baseNavItems = [
   { href: "/como-funciona", label: "Como funciona" }
 ];
 
+function navItemClassName(href: string) {
+  return href === "/figurinhas" ? "nav-link nav-link--stickers" : "nav-link";
+}
+
 function readSeenNotificationIds(rawValue: string | null): string[] {
   if (!rawValue) {
     return [];
@@ -103,7 +107,7 @@ export function AppHeader() {
         </form>
 
         <nav className="desktop-nav" aria-label="Navegacao principal">
-          {navItems.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
+          {navItems.map((item) => <Link key={item.href} href={item.href} className={navItemClassName(item.href)}>{item.label}</Link>)}
         </nav>
 
         <div className="header-actions">
@@ -140,7 +144,7 @@ export function AppHeader() {
             <Search size={18} />
             <input name="query" placeholder="Buscar interesses" />
           </form>
-          {navItems.map((item) => <Link key={item.href} href={item.href} onClick={() => setIsMenuOpen(false)}>{item.label}</Link>)}
+          {navItems.map((item) => <Link key={item.href} href={item.href} className={navItemClassName(item.href)} onClick={() => setIsMenuOpen(false)}>{item.label}</Link>)}
           {currentUser?.id ? (
             <>
               <Link href="/meus-interesses" onClick={() => setIsMenuOpen(false)}>Minha conta</Link>

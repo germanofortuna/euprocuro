@@ -144,7 +144,8 @@ public class OperationalCatalogService {
         if (STICKERS_CATEGORY_CODE.equals(normalizedCode) && !stickersPageEnabled()) {
             throw new BusinessException("Pagina de figurinhas esta temporariamente desabilitada.");
         }
-        boolean active = listActiveCategories().stream()
+        boolean active = listCategories().stream()
+                .filter(CatalogCategoryView::isActive)
                 .anyMatch(category -> category.getCode().equals(normalizedCode));
         if (!active) {
             throw new BusinessException("Categoria invalida ou inativa.");
@@ -317,6 +318,7 @@ public class OperationalCatalogService {
         }
         categories.add(category(STICKERS_CATEGORY_CODE, "Figurinhas", 70));
         saveCatalogEntry(CATEGORY_KEY, "Categorias de anuncios", categories, null);
+        publicCacheService.invalidate(PublicCacheService.CATALOG);
     }
 
     private void seedCatalogEntry(String key, String description, Object value) {
@@ -375,7 +377,7 @@ public class OperationalCatalogService {
         List<CatalogCategoryView> categories = new ArrayList<>();
         for (CatalogCategoryCommand command : commands) {
             String code = normalizeCode(command.getCode());
-            if (StringUtils.isEmpty(code)) {
+            if (!StringUtils.hasText(code)) {
                 throw new BusinessException("Codigo da categoria nao pode ser vazio.");
             }
             if (!code.matches(CODE_PATTERN) || !codes.add(code)) {
@@ -405,7 +407,7 @@ public class OperationalCatalogService {
         List<MonetizationProductView> products = new ArrayList<>();
         for (CatalogProductCommand command : commands) {
             String code = normalizeCode(command.getCode());
-            if (StringUtils.isEmpty(code)) {
+            if (!StringUtils.hasText(code)) {
                 throw new BusinessException("Codigo do produto nao pode ser vazio.");
             }
             if (!code.matches(CODE_PATTERN) || !codes.add(code)) {

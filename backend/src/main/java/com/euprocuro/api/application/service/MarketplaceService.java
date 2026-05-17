@@ -421,6 +421,12 @@ public class MarketplaceService implements MarketplaceUseCase {
                     .build());
         }
 
+        String message = trimToNull(command.getMessage());
+        String offerImageUrl = normalizeReferenceImage(command.getOfferImageUrl());
+        if (!StringUtils.hasText(message) && !StringUtils.hasText(offerImageUrl)) {
+            throw new BusinessException("A mensagem nao pode estar em branco.");
+        }
+
         Offer offer = Offer.builder()
                 .interestPostId(interestId)
                 .sellerId(seller.getId())
@@ -428,8 +434,8 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .sellerEmail(seller.getEmail())
                 .sellerPhone(trimToNull(command.getSellerPhone()))
                 .offeredPrice(command.getOfferedPrice())
-                .message(command.getMessage())
-                .offerImageUrl(null)
+                .message(message)
+                .offerImageUrl(offerImageUrl)
                 .includesDelivery(command.isIncludesDelivery())
                 .highlights(Optional.ofNullable(command.getHighlights()).orElse(List.of()))
                 .status(OfferStatus.SENT)

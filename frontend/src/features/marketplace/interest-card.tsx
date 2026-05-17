@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, MapPin, Tag } from "lucide-react";
+import { ArrowRight, MapPin, Tag, Zap } from "lucide-react";
 import { usePlatform } from "@/features/platform/platform-context";
 import type { Category, Interest } from "@/shared/api/types";
 import { budgetLabel, categoryLabel, isBoostActive, locationLabel } from "@/shared/lib/format";
@@ -13,10 +13,15 @@ export function InterestCard({ interest, categories }: { interest: Interest; cat
   const isOwnInterest = Boolean(
     currentUser?.id && (interest.ownerId === currentUser.id || dashboard?.myInterests?.some((item) => item.id === interest.id))
   );
+  const isOwnBoostActive = isOwnInterest && isBoostActive(interest);
   return (
     <article className={`interest-card${imageSrc ? " interest-card--with-image" : ""}`}>
-      {isBoostActive(interest) ? <span className="boost-ribbon">Boost</span> : null}
-      {isOwnInterest ? <span className="owner-ribbon">Seu interesse</span> : null}
+      {isOwnInterest ? (
+        <div className="interest-card__badges">
+          {isOwnBoostActive ? <span className="boost-ribbon"><Zap size={13} /> Boost</span> : null}
+          <span className="owner-ribbon">Seu interesse</span>
+        </div>
+      ) : null}
       {imageSrc ? (
         <Link className="interest-card__media" href={`/interesses/${interest.id}`} aria-label={`Ver detalhes de ${interest.title}`}>
           <img src={imageSrc} alt={`Imagem de referencia da procura ${interest.title}`} loading="lazy" />

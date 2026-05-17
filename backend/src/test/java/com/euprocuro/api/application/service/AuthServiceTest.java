@@ -214,7 +214,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.register(command))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("e-mail de confirmacao");
+                .hasMessageContaining("e-mail de confirma");
 
         verify(emailVerificationTokenGateway).deleteByToken("verify-123");
         verify(userGateway).deleteById("user-1");

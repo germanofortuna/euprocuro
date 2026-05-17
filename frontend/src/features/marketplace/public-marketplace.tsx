@@ -13,9 +13,10 @@ import { Button } from "@/shared/ui/button";
 import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
 
 export function PublicHome() {
-  const { categories, interests, selectedInterest, selectInterest, refreshPublicData, openAuthModal } = usePlatform();
+  const { categories, interests, selectedInterest, selectInterest, refreshPublicData, openAuthModal, isLoadingPublic, hasLoadedPublicData } = usePlatform();
   const searchParams = useSearchParams();
   const query = (searchParams.get("query") ?? "").trim().toLowerCase();
+  const isResolvingResults = isLoadingPublic || !hasLoadedPublicData;
   const visibleInterests = query
     ? interests.filter((interest) => [interest.title, interest.description, ...(interest.tags ?? [])].join(" ").toLowerCase().includes(query))
     : interests;
@@ -42,7 +43,7 @@ export function PublicHome() {
               <Link href="/categorias">Ver todas</Link>
             </div>
             <div className="interest-list">
-              {visibleInterests.map((interest) => <InterestCard key={interest.id} interest={interest} categories={categories} onSelect={(item) => selectInterest(item.id)} />)}
+              {isResolvingResults ? <div className="section-loading" role="status">Carregando procuras...</div> : visibleInterests.map((interest) => <InterestCard key={interest.id} interest={interest} categories={categories} onSelect={(item) => selectInterest(item.id)} />)}
             </div>
           </div>
           <aside className="detail-preview">
@@ -69,7 +70,7 @@ export function PublicHome() {
 }
 
 export function CategoryLanding({ categorySlug }: { categorySlug?: string }) {
-  const { categories, interests, refreshPublicData, selectInterest } = usePlatform();
+  const { categories, interests, refreshPublicData, selectInterest, isLoadingPublic, hasLoadedPublicData } = usePlatform();
   const searchParams = useSearchParams();
   useEffect(() => {
     rememberInterestListHref(`${window.location.pathname}${window.location.search}`);
@@ -84,6 +85,7 @@ export function CategoryLanding({ categorySlug }: { categorySlug?: string }) {
     : baseInterests;
   const title = currentCategory?.label ?? "Categorias";
   const isSearchPage = Boolean(query && !currentCategory);
+  const isResolvingResults = isLoadingPublic || !hasLoadedPublicData;
 
   return (
     <>
@@ -115,10 +117,10 @@ export function CategoryLanding({ categorySlug }: { categorySlug?: string }) {
               </div>
             ) : null}
             <div className="section-heading">
-              <h2>{query ? `${categoryInterests.length} resultados para "${query}"` : `${categoryInterests.length} procuras ativas`}</h2>
+              <h2>{isResolvingResults ? "Carregando procuras..." : query ? `${categoryInterests.length} resultados para "${query}"` : `${categoryInterests.length} procuras ativas`}</h2>
             </div>
             <div className="interest-list">
-              {categoryInterests.map((interest) => <InterestCard key={interest.id} interest={interest} categories={categories} onSelect={(item) => selectInterest(item.id)} />)}
+              {isResolvingResults ? <div className="section-loading" role="status">Carregando resultados...</div> : categoryInterests.map((interest) => <InterestCard key={interest.id} interest={interest} categories={categories} onSelect={(item) => selectInterest(item.id)} />)}
             </div>
           </div>
         </div>

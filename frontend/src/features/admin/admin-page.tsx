@@ -456,8 +456,8 @@ export function AdminPage() {
             <h2>Produtos e categorias</h2>
             {catalog ? (
               <div className="admin-edit-list">
-                <article><strong>{catalog.products?.length ?? 0} produtos</strong><span>{creditProductEntries.length} creditos/planos e {boostProductEntries.length} boosts</span></article>
-                <article><strong>{catalog.categories?.length ?? 0} categorias</strong><span>Rotas SEO e filtros publicos</span></article>
+                <article><strong>{catalog.products?.length ?? 0} produtos</strong>&nbsp;-&nbsp;<span>{creditProductEntries.length} creditos/planos e {boostProductEntries.length} boosts</span></article>
+                <article><strong>{catalog.categories?.length ?? 0} categorias</strong>&nbsp;-&nbsp;<span>Rotas SEO e filtros publicos</span></article>
                 <h3>Boosts</h3>
                 {!(catalog.products ?? []).some((product) => String(product.code ?? "").toUpperCase() === "BOOST_9_DAYS") ? (
                   <Button type="button" variant="outline" onClick={() => addCatalogProduct({ code: "BOOST_9_DAYS", name: "Boost 9 dias", description: "Destaque prolongado para procuras prioritarias.", type: "BOOST", price: 24.9, credits: 15, durationDays: 9, enabled: true, sortOrder: 60 })}>

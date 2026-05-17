@@ -3,6 +3,7 @@ package com.euprocuro.api.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -92,6 +93,22 @@ class OperationalCatalogServiceIntegrationStyleTest {
     }
 
     @Test
+    void requireActiveCategoryShouldBackfillStickersWhenExistingCatalogWasSeededBeforeFeature() {
+        contentEntryGateway.save(ContentEntry.builder()
+                .key("catalog.categories")
+                .locale("pt-BR")
+                .status(ContentEntryStatus.PUBLISHED)
+                .version(1)
+                .publishedValue("[{\"code\":\"SERVICOS\",\"label\":\"Servicos\",\"active\":true,\"sortOrder\":10}]")
+                .draftValue("[{\"code\":\"SERVICOS\",\"label\":\"Servicos\",\"active\":true,\"sortOrder\":10}]")
+                .build());
+
+        assertThat(service.requireActiveCategory("figurinhas")).isEqualTo("FIGURINHAS");
+        assertThat(service.listActiveCategories()).extracting("code").contains("SERVICOS", "FIGURINHAS");
+        verify(publicCacheService, atLeastOnce()).invalidate(PublicCacheService.CATALOG);
+    }
+
+    @Test
     void saveAdminCatalogShouldPersistValidatedCatalogAndInvalidateCache() {
         when(adminAccessService.requireAdmin("admin-1"))
                 .thenReturn(UserProfile.builder().id("admin-1").email("admin@test.com").build());
@@ -151,7 +168,7 @@ class OperationalCatalogServiceIntegrationStyleTest {
         assertThat(service.getMonetizationSettings().isCreditPurchasesEnabled()).isFalse();
         assertThat(service.getMonetizationSettings().isBoostPurchasesEnabled()).isFalse();
         assertThat(service.getModerationSettings().isUserBlockListEnabled()).isTrue();
-        verify(publicCacheService).invalidate(PublicCacheService.CATALOG);
+        verify(publicCacheService, atLeastOnce()).invalidate(PublicCacheService.CATALOG);
     }
 
     @Test

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Filter, Search, Sparkles, Trophy, Users, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Filter, Plus, Search, Sparkles, Trash2, Trophy, Users, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import { trackEvent } from "@/features/analytics/analytics";
@@ -16,6 +16,7 @@ import { EmptyState } from "@/shared/ui/empty-state";
 import { SPECIAL_STICKER_SELECTIONS, STICKERS_CATEGORY, stickerGroupForSelection, stickerGroups, normalizeStickerNumbers } from "./stickers-data";
 
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
+type StickerPublishEntry = { id: string; selection: string; numbers: string };
 
 const emptyStickerFilters = { stickerType: "", stickerGroup: "", stickerSelection: "", stickerNumber: "", state: "", city: "", neighborhood: "" };
 
@@ -31,6 +32,10 @@ function stickerTypeLabel(type?: string | null) {
 
 function selectionOptions() {
   return Object.entries(stickerGroups());
+}
+
+function createStickerPublishEntry(): StickerPublishEntry {
+  return { id: `stickers-${Date.now()}-${Math.random().toString(36).slice(2)}`, selection: "", numbers: "" };
 }
 
 function selectionsForGroup(group: string, groups: ReturnType<typeof selectionOptions>) {
@@ -49,6 +54,15 @@ function stickerLocationParts(item: Interest) {
     item.location?.city ? `Cidade: ${item.location.city}` : "",
     item.location?.neighborhood ? `Bairro: ${item.location.neighborhood}` : ""
   ].filter(Boolean);
+}
+
+function stickerTitleParts(item: Interest) {
+  const type = item.stickerDetails?.type;
+  const action = type === "AVAILABLE" ? "Tenho repetidas" : "Procuro figurinhas";
+  const separator = type === "AVAILABLE" ? " - " : ": ";
+  const selection = item.stickerDetails?.selection ?? "Copa 2026";
+  const numbers = (item.stickerDetails?.numbers ?? []).slice(0, 8).join(", ");
+  return { action, separator, selection, numbers };
 }
 
 function normalizeFilterText(value?: string | null) {
@@ -186,24 +200,31 @@ export function StickersLandingPage() {
           </aside>
           <div className="stickers-list">
             {isLoading ? <div className="section-loading" role="status">Carregando figurinhas...</div> : null}
-            {!isLoading && stickers.length ? stickers.map((item) => (
-              <Link key={item.id} href={`/interesses/${item.id}`} className="sticker-card">
-                {item.boostedUntil ? <span className="sticker-card__boost"><Zap size={13} /> Destaque</span> : null}
-                <div className="sticker-card__badges">
-                  <span className={`sticker-card__type sticker-card__type--${item.stickerDetails?.type === "AVAILABLE" ? "available" : "missing"}`}>{stickerTypeLabel(item.stickerDetails?.type)}</span>
-                  {myStickerIds.has(item.id) ? <span className="sticker-card__own">Seu registro</span> : null}
-                </div>
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
-                <div className="sticker-card__meta-grid">
-                  <span><small>Seleção</small>{item.stickerDetails?.selection ?? "Copa 2026"}</span>
-                  <span><small>Grupo</small>{item.stickerDetails?.group === "SPECIAL" ? "Especiais" : `Grupo ${item.stickerDetails?.group ?? "-"}`}</span>
-                  {stickerLocationParts(item).map((part) => <span key={part}><small>{part.split(":")[0]}</small>{part.split(":").slice(1).join(":").trim()}</span>)}
-                </div>
-                <div className="sticker-number-list">{(item.stickerDetails?.numbers ?? []).slice(0, 10).map((number) => <span key={number}>{number}</span>)}</div>
-                <strong>Ver detalhes e fazer proposta <ArrowRight size={16} /></strong>
-              </Link>
-            )) : null}
+            {!isLoading && stickers.length ? stickers.map((item) => {
+              const titleParts = stickerTitleParts(item);
+              return (
+                <Link key={item.id} href={`/interesses/${item.id}`} className="sticker-card">
+                  {item.boostedUntil ? <span className="sticker-card__boost"><Zap size={13} /> Destaque</span> : null}
+                  <div className="sticker-card__badges">
+                    <span className={`sticker-card__type sticker-card__type--${item.stickerDetails?.type === "AVAILABLE" ? "available" : "missing"}`}>{stickerTypeLabel(item.stickerDetails?.type)}</span>
+                    {myStickerIds.has(item.id) ? <span className="sticker-card__own">Seu registro</span> : null}
+                  </div>
+                  <h3 className="sticker-card__title">
+                    <span>{titleParts.action}{titleParts.separator}</span>
+                    <span className="sticker-card__selection">{titleParts.selection}</span>
+                    {titleParts.numbers ? <span>: {titleParts.numbers}</span> : null}
+                  </h3>
+                  <p>{item.description}</p>
+                  <div className="sticker-card__meta-grid">
+                    <span><small>Seleção</small>{item.stickerDetails?.selection ?? "Copa 2026"}</span>
+                    <span><small>Grupo</small>{item.stickerDetails?.group === "SPECIAL" ? "Especiais" : `Grupo ${item.stickerDetails?.group ?? "-"}`}</span>
+                    {stickerLocationParts(item).map((part) => <span key={part}><small>{part.split(":")[0]}</small>{part.split(":").slice(1).join(":").trim()}</span>)}
+                  </div>
+                  <div className="sticker-number-list">{(item.stickerDetails?.numbers ?? []).slice(0, 10).map((number) => <span key={number}>{number}</span>)}</div>
+                  <strong>Ver detalhes e fazer proposta <ArrowRight size={16} /></strong>
+                </Link>
+              );
+            }) : null}
             {!isLoading && !stickers.length ? <EmptyState title="Nenhuma figurinha encontrada" description="Ajuste os filtros ou publique a primeira procura de figurinhas." /> : null}
           </div>
         </div>
@@ -222,14 +243,14 @@ export function StickersLandingPage() {
 }
 
 function buildTitle(type: "MISSING" | "AVAILABLE", selection: string, numbers: string[]) {
-  const verb = type === "MISSING" ? "Procuro" : "Tenho repetidas";
+  const verb = type === "MISSING" ? "Procuro figurinhas" : "Tenho repetidas";
   const target = selection ? `${selection}` : "Copa 2026";
-  return limitText(`${verb} figurinhas ${target}: ${numbers.slice(0, 8).join(", ")}`, 80);
+  return limitText(`${verb} - ${target}: ${numbers.slice(0, 8).join(", ")}`, 80);
 }
 
 function buildDescription(type: "MISSING" | "AVAILABLE", selection: string, numbers: string[], extra: string) {
-  const action = type === "MISSING" ? "Busco" : "Disponíveis para troca ou venda";
-  const base = `${action}: ${numbers.join(", ")}${selection ? ` (${selection})` : ""}. ${extra}`.trim();
+  const action = type === "MISSING" ? "Figurinhas faltantes" : "Figurinhas disponíveis para troca ou venda";
+  const base = `${action}:\n${numbers.join(", ")}${selection ? ` - ${selection}` : ""}.${extra ? `\n${extra}` : ""}`.trim();
   return limitText(base, 120);
 }
 
@@ -238,8 +259,6 @@ export function PublishStickersPage() {
   const { currentUser, openAuthModal, saveInterest, setFeedback, operationalSettings } = usePlatform();
   const [form, setForm] = useState({
     type: "MISSING" as "MISSING" | "AVAILABLE",
-    selection: "",
-    numbers: "",
     postalCode: "",
     city: currentUser?.city ?? "",
     state: currentUser?.state ?? "",
@@ -248,11 +267,13 @@ export function PublishStickersPage() {
     description: "",
     tags: ""
   });
+  const [entries, setEntries] = useState<StickerPublishEntry[]>([{ id: "stickers-1", selection: "", numbers: "" }]);
   const [isSaving, setIsSaving] = useState(false);
   const [publishLookupState, setPublishLookupState] = useState<{ loading: boolean; message: string; tone: "muted" | "success" | "error" }>({ loading: false, message: "", tone: "muted" });
   const groups = useMemo(selectionOptions, []);
-  const numbers = normalizeStickerNumbers(form.numbers);
-  const selectedGroup = stickerGroupForSelection(form.selection);
+  const previewEntries = entries
+    .map((entry) => ({ ...entry, numbers: normalizeStickerNumbers(entry.numbers), group: stickerGroupForSelection(entry.selection) }))
+    .filter((entry) => entry.selection || entry.numbers.length);
   const stickersEnabled = operationalSettings.featureFlags?.stickersPageEnabled !== false;
 
   useEffect(() => {
@@ -310,37 +331,51 @@ export function PublishStickersPage() {
       openAuthModal("login", "/figurinhas/publicar");
       return;
     }
-    if (!numbers.length) {
+    const publishEntries = entries
+      .map((entry) => ({
+        selection: entry.selection,
+        numbers: normalizeStickerNumbers(entry.numbers),
+        group: stickerGroupForSelection(entry.selection)
+      }))
+      .filter((entry) => entry.selection || entry.numbers.length);
+    if (!publishEntries.length || publishEntries.some((entry) => !entry.selection || !entry.numbers.length)) {
       setFeedback({ type: "error", title: "Informe as figurinhas", message: "Digite pelo menos um número ou código de figurinha." });
       return;
     }
     setIsSaving(true);
     try {
-      trackEvent("stickers_publish_started", { type: form.type, group: selectedGroup, selection: form.selection });
-      const saved = await saveInterest({
-        title: buildTitle(form.type, form.selection, numbers),
-        description: buildDescription(form.type, form.selection, numbers, form.description),
-        category: STICKERS_CATEGORY,
-        budgetMin: null,
-        budgetMax: 0,
-        postalCode: form.postalCode,
-        city: form.city,
-        state: form.state.toUpperCase().slice(0, 2),
-        neighborhood: form.neighborhood,
-        country: form.country || "Brasil",
-        desiredRadiusKm: 25,
-        preferredCondition: form.type === "MISSING" ? "Faltantes" : "Repetidas",
-        preferredContactMode: "CHAT",
-        tags: ["copa-2026", "figurinhas", form.type === "MISSING" ? "faltantes" : "repetidas", form.selection, ...form.tags.split(",")].map((tag) => tag.trim()).filter(Boolean),
-        stickerDetails: {
-          type: form.type,
-          group: selectedGroup || "SPECIAL",
-          selection: form.selection || null,
-          numbers
-        }
-      });
-      trackEvent("stickers_publish_completed", { type: form.type, interestId: saved?.id });
-      if (saved?.id) {
+      trackEvent("stickers_publish_started", { type: form.type, totalSelections: publishEntries.length });
+      const savedItems = [];
+      for (const entry of publishEntries) {
+        const saved = await saveInterest({
+          title: buildTitle(form.type, entry.selection, entry.numbers),
+          description: buildDescription(form.type, entry.selection, entry.numbers, form.description),
+          category: STICKERS_CATEGORY,
+          budgetMin: null,
+          budgetMax: 0,
+          postalCode: form.postalCode,
+          city: form.city,
+          state: form.state.toUpperCase().slice(0, 2),
+          neighborhood: form.neighborhood,
+          country: form.country || "Brasil",
+          desiredRadiusKm: 25,
+          preferredCondition: form.type === "MISSING" ? "Faltantes" : "Repetidas",
+          preferredContactMode: "CHAT",
+          tags: ["copa-2026", "figurinhas", form.type === "MISSING" ? "faltantes" : "repetidas", entry.selection, ...form.tags.split(",")].map((tag) => tag.trim()).filter(Boolean),
+          stickerDetails: {
+            type: form.type,
+            group: entry.group || "SPECIAL",
+            selection: entry.selection || null,
+            numbers: entry.numbers
+          }
+        });
+        savedItems.push(saved);
+      }
+      trackEvent("stickers_publish_completed", { type: form.type, totalSelections: savedItems.length, interestId: savedItems[0]?.id });
+      if (savedItems.length > 1) {
+        router.push("/meus-interesses");
+      } else if (savedItems[0]?.id) {
+        const saved = savedItems[0];
         router.push(`/interesses/${saved.id}`);
       }
     } catch (error) {
@@ -349,6 +384,18 @@ export function PublishStickersPage() {
       setIsSaving(false);
     }
   };
+
+  function updateEntry(id: string, patch: Partial<StickerPublishEntry>) {
+    setEntries((current) => current.map((entry) => entry.id === id ? { ...entry, ...patch } : entry));
+  }
+
+  function addEntry() {
+    setEntries((current) => [...current, createStickerPublishEntry()]);
+  }
+
+  function removeEntry(id: string) {
+    setEntries((current) => current.length > 1 ? current.filter((entry) => entry.id !== id) : current);
+  }
 
   if (!stickersEnabled) {
     return <section className="route-shell"><EmptyState title="Figurinhas indisponível" description="Esta página está temporariamente desabilitada." /></section>;
@@ -369,8 +416,20 @@ export function PublishStickersPage() {
             <button type="button" className={form.type === "MISSING" ? "is-active" : ""} onClick={() => setForm((current) => ({ ...current, type: "MISSING" }))}>Procuro faltantes</button>
             <button type="button" className={form.type === "AVAILABLE" ? "is-active" : ""} onClick={() => setForm((current) => ({ ...current, type: "AVAILABLE" }))}>Tenho repetidas</button>
           </div>
-          <label>Seleção ou especial<select value={form.selection} onChange={(event) => setForm((current) => ({ ...current, selection: event.target.value }))} required><option value="">Selecione a seleção ou tipo especial...</option>{groups.map(([group, selections]) => <optgroup key={group} label={`Grupo ${group}`}>{selections.map((selection) => <option key={selection.name} value={selection.name}>{selection.emblem} {selection.name}</option>)}</optgroup>)}<optgroup label="Especiais">{SPECIAL_STICKER_SELECTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</optgroup></select></label>
-          <label>Números das figurinhas<input value={form.numbers} onChange={(event) => setForm((current) => ({ ...current, numbers: event.target.value }))} placeholder="Ex: 12, 45, 78, FW26" required /></label>
+          <div className="sticker-entry-list">
+            {entries.map((entry, index) => (
+              <div className="sticker-entry-row" key={entry.id}>
+                <span className="sticker-entry-index">Seleção {index + 1}</span>
+                <label>Seleção ou especial<select value={entry.selection} onChange={(event) => updateEntry(entry.id, { selection: event.target.value })} required><option value="">Selecione a seleção ou tipo especial...</option>{groups.map(([group, selections]) => <optgroup key={group} label={`Grupo ${group}`}>{selections.map((selection) => <option key={selection.name} value={selection.name}>{selection.emblem} {selection.name}</option>)}</optgroup>)}<optgroup label="Especiais">{SPECIAL_STICKER_SELECTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</optgroup></select></label>
+                <label>Números das figurinhas<input value={entry.numbers} onChange={(event) => updateEntry(entry.id, { numbers: event.target.value })} placeholder="Ex: 12, 45, 78, FW26" required /></label>
+                <Button type="button" variant="outline" className="sticker-entry-remove" onClick={() => removeEntry(entry.id)} disabled={entries.length === 1} title={entries.length === 1 ? "Mantenha pelo menos uma seleção" : "Remover seleção"}><Trash2 size={16} /><span>Remover</span></Button>
+              </div>
+            ))}
+          </div>
+          <div className="sticker-entry-add-row">
+            <Button type="button" variant="outline" className="sticker-entry-add" onClick={addEntry}><Plus size={16} /> Adicionar outra seleção</Button>
+            <small>A cada seleção adicionada, outro card de interesse será criado.</small>
+          </div>
           <label>Descrição adicional<textarea rows={4} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: limitText(event.target.value, 80) }))} placeholder="Ex: aceito troca presencial, envio por correio ou compra em lote." /></label>
           <label>Tags<input value={form.tags} onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))} placeholder="Ex: troca presencial, urgente, lote" /></label>
         </section>
@@ -382,15 +441,20 @@ export function PublishStickersPage() {
             <label>UF<input value={form.state} onChange={(event) => setForm((current) => ({ ...current, state: event.target.value.toUpperCase().slice(0, 2) }))} required /></label>
           </div>
           {publishLookupState.message ? <span className={`address-lookup-note address-lookup-note--${publishLookupState.tone}`} role="status" aria-live="polite" aria-busy={publishLookupState.loading}>{publishLookupState.message}</span> : null}
+          <span className="address-lookup-note">Usamos os dados do seu cadastro como sugestão. Ajuste cidade, UF e bairro se a troca for em outro local.</span>
           <div className="form-grid">
             <label>Bairro<input value={form.neighborhood} onChange={(event) => setForm((current) => ({ ...current, neighborhood: event.target.value }))} placeholder="Bairro" /></label>
             <label>País<input value={form.country} onChange={(event) => setForm((current) => ({ ...current, country: event.target.value }))} /></label>
           </div>
-          {numbers.length ? (
+          {previewEntries.length ? (
             <div className="sticker-preview">
               <strong>Prévia do anúncio</strong>
-              <p>{buildTitle(form.type, form.selection, numbers)}</p>
-              <div className="sticker-number-list">{numbers.slice(0, 12).map((number) => <span key={number}>{number}</span>)}</div>
+              {previewEntries.slice(0, 4).map((entry) => (
+                <div className="sticker-preview-entry" key={entry.id}>
+                  <p>{buildTitle(form.type, entry.selection, entry.numbers)}</p>
+                  <div className="sticker-number-list">{entry.numbers.slice(0, 12).map((number) => <span key={number}>{number}</span>)}</div>
+                </div>
+              ))}
             </div>
           ) : null}
         </section>

@@ -82,7 +82,7 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
   const publicRouteInterest = routeInitialInterest ?? routeFetchedInterest;
   const detailInterest = ownDashboardInterest ?? publicRouteInterest;
   const isMine = Boolean(ownDashboardInterest);
-  const [offerForm, setOfferForm] = useState({ offeredPrice: "", sellerPhone: "", message: "", highlights: "" });
+  const [offerForm, setOfferForm] = useState({ offeredPrice: "", sellerPhone: "", message: "", highlights: "", offerImageUrl: "" });
   const [reportForm, setReportForm] = useState({ reason: "", message: "" });
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isOfferSubmitting, setIsOfferSubmitting] = useState(false);
@@ -182,15 +182,20 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
 
   const submitOfferForm: FormSubmitHandler = async (event) => {
     event.preventDefault();
+    if (!offerForm.message.trim() && !offerForm.offerImageUrl) {
+      setFeedback({ type: "error", title: "Mensagem obrigatoria", message: "Escreva uma mensagem ou anexe uma imagem para enviar a proposta." });
+      return;
+    }
     setIsOfferSubmitting(true);
     try {
       await submitOffer(resolvedInterest.id, {
         offeredPrice: offerForm.offeredPrice ? Number(offerForm.offeredPrice) : null,
         sellerPhone: offerForm.sellerPhone,
-        message: offerForm.message,
+        message: offerForm.message.trim(),
+        offerImageUrl: offerForm.offerImageUrl || null,
         highlights: offerForm.highlights.split(",").map((item) => item.trim()).filter(Boolean)
       });
-      setOfferForm({ offeredPrice: "", sellerPhone: "", message: "", highlights: "" });
+      setOfferForm({ offeredPrice: "", sellerPhone: "", message: "", highlights: "", offerImageUrl: "" });
     } finally {
       setIsOfferSubmitting(false);
     }
@@ -250,6 +255,20 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
     try {
       const imageUrl = await readImageFile(file, CHAT_IMAGE_OPTIONS);
       setConversation((current) => ({ ...current, imageUrl }));
+    } catch (error) {
+      setFeedback({ type: "error", title: "Imagem invalida", message: error instanceof Error ? error.message : "Selecione outra imagem." });
+    }
+  }
+
+  async function handleOfferImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+    try {
+      const offerImageUrl = await readImageFile(file, CHAT_IMAGE_OPTIONS);
+      setOfferForm((current) => ({ ...current, offerImageUrl }));
     } catch (error) {
       setFeedback({ type: "error", title: "Imagem invalida", message: error instanceof Error ? error.message : "Selecione outra imagem." });
     }
@@ -356,7 +375,7 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
                     onClick={handleSelectedBoost}
                   >
                     {selectedBoostPaymentMethod === "CREDITS" ? <CreditCard size={16} /> : null}
-                    {boostingKey || selectedBoostPaymentMethod !== "CREDITS" ? <span>{boostingKey ? "Ativando..." : "Pagar e impulsionar"}</span> : null}
+                    <span>{boostingKey ? "Ativando..." : selectedBoostPaymentMethod === "CREDITS" ? `Impulsionar por ${selectedBoostCreditCost} créditos` : "Pagar e impulsionar"}</span>
                   </Button>
                 </div>
               ) : null}
@@ -387,7 +406,18 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
             <form className="stack-form" onSubmit={submitOfferForm}>
               <label>Valor da proposta<input type="number" min="0" value={offerForm.offeredPrice} onChange={(event) => setOfferForm((current) => ({ ...current, offeredPrice: event.target.value }))} /></label>
               <label>Telefone ou WhatsApp<input value={offerForm.sellerPhone} onChange={(event) => setOfferForm((current) => ({ ...current, sellerPhone: event.target.value }))} /></label>
-              <label>Mensagem<textarea rows={4} value={offerForm.message} onChange={(event) => setOfferForm((current) => ({ ...current, message: event.target.value }))} required /></label>
+              <label>Mensagem<textarea rows={4} value={offerForm.message} onChange={(event) => setOfferForm((current) => ({ ...current, message: event.target.value }))} placeholder="Conte como voce pode atender esta procura" /></label>
+              {offerForm.offerImageUrl ? (
+                <div className="conversation-image-preview offer-image-preview">
+                  <img src={offerForm.offerImageUrl} alt="Previa da imagem da proposta" />
+                  <button type="button" className="icon-button" onClick={() => setOfferForm((current) => ({ ...current, offerImageUrl: "" }))} aria-label="Remover imagem"><X size={16} /></button>
+                </div>
+              ) : null}
+              <label className="button button--outline conversation-file-button offer-file-button">
+                <ImagePlus size={16} />
+                Anexar imagem
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleOfferImageChange} />
+              </label>
               <label>Destaques<input value={offerForm.highlights} onChange={(event) => setOfferForm((current) => ({ ...current, highlights: event.target.value }))} placeholder="Entrega, garantia, disponibilidade" /></label>
               <Button type="submit" disabled={isOfferSubmitting}><Send size={16} /> {isOfferSubmitting ? "Enviando..." : "Enviar proposta"}</Button>
             </form>

@@ -46,6 +46,7 @@ const initialRegister: RegisterForm = {
 
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 type SubmitHandlerEvent = Parameters<FormSubmitHandler>[0];
+const TERMS_GATE_MESSAGE = "É necessário abrir os Termos de Uso antes de marcar o aceite.";
 
 function passwordStatus(password: string) {
   if (!password) {
@@ -69,6 +70,7 @@ export function AuthModal() {
   const [resetForm, setResetForm] = useState({ token: "", newPassword: "", confirmPassword: "" });
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [termsReminder, setTermsReminder] = useState("");
   const [lookupState, setLookupState] = useState<{ loading: boolean; message: string; tone: "muted" | "success" | "error" }>({
     loading: false,
     message: "",
@@ -151,7 +153,16 @@ export function AuthModal() {
 
   function openTerms() {
     setRegisterForm((current) => ({ ...current, termsOpened: true }));
+    setTermsReminder("");
     setIsTermsOpen(true);
+  }
+
+  function remindTermsGate() {
+    if (registerForm.termsOpened) {
+      return;
+    }
+    setTermsReminder(TERMS_GATE_MESSAGE);
+    setFeedback({ type: "warning", title: "Abra os termos primeiro", message: TERMS_GATE_MESSAGE });
   }
 
   async function handlePostalCodeLookup(postalCode = registerForm.postalCode) {
@@ -240,12 +251,12 @@ export function AuthModal() {
                 <label>Bairro<input value={registerForm.neighborhood} onChange={(event) => setRegisterForm((current) => ({ ...current, neighborhood: event.target.value }))} /></label>
                 <label>País<input value={registerForm.country} onChange={(event) => setRegisterForm((current) => ({ ...current, country: event.target.value }))} /></label>
               </div>
-              <div className="terms-box">
-                <label className={!registerForm.termsOpened ? "is-disabled checkbox-row" : "checkbox-row"}>
-                  <input type="checkbox" checked={registerForm.termsAccepted} disabled={!registerForm.termsOpened} onChange={(event) => setRegisterForm((current) => ({ ...current, termsAccepted: event.target.checked }))} />
+              <div className={termsReminder ? "terms-box terms-box--attention" : "terms-box"}>
+                <label className={!registerForm.termsOpened ? "is-disabled checkbox-row" : "checkbox-row"} title={!registerForm.termsOpened ? TERMS_GATE_MESSAGE : undefined} onClickCapture={!registerForm.termsOpened ? (event) => { if ((event.target as HTMLElement).closest(".text-button--inline")) { return; } event.preventDefault(); remindTermsGate(); } : undefined}>
+                  <input type="checkbox" checked={registerForm.termsAccepted} aria-disabled={!registerForm.termsOpened} aria-describedby="terms-acceptance-helper" onChange={(event) => { if (!registerForm.termsOpened) { event.preventDefault(); remindTermsGate(); return; } setRegisterForm((current) => ({ ...current, termsAccepted: event.target.checked })); }} />
                   <span>Li e aceito os <button type="button" className="text-button text-button--inline" onClick={openTerms}>Termos de Uso da plataforma</button></span>
                 </label>
-                <small>{registerForm.termsOpened ? `Versão dos termos: ${termsVersion}` : "Abra os termos para habilitar o aceite."}</small>
+                <small id="terms-acceptance-helper" className={termsReminder ? "terms-helper terms-helper--warning" : "terms-helper"}>{registerForm.termsOpened ? `Versão dos termos: ${termsVersion}` : termsReminder || "Abra os termos para habilitar o aceite."}</small>
               </div>
               <Button type="submit" disabled={isSubmitting || !registerForm.termsAccepted}>{isSubmitting ? "Criando..." : "Criar conta"}</Button>
             </form>

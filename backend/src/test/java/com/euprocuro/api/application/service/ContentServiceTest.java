@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +60,10 @@ class ContentServiceTest {
     private ContentService contentService;
 
     private UserProfile admin;
+
+    private ObjectMapper contentObjectMapper() {
+        return new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
 
     @BeforeEach
     void setUp() {
@@ -601,6 +607,84 @@ class ContentServiceTest {
         assertThat(result).hasSize(2);
         assertThat(result.get(0).getVersion()).isEqualTo(1);
         assertThat(result.get(1).getVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void seedDefaultsOnStartupShouldCreateEntriesAndRevisionsFromResource() {
+        ContentService seededService = new ContentService(
+                adminAccessService,
+                contentEntryGateway,
+                contentRevisionGateway,
+                contentObjectMapper(),
+                publicCacheService
+        );
+        when(contentEntryGateway.findByKeyAndLocale(any(), eq("pt-BR"))).thenReturn(Optional.empty());
+        when(contentEntryGateway.save(any(ContentEntry.class))).thenAnswer(invocation -> {
+            ContentEntry entry = invocation.getArgument(0);
+            if (entry.getId() == null) {
+                entry.setId(entry.getKey());
+            }
+            return entry;
+        });
+        when(contentRevisionGateway.save(any(ContentRevision.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        seededService.seedDefaultsOnStartup();
+
+        ArgumentCaptor<ContentEntry> entryCaptor = ArgumentCaptor.forClass(ContentEntry.class);
+        verify(contentEntryGateway, atLeastOnce()).save(entryCaptor.capture());
+        verify(contentRevisionGateway, atLeastOnce()).save(any(ContentRevision.class));
+        assertThat(entryCaptor.getAllValues())
+                .anySatisfy(entry -> {
+                    assertThat(entry.getKey()).isEqualTo("legal.page.termos-de-uso");
+                    assertThat(entry.getType()).isEqualTo(ContentEntryType.LEGAL_DOCUMENT);
+                    assertThat(entry.isRequiresUserAcceptance()).isTrue();
+                    assertThat(entry.getLegalSlug()).isEqualTo("termos-de-uso");
+                    assertThat(entry.getDefaultValueHash()).isNotBlank();
+                })
+                .anySatisfy(entry -> {
+                    assertThat(entry.getType()).isEqualTo(ContentEntryType.TEXT);
+                    assertThat(entry.getStatus()).isEqualTo(ContentEntryStatus.PUBLISHED);
+                    assertThat(entry.getPublishedValue()).isEqualTo(entry.getDraftValue());
+                });
+    }
+
+    @Test
+    void seedDefaultsOnStartupShouldMarkDefaultUpdatesForCustomizedEntries() {
+        ContentService seededService = new ContentService(
+                adminAccessService,
+                contentEntryGateway,
+                contentRevisionGateway,
+                contentObjectMapper(),
+                publicCacheService
+        );
+        when(contentEntryGateway.findByKeyAndLocale(any(), eq("pt-BR"))).thenAnswer(invocation -> {
+            String key = invocation.getArgument(0);
+            return Optional.of(ContentEntry.builder()
+                    .id("existing-" + key)
+                    .key(key)
+                    .type(null)
+                    .locale("pt-BR")
+                    .status(ContentEntryStatus.PUBLISHED)
+                    .version(2)
+                    .draftValue("Texto customizado")
+                    .publishedValue("Texto customizado")
+                    .defaultValue("Texto padrao antigo")
+                    .defaultValueHash("hash-antigo")
+                    .defaultUpdateAvailable(false)
+                    .build());
+        });
+        when(contentEntryGateway.save(any(ContentEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        seededService.seedDefaultsOnStartup();
+
+        ArgumentCaptor<ContentEntry> entryCaptor = ArgumentCaptor.forClass(ContentEntry.class);
+        verify(contentEntryGateway, atLeastOnce()).save(entryCaptor.capture());
+        assertThat(entryCaptor.getAllValues())
+                .allSatisfy(entry -> {
+                    assertThat(entry.getDefaultValue()).isNotEqualTo("Texto padrao antigo");
+                    assertThat(entry.getDefaultValueHash()).isNotEqualTo("hash-antigo");
+                    assertThat(entry.isDefaultUpdateAvailable()).isTrue();
+                });
     }
 
     @Test
