@@ -8,4 +8,6 @@ import com.euprocuro.api.infrastructure.persistence.document.PasswordResetTokenD
 
 public interface SpringDataPasswordResetTokenRepository extends MongoRepository<PasswordResetTokenDocument, String> {
     Optional<PasswordResetTokenDocument> findByToken(String token);
+
+    void deleteByUserId(String userId);
 }

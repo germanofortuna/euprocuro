@@ -8,4 +8,6 @@ import com.euprocuro.api.infrastructure.persistence.document.SellerItemDocument;
 
 public interface SpringDataSellerItemRepository extends MongoRepository<SellerItemDocument, String> {
     List<SellerItemDocument> findByOwnerIdOrderByCreatedAtDesc(String ownerId);
+
+    void deleteByOwnerId(String ownerId);
 }

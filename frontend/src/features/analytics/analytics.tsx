@@ -3,6 +3,7 @@
 import Script from "next/script";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
+import { hasCookieConsent } from "@/features/privacy/cookie-consent";
 
 const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
 
@@ -14,7 +15,7 @@ declare global {
 }
 
 export function trackPageView(path: string) {
-  if (!measurementId || typeof window.gtag !== "function") {
+  if (!measurementId || !hasCookieConsent("analytics") || typeof window.gtag !== "function") {
     return;
   }
   window.gtag("event", "page_view", {
@@ -25,7 +26,7 @@ export function trackPageView(path: string) {
 }
 
 export function trackEvent(name: string, params: Record<string, unknown> = {}) {
-  if (!measurementId || typeof window.gtag !== "function") {
+  if (!measurementId || !hasCookieConsent("analytics") || typeof window.gtag !== "function") {
     return;
   }
   window.gtag("event", name, params);
@@ -44,7 +45,7 @@ function AnalyticsRouteTracker() {
 }
 
 export function Analytics() {
-  if (!measurementId) {
+  if (!measurementId || !hasCookieConsent("analytics")) {
     return null;
   }
 

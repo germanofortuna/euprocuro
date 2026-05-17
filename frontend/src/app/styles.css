@@ -103,6 +103,17 @@ img {
   }
 }
 
+@keyframes cookieBannerIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
 @keyframes menuDrop {
   from {
     opacity: 0;
@@ -1550,6 +1561,66 @@ small {
   font-weight: 800;
 }
 
+.sidebar-delete-account-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.sidebar-delete-account-button:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.account-delete-modal {
+  width: min(100%, 560px);
+}
+
+.account-delete-warning {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--warning) 38%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface-raised));
+}
+
+.account-delete-warning p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.status-icon--warning {
+  color: var(--warning);
+}
+
+.account-delete-actions {
+  justify-content: flex-end;
+}
+
+.account-delete-confirm {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  font-weight: 900;
+}
+
+.account-delete-confirm:hover {
+  color: color-mix(in srgb, var(--danger) 82%, var(--text));
+}
+
 .private-content {
   min-width: 0;
   min-height: 0;
@@ -2295,6 +2366,115 @@ small {
   animation: popIn 180ms ease both;
 }
 
+.cookie-banner {
+  position: fixed;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 90;
+  width: min(calc(100% - 28px), 980px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(14px);
+  transform: translateX(-50%);
+  animation: cookieBannerIn 180ms ease both;
+}
+
+.cookie-banner__content {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cookie-banner p,
+.cookie-preferences-modal__intro {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.cookie-banner p {
+  font-size: 0.85rem;
+}
+
+.cookie-banner__links,
+.cookie-banner__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cookie-banner__links a {
+  color: var(--primary-strong);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.cookie-banner__actions {
+  justify-content: flex-end;
+}
+
+.cookie-preferences-modal {
+  width: min(100%, 620px);
+}
+
+.cookie-modal-overlay {
+  z-index: 120;
+}
+
+.cookie-preferences-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.cookie-preference-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.cookie-preference-row strong,
+.cookie-preference-row small {
+  display: block;
+}
+
+.cookie-preference-row small {
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.cookie-preference-row input {
+  width: 20px;
+  min-height: 20px;
+}
+
+.cookie-preference-row.is-disabled {
+  opacity: 0.78;
+}
+
+.cookie-preferences-actions {
+  justify-content: flex-end;
+}
+
+.cookie-preferences-entrypoint {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .conversation-modal {
   width: min(100%, 680px);
 }
@@ -2620,6 +2800,25 @@ small {
   .header-actions > .credit-chip {
     display: none;
   }
+
+  .cookie-banner {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .cookie-banner__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .cookie-banner__actions .button {
+    width: 100%;
+  }
+
+  .cookie-preference-row {
+    grid-template-columns: 1fr auto;
+  }
 }
 
 @media (max-width: 520px) {
@@ -2681,6 +2880,16 @@ small {
   .notification-modal {
     width: 100%;
     max-height: 92vh;
+  }
+
+  .cookie-banner {
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: min(calc(100% - 20px), 980px);
+    padding: 12px;
+  }
+
+  .cookie-preferences-actions {
+    align-items: stretch;
   }
 
   .payment-button {

@@ -33,4 +33,9 @@ public class AuthSessionGatewayAdapter implements AuthSessionGateway {
     public void deleteByToken(String token) {
         repository.deleteByToken(token);
     }
+
+    @Override
+    public void deleteByUserId(String userId) {
+        repository.deleteByUserId(userId);
+    }
 }

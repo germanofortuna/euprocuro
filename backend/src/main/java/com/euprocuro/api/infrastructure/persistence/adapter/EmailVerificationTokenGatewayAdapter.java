@@ -33,4 +33,9 @@ public class EmailVerificationTokenGatewayAdapter implements EmailVerificationTo
     public void deleteByToken(String token) {
         repository.findByToken(token).ifPresent(repository::delete);
     }
+
+    @Override
+    public void deleteByUserId(String userId) {
+        repository.deleteByUserId(userId);
+    }
 }

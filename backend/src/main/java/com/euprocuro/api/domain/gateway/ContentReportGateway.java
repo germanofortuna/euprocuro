@@ -16,4 +16,6 @@ public interface ContentReportGateway {
     List<ContentReport> findByContentIdAndStatusOrderByCreatedAtDesc(String contentId, ContentReportStatus status);
 
     Optional<ContentReport> findById(String id);
+
+    void deleteByReportedByOrContentIdIn(String reportedBy, List<String> contentIds);
 }

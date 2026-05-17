@@ -14,6 +14,7 @@ import {
   createOffer,
   createOmbudsmanRequest,
   createSellerItem,
+  deleteAccount as requestDeleteAccount,
   deleteInterest,
   fetchAdminModeration,
   fetchCategories,
@@ -74,6 +75,7 @@ type PlatformContextValue = {
   signIn: (payload: { email: string; password: string }) => Promise<void>;
   signUp: (payload: Record<string, unknown>) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   recoverSession: () => Promise<void>;
   refreshPublicData: (filters?: Record<string, string | number | undefined | null>) => Promise<void>;
   selectInterest: (interestId: string) => Promise<void>;
@@ -357,6 +359,19 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    await requestDeleteAccount();
+    clearSession();
+    setSession(null);
+    setDashboard(null);
+    setMonetization(null);
+    setSellerItems([]);
+    setAdminModeration(null);
+    setHasAdminAccess(false);
+    setAuthModal({ visible: false, mode: "login", redirectTo: null });
+    setFeedback({ type: "success", title: "Conta excluída", message: "Sua conta e seus conteúdos foram excluídos." });
+  }, []);
+
   const saveInterest = useCallback(async (payload: Record<string, unknown>, interestId?: string | null) => {
     const saved = interestId ? await updateInterest(interestId, payload) : await createInterest(payload);
     setFeedback({
@@ -477,6 +492,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signUp,
     signOut,
+    deleteAccount,
     recoverSession,
     refreshPublicData,
     selectInterest,
@@ -506,6 +522,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     currentUser,
     dashboard,
     deleteOwnInterest,
+    deleteAccount,
     feedback,
     interests,
     isLoadingPrivate,

@@ -271,6 +271,7 @@ export const login = (payload: unknown) => request<StoredSession>("/auth/login",
 export const register = (payload: unknown) => request<{ message?: string }>("/auth/register", { method: "POST", body: JSON.stringify(payload) });
 export const fetchMe = () => request<Record<string, unknown>>("/auth/me");
 export const logout = () => request<null>("/auth/logout", { method: "POST" });
+export const deleteAccount = () => request<null>("/auth/me", { method: "DELETE" });
 export const forgotPassword = (payload: unknown) => request<Record<string, unknown>>("/auth/forgot-password", { method: "POST", body: JSON.stringify(payload) });
 export const resetPassword = (payload: unknown) => request<null>("/auth/reset-password", { method: "POST", body: JSON.stringify(payload) });
 export const verifyEmail = (token: string) => request<{ message?: string }>(`/auth/verify-email?${new URLSearchParams({ token })}`);

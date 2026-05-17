@@ -16,6 +16,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ConversationMessageGatewayAdapter implements ConversationMessageGateway {
 
+    private static final String DELETED_USER_LABEL = "Usuário excluído";
+    private static final String REMOVED_MESSAGE_CONTENT = "[Mensagem removida por exclusão de conta]";
+
     private final SpringDataConversationMessageRepository repository;
 
     @Override
@@ -43,5 +46,39 @@ public class ConversationMessageGatewayAdapter implements ConversationMessageGat
                 .stream()
                 .map(ConversationMessagePersistenceMapper::toDomain)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public void deleteByOfferIdIn(List<String> offerIds) {
+        if (offerIds == null || offerIds.isEmpty()) {
+            return;
+        }
+        repository.deleteByOfferIdIn(offerIds);
+    }
+
+    @Override
+    public void deleteBySenderIdOrRecipientId(String userId) {
+        repository.deleteBySenderIdOrRecipientId(userId, userId);
+    }
+
+    @Override
+    public void anonymizeByUserId(String userId) {
+        repository.findBySenderIdOrRecipientId(userId, userId)
+                .stream()
+                .map(message -> {
+                    boolean isSender = userId.equals(message.getSenderId());
+                    boolean isRecipient = userId.equals(message.getRecipientId());
+                    if (isSender) {
+                        message.setSenderId(null);
+                        message.setSenderName(DELETED_USER_LABEL);
+                        message.setContent(REMOVED_MESSAGE_CONTENT);
+                    }
+                    if (isRecipient) {
+                        message.setRecipientId(null);
+                        message.setRecipientName(DELETED_USER_LABEL);
+                    }
+                    return message;
+                })
+                .forEach(repository::save);
     }
 }

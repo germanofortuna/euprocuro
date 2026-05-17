@@ -36,4 +36,9 @@ public class SellerItemGatewayAdapter implements SellerItemGateway {
     public Optional<SellerItem> findById(String id) {
         return repository.findById(id).map(SellerItemPersistenceMapper::toDomain);
     }
+
+    @Override
+    public void deleteByOwnerId(String ownerId) {
+        repository.deleteByOwnerId(ownerId);
+    }
 }

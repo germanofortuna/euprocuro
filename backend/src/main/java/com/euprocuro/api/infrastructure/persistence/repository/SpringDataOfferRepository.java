@@ -12,4 +12,6 @@ public interface SpringDataOfferRepository extends MongoRepository<OfferDocument
     List<OfferDocument> findByInterestPostIdInOrderByCreatedAtDesc(List<String> interestPostIds);
 
     List<OfferDocument> findBySellerIdOrderByCreatedAtDesc(String sellerId);
+
+    void deleteByIdIn(List<String> ids);
 }

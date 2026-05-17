@@ -115,6 +115,11 @@ public class InterestGatewayAdapter implements InterestGateway, InterestSearchGa
     }
 
     @Override
+    public void deleteByOwnerId(String ownerId) {
+        repository.deleteByOwnerId(ownerId);
+    }
+
+    @Override
     public long countByStatus(InterestStatus status) {
         return repository.countByStatus(status);
     }

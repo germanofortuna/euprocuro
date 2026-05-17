@@ -13,4 +13,6 @@ public interface SpringDataContentReportRepository extends MongoRepository<Conte
     List<ContentReportDocument> findByStatusInOrderByCreatedAtDesc(List<ContentReportStatus> statuses);
 
     List<ContentReportDocument> findByContentIdAndStatusOrderByCreatedAtDesc(String contentId, ContentReportStatus status);
+
+    void deleteByReportedByOrContentIdIn(String reportedBy, List<String> contentIds);
 }

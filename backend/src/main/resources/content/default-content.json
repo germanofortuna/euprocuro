@@ -539,7 +539,8 @@
           "items": [
             "É proibido publicar ou propor itens, serviços, dados, atividades ou ofertas vedadas pela Política de Conteúdo Proibido.",
             "Fotos, textos, marcas, descrições e anexos usados na plataforma devem respeitar direitos de terceiros.",
-            "Preço, entrega, garantia, suporte, arrependimento, troca, reembolso e nota fiscal devem ser combinados e cumpridos pelos usuários responsáveis pela negociação, conforme a legislação aplicável."
+            "Preço, entrega, garantia, suporte, arrependimento, troca, reembolso e nota fiscal devem ser combinados e cumpridos pelos usuários responsáveis pela negociação, conforme a legislação aplicável.",
+            "Recursos pagos, créditos, planos, destaques ou boosts, quando disponíveis, seguem as condições exibidas no momento da contratação e podem ser recusados, suspensos ou revertidos em caso de fraude, abuso, erro operacional ou violação destes termos."
           ]
         },
         {
@@ -624,6 +625,7 @@
           "items": [
             "Dados cadastrais: nome, e-mail, cidade, estado, bio, data de aceite dos termos e versão aceita.",
             "Dados de uso do marketplace: interesses publicados, categorias, orçamento, localização informada, tags, propostas, mensagens, destaques e dados de contato inseridos pelos usuários.",
+            "Dados de pagamento: produto contratado, valor, status da transação, provedor de pagamento, identificadores do pedido e informações necessárias para conciliação, suporte, prevenção a fraude e cumprimento legal. A plataforma não solicita nem armazena dados completos de cartão.",
             "Dados técnicos e de segurança: endereço IP, identificadores de sessão, registros de acesso, navegador, dispositivo, data e hora de eventos, logs de erro e sinais de abuso.",
             "Dados de moderação e denúncia: conteúdo reportado, motivo da denúncia, evidências enviadas, histórico de análise, medidas adotadas e comunicações com denunciantes ou usuários afetados.",
             "Dados de provedores: informações recebidas de serviços de hospedagem, analytics, e-mail, suporte, antifraude, moderação automatizada, incluindo provedores de inteligência artificial, quando necessários para o funcionamento da plataforma."
@@ -664,7 +666,7 @@
           ],
           "items": [
             "Com outros usuários, quando dados de perfil, interesses, propostas e contatos forem necessários para a negociação.",
-            "Com fornecedores de infraestrutura, hospedagem, banco de dados, e-mail, suporte, analytics, segurança, antifraude e moderação.",
+            "Com fornecedores de infraestrutura, hospedagem, banco de dados, pagamento, e-mail, suporte, analytics, segurança, antifraude e moderação.",
             "Com serviços de inteligência artificial ou moderação automatizada para classificar, detectar ou bloquear conteúdo proibido e abuso.",
             "Com autoridades públicas, órgãos reguladores, Poder Judiciário ou terceiros legitimados, quando houver obrigação legal, ordem válida ou necessidade de exercício regular de direitos.",
             "Em operações societárias, reorganização, aquisição ou transferência de ativos, sempre respeitando esta política e a legislação aplicável."
@@ -674,7 +676,13 @@
           "title": "6. Cookies e tecnologias semelhantes",
           "paragraphs": [
             "A plataforma poderá usar cookies e tecnologias semelhantes para manter sessão, preservar preferências, melhorar desempenho, medir uso, prevenir fraude e oferecer funcionalidades essenciais.",
-            "Cookies estritamente necessários podem ser usados sem consentimento adicional. Cookies analíticos, publicitários ou opcionais deverão observar consentimento ou outra base legal aplicável, com meios de gerenciamento quando implementados."
+            "Cookies estritamente necessários podem ser usados sem consentimento adicional. Cookies analíticos, publicitários, de marketing, pixels, remarketing, mapas de calor ou tecnologias semelhantes ficam bloqueados por padrão e só devem ser carregados após autorização do usuário, quando aplicável.",
+            "A preferência de cookies opcionais é salva sem nome, e-mail, identificador de usuário, IP ou outro dado pessoal. O usuário pode aceitar, recusar, configurar ou revogar o consentimento de cookies opcionais a qualquer momento pelo botão Gerenciar preferências de cookies nesta política."
+          ],
+          "items": [
+            "Necessários: usados para autenticação, sessão, segurança, prevenção a fraude, preferências essenciais e funcionamento básico da aplicação.",
+            "Analytics: usados somente com consentimento para medir navegação, páginas acessadas e uso agregado do produto.",
+            "Marketing: usados somente com consentimento para campanhas, pixels, remarketing ou mensuração publicitária, caso essas integrações sejam ativadas."
           ]
         },
         {

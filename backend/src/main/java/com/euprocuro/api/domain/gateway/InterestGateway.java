@@ -25,6 +25,8 @@ public interface InterestGateway {
 
     void deleteById(String id);
 
+    void deleteByOwnerId(String ownerId);
+
     long countByStatus(InterestStatus status);
 
     long count();

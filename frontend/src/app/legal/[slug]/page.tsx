@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { fallbackLegalPages } from "@/features/legal/legal-content";
+import { fallbackLegalPages, LEGAL_SLUGS } from "@/features/legal/legal-content";
+import { CookiePreferencesButton } from "@/features/privacy/cookie-preferences-button";
 import { canonical, truncateDescription } from "@/shared/lib/seo";
 import { PublicLayout } from "@/shared/layout/public-layout";
 
@@ -32,6 +33,7 @@ export default async function LegalPage({ params }: { params: Promise<{ slug: st
           <span className="pill">Atualizado em {page.updatedAt}</span>
           <h1>{page.title}</h1>
           {page.summary ? <p className="legal-summary">{page.summary}</p> : null}
+          {slug === LEGAL_SLUGS.privacy ? <CookiePreferencesButton /> : null}
           {(page.sections ?? []).map((section) => (
             <section key={section.title}>
               <h2>{section.title}</h2>

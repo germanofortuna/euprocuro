@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CreditCard, LayoutDashboard, MessageSquare, Package, Search, Settings, Sparkles } from "lucide-react";
-import { useEffect } from "react";
+import { AlertTriangle, CreditCard, LayoutDashboard, MessageSquare, Package, Search, Settings, Sparkles, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { AppHeader } from "./app-header";
 import { AppFooter } from "./app-footer";
 import { usePlatform } from "@/features/platform/platform-context";
 import { isAdminUser } from "@/shared/lib/format";
+import { Button } from "@/shared/ui/button";
 
 const navItems = [
   { href: "/meus-interesses", label: "Minhas Procuras", icon: Search },
@@ -21,7 +22,9 @@ const navItems = [
 export function PrivateLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser, monetization, isSessionReady, hasAdminAccess, sellerItems } = usePlatform();
+  const { currentUser, monetization, isSessionReady, hasAdminAccess, sellerItems, deleteAccount, setFeedback } = usePlatform();
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const credits = monetization?.sellerCredits ?? currentUser?.sellerCredits ?? currentUser?.credits ?? 0;
   const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
   const visibleNavItems = navItems.filter((item) => {
@@ -49,6 +52,23 @@ export function PrivateLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     );
+  }
+
+  async function confirmDeleteAccount() {
+    setIsDeletingAccount(true);
+    try {
+      await deleteAccount();
+      setIsDeleteModalOpen(false);
+      router.replace("/");
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        title: "Não foi possível excluir a conta",
+        message: error instanceof Error ? error.message : "Tente novamente em instantes."
+      });
+    } finally {
+      setIsDeletingAccount(false);
+    }
   }
 
   return (
@@ -84,10 +104,36 @@ export function PrivateLayout({ children }: { children: React.ReactNode }) {
             <strong>{credits} Créditos</strong>
             <Link href="/comprar-creditos">Comprar mais</Link>
           </div> : null}
+          <button type="button" className="sidebar-delete-account-button" onClick={() => setIsDeleteModalOpen(true)}>
+            <Trash2 size={16} aria-hidden="true" />
+            <span>Excluir minha conta</span>
+          </button>
         </aside>
         <main className="private-content">{children}</main>
       </div>
       <AppFooter />
+      {isDeleteModalOpen ? (
+        <div className="modal-overlay modal-overlay--plain" role="presentation">
+          <section className="modal-card account-delete-modal" role="dialog" aria-modal="true" aria-labelledby="account-delete-title">
+            <div className="modal-header">
+              <div className="modal-title">
+                <span className="status-icon status-icon--warning"><AlertTriangle size={20} aria-hidden="true" /></span>
+                <strong id="account-delete-title">Excluir conta</strong>
+              </div>
+            </div>
+            <div className="account-delete-warning">
+              <p>Ao excluir sua conta, seus dados de perfil serão removidos e seus conteúdos serão excluídos ou anonimizados, incluindo chats, propostas, procuras e itens cadastrados.</p>
+              <p>Alguns registros mínimos poderão ser mantidos quando necessários por obrigação legal, segurança, antifraude ou exercício regular de direitos. Essa ação é permanente e não poderá ser desfeita.</p>
+            </div>
+            <div className="modal-actions account-delete-actions">
+              <Button type="button" onClick={() => setIsDeleteModalOpen(false)} disabled={isDeletingAccount}>Cancelar</Button>
+              <button type="button" className="account-delete-confirm" onClick={confirmDeleteAccount} disabled={isDeletingAccount}>
+                {isDeletingAccount ? "Excluindo..." : "Sim, quero excluir"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

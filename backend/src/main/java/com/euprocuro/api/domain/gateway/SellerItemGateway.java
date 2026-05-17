@@ -11,4 +11,6 @@ public interface SellerItemGateway {
     List<SellerItem> findByOwnerIdOrderByCreatedAtDesc(String ownerId);
 
     Optional<SellerItem> findById(String id);
+
+    void deleteByOwnerId(String ownerId);
 }
