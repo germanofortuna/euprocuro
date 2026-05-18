@@ -236,6 +236,9 @@ public final class RestMapper {
                         .stickersPageEnabled(request.getFeatureFlags() == null
                                 ? null
                                 : request.getFeatureFlags().getStickersPageEnabled())
+                        .sellerProPlanEnabled(request.getFeatureFlags() == null
+                                ? null
+                                : request.getFeatureFlags().getSellerProPlanEnabled())
                         .build())
                 .operationalFields(OperationalFieldsCommand.builder()
                         .initialFreeCredits(request.getOperationalFields() == null
@@ -530,10 +533,12 @@ public final class RestMapper {
         if (view == null) {
             return FeatureFlagsResponse.builder()
                     .stickersPageEnabled(true)
+                    .sellerProPlanEnabled(false)
                     .build();
         }
         return FeatureFlagsResponse.builder()
                 .stickersPageEnabled(view.isStickersPageEnabled())
+                .sellerProPlanEnabled(view.isSellerProPlanEnabled())
                 .build();
     }
 

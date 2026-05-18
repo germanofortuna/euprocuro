@@ -8,7 +8,7 @@ import type { Category, Interest } from "@/shared/api/types";
 import { budgetLabel, categoryLabel, isBoostActive, locationLabel } from "@/shared/lib/format";
 import { referenceImageSrc } from "@/shared/lib/images";
 
-export function InterestCard({ interest, categories }: { interest: Interest; categories: Category[]; onSelect?: (interest: Interest) => void }) {
+export function InterestCard({ interest, categories, onSelect }: { interest: Interest; categories: Category[]; onSelect?: (interest: Interest) => void }) {
   const { currentUser, dashboard } = usePlatform();
   const imageSrc = referenceImageSrc(interest);
   const isOwnInterest = Boolean(
@@ -18,7 +18,10 @@ export function InterestCard({ interest, categories }: { interest: Interest; cat
   const stickerSelection = interest.category === STICKERS_CATEGORY ? stickerSelectionLabel(interest.stickerDetails?.selection) : "";
   const stickerFlagSrc = interest.category === STICKERS_CATEGORY ? stickerFlagImageForSelection(interest.stickerDetails?.selection) : "";
   return (
-    <article className={`interest-card${imageSrc ? " interest-card--with-image" : ""}`}>
+    <article
+      className={`interest-card${imageSrc ? " interest-card--with-image" : ""}${onSelect ? " interest-card--selectable" : ""}`}
+      onClick={() => onSelect?.(interest)}
+    >
       {isOwnInterest ? (
         <div className="interest-card__badges">
           {isOwnBoostActive ? <span className="boost-ribbon"><Zap size={13} /> Boost</span> : null}

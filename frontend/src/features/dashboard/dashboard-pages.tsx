@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { CreditCard, Eye, MessageSquare, Package, Plus, Search, Sparkles, Trash2, Upload, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps } from "react";
@@ -329,9 +330,29 @@ export function SellerItemsPage() {
 
 export function CreditsPage() {
   const { monetization, buyProduct, cancelPlan, setFeedback, isLoadingPrivate } = usePlatform();
+  const searchParams = useSearchParams();
   const products = (monetization?.products ?? []).filter((product) => String(product.type).toUpperCase() !== "BOOST");
   const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
   const [buyingProductCode, setBuyingProductCode] = useState<string | null>(null);
+  const paymentStatus = searchParams.get("payment");
+
+  useEffect(() => {
+    if (!paymentStatus) {
+      return;
+    }
+    if (paymentStatus === "success") {
+      setFeedback({ type: "success", title: "Pagamento aprovado", message: "Recebemos o retorno do Mercado Pago. Seu saldo sera atualizado assim que a confirmacao chegar pelo webhook." });
+      return;
+    }
+    if (paymentStatus === "pending") {
+      setFeedback({ type: "info", title: "Pagamento pendente", message: "O Mercado Pago ainda esta processando o pagamento. Vamos atualizar seus creditos quando houver confirmacao." });
+      return;
+    }
+    if (paymentStatus === "failure") {
+      setFeedback({ type: "info", title: "Pagamento nao concluido", message: "Voce voltou sem finalizar o pagamento. Pode tentar novamente quando quiser." });
+    }
+  }, [paymentStatus, setFeedback]);
+
   async function purchase(productCode: string) {
     setBuyingProductCode(productCode);
     try {

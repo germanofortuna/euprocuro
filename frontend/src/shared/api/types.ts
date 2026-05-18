@@ -190,6 +190,7 @@ export type MonetizationAccount = {
 export type OperationalSettings = {
   featureFlags?: {
     stickersPageEnabled?: boolean;
+    sellerProPlanEnabled?: boolean;
   };
   operationalFields?: {
     initialFreeCredits?: number;

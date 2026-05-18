@@ -103,7 +103,7 @@ type PlatformContextValue = {
 
 const PlatformContext = createContext<PlatformContextValue | null>(null);
 const DEFAULT_OPERATIONAL_SETTINGS: OperationalSettings = {
-  featureFlags: { stickersPageEnabled: true },
+  featureFlags: { stickersPageEnabled: true, sellerProPlanEnabled: false },
   operationalFields: { initialFreeCredits: 15, listingRenewalCredits: 1 }
 };
 
@@ -279,7 +279,8 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     const settings = await fetchOperationalSettings().catch(() => DEFAULT_OPERATIONAL_SETTINGS);
     setOperationalSettings({
       featureFlags: {
-        stickersPageEnabled: settings.featureFlags?.stickersPageEnabled ?? true
+        stickersPageEnabled: settings.featureFlags?.stickersPageEnabled ?? true,
+        sellerProPlanEnabled: settings.featureFlags?.sellerProPlanEnabled ?? false
       },
       operationalFields: {
         initialFreeCredits: settings.operationalFields?.initialFreeCredits ?? 15,

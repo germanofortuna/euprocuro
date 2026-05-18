@@ -649,6 +649,15 @@ button:disabled {
   border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
 }
 
+.interest-card--selectable {
+  cursor: pointer;
+}
+
+.interest-card--selectable:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 48%, transparent);
+  outline-offset: 3px;
+}
+
 .filter-panel {
   position: sticky;
   top: calc(var(--header-height) + 24px);
@@ -664,6 +673,10 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.share-panel h2 {
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
 }
 
 .stack-form,
@@ -2179,6 +2192,33 @@ select:focus {
 .button.button--outline.share-icon-button:hover {
   background: color-mix(in srgb, var(--primary) 8%, transparent);
   border-color: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.button.button--outline.share-icon-button--whatsapp:hover {
+  background: color-mix(in srgb, #25d366 18%, transparent);
+  border-color: color-mix(in srgb, #25d366 42%, transparent);
+}
+
+.button.button--outline.share-icon-button--whatsapp:hover .brand-icon--whatsapp {
+  color: #7cf5aa;
+}
+
+.button.button--outline.share-icon-button--x:hover {
+  background: var(--text);
+  border-color: var(--text);
+}
+
+.button.button--outline.share-icon-button--x:hover .brand-icon--x {
+  color: var(--surface);
+}
+
+.button.button--outline.share-icon-button--facebook:hover {
+  background: color-mix(in srgb, #1877f2 14%, transparent);
+  border-color: color-mix(in srgb, #1877f2 48%, transparent);
+}
+
+.button.button--outline.share-icon-button--facebook:hover .brand-icon--facebook {
+  color: #1877f2;
 }
 
 .image-lightbox {

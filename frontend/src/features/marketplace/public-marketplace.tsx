@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Search, Sparkles, TrendingUp } from "lucide-react";
 import { useEffect } from "react";
 import { usePlatform } from "@/features/platform/platform-context";
@@ -42,12 +42,21 @@ function interestMatchesQuery(interest: Interest, query: string) {
 
 export function PublicHome() {
   const { categories, interests, selectedInterest, selectInterest, refreshPublicData, isLoadingPublic, hasLoadedPublicData } = usePlatform();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const query = (searchParams.get("query") ?? "").trim().toLowerCase();
+  const paymentStatus = searchParams.get("payment");
   const isResolvingResults = isLoadingPublic || !hasLoadedPublicData;
   const visibleInterests = query
     ? interests.filter((interest) => interestMatchesQuery(interest, query))
     : interests;
+
+  useEffect(() => {
+    if (!paymentStatus) {
+      return;
+    }
+    router.replace(`/comprar-creditos?payment=${encodeURIComponent(paymentStatus)}`);
+  }, [paymentStatus, router]);
 
   return (
     <>

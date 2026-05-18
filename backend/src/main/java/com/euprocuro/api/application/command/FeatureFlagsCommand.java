@@ -7,4 +7,5 @@ import lombok.Value;
 @Builder
 public class FeatureFlagsCommand {
     Boolean stickersPageEnabled;
+    Boolean sellerProPlanEnabled;
 }

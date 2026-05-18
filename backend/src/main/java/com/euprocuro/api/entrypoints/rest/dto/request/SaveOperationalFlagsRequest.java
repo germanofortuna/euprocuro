@@ -23,6 +23,7 @@ public class SaveOperationalFlagsRequest {
     @Data
     public static class FeatureFlagsRequest {
         private Boolean stickersPageEnabled;
+        private Boolean sellerProPlanEnabled;
     }
 
     @Data
