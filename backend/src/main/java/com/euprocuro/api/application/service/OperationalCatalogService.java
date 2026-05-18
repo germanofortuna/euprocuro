@@ -139,6 +139,10 @@ public class OperationalCatalogService {
         return getOperationalFields().getInitialFreeCredits();
     }
 
+    public int listingRenewalCredits() {
+        return getOperationalFields().getListingRenewalCredits();
+    }
+
     public String requireActiveCategory(String code) {
         String normalizedCode = normalizeCode(code);
         if (STICKERS_CATEGORY_CODE.equals(normalizedCode) && !stickersPageEnabled()) {
@@ -474,11 +478,18 @@ public class OperationalCatalogService {
         int initialFreeCredits = command == null || command.getInitialFreeCredits() == null
                 ? defaultOperationalFields().getInitialFreeCredits()
                 : command.getInitialFreeCredits();
+        int listingRenewalCredits = command == null || command.getListingRenewalCredits() == null
+                ? defaultOperationalFields().getListingRenewalCredits()
+                : command.getListingRenewalCredits();
         if (initialFreeCredits < 0 || initialFreeCredits > 1000) {
             throw new BusinessException("Creditos iniciais devem ficar entre 0 e 1000.");
         }
+        if (listingRenewalCredits < 0 || listingRenewalCredits > 1000) {
+            throw new BusinessException("Creditos de renovacao devem ficar entre 0 e 1000.");
+        }
         return OperationalFieldsView.builder()
                 .initialFreeCredits(initialFreeCredits)
+                .listingRenewalCredits(listingRenewalCredits)
                 .build();
     }
 
@@ -525,6 +536,7 @@ public class OperationalCatalogService {
     private OperationalFieldsView defaultOperationalFields() {
         return OperationalFieldsView.builder()
                 .initialFreeCredits(15)
+                .listingRenewalCredits(1)
                 .build();
     }
 
@@ -687,10 +699,12 @@ public class OperationalCatalogService {
     @Data
     private static class OperationalFieldsRecord {
         private int initialFreeCredits = 15;
+        private int listingRenewalCredits = 1;
 
         private OperationalFieldsView toView() {
             return OperationalFieldsView.builder()
                     .initialFreeCredits(initialFreeCredits < 0 ? 15 : initialFreeCredits)
+                    .listingRenewalCredits(listingRenewalCredits < 0 ? 1 : listingRenewalCredits)
                     .build();
         }
     }

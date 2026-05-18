@@ -244,34 +244,44 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     @Override
     public InterestPost renewInterest(String currentUserId, String interestId) {
-        InterestPost existingInterest = loadInterest(interestId);
+        InterestPost existingInterest = interestGateway.findById(interestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Interesse nao encontrado."));
         if (!Objects.equals(existingInterest.getOwnerId(), currentUserId)) {
             throw new ForbiddenException("Apenas o dono do interesse pode renovar esse anuncio.");
         }
 
         UserProfile owner = userGateway.findById(currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado."));
+        Instant now = Instant.now();
+        Instant currentExpiration = Optional.ofNullable(existingInterest.getExpiresAt())
+                .orElseGet(() -> existingInterest.getCreatedAt() == null
+                        ? null
+                        : existingInterest.getCreatedAt().plus(safeExpirationDays(), ChronoUnit.DAYS));
+        if (currentExpiration != null && currentExpiration.isAfter(now)) {
+            throw new BusinessException("Este anuncio ainda esta dentro do prazo e nao precisa de renovacao.");
+        }
+        int renewalCreditCost = Math.max(0, operationalCatalogService.listingRenewalCredits());
         int availableCredits = owner.getSellerCredits() == null ? 0 : owner.getSellerCredits();
-        if (availableCredits <= 0) {
-            throw new BusinessException("Voce precisa de um credito para renovar este anuncio.");
+        if (availableCredits < renewalCreditCost) {
+            throw new BusinessException("Voce precisa de creditos suficientes para renovar este anuncio.");
         }
 
-        userGateway.save(owner.toBuilder()
-                .sellerCredits(availableCredits - 1)
-                .build());
+        if (renewalCreditCost > 0) {
+            userGateway.save(owner.toBuilder()
+                    .sellerCredits(availableCredits - renewalCreditCost)
+                    .build());
+        }
 
-        Instant now = Instant.now();
-        Instant renewalBase = Optional.ofNullable(existingInterest.getExpiresAt())
-                .filter(expiration -> expiration.isAfter(now))
-                .orElse(now);
         InterestPost renewedInterest = existingInterest.toBuilder()
-                .expiresAt(renewalExpiresAt(renewalBase))
+                .expiresAt(renewalExpiresAt(now))
                 .updatedAt(now)
                 .build();
 
         InterestPost saved = interestGateway.save(renewedInterest);
         auditLogService.record("INTEREST_RENEWED", currentUserId, owner.getEmail(), "INTEREST", saved.getId(),
-                AuditLogService.OUTCOME_SUCCESS, Map.of("creditsRemaining", availableCredits - 1));
+                AuditLogService.OUTCOME_SUCCESS, Map.of(
+                        "creditsUsed", renewalCreditCost,
+                        "creditsRemaining", availableCredits - renewalCreditCost));
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.renewed", Map.of(
                 "interestId", saved.getId(),

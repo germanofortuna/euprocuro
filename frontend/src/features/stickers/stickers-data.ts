@@ -69,6 +69,11 @@ const SPECIAL_FLAG_EMBLEMS: Record<string, string> = {
   SCO: "\uD83C\uDDEC\uD83C\uDDE7"
 };
 
+const SPECIAL_FLAG_IMAGE_CODES: Record<string, string> = {
+  ENG: "gb-eng",
+  SCO: "gb-sct"
+};
+
 function flagFromEmblem(emblem?: string | null) {
   const normalized = String(emblem ?? "").trim().toUpperCase();
   if (SPECIAL_FLAG_EMBLEMS[normalized]) {
@@ -78,6 +83,12 @@ function flagFromEmblem(emblem?: string | null) {
     return "";
   }
   return String.fromCodePoint(...[...normalized].map((char) => 0x1f1e6 + char.charCodeAt(0) - 65));
+}
+
+function flagImageFromEmblem(emblem?: string | null) {
+  const normalized = String(emblem ?? "").trim().toUpperCase();
+  const flagCode = SPECIAL_FLAG_IMAGE_CODES[normalized] ?? (/^[A-Z]{2}$/.test(normalized) ? normalized.toLowerCase() : "");
+  return flagCode ? `https://flagcdn.com/w40/${flagCode}.png` : "";
 }
 
 export function stickerFlagForSelection(value?: string | null) {
@@ -90,13 +101,21 @@ export function stickerSelectionLabel(value?: string | null) {
   if (!selectionName) {
     return "";
   }
-  const flag = stickerFlagForSelection(selectionName);
-  return flag ? `${flag} ${selectionName}` : selectionName;
+  return selectionName;
 }
 
 export function stickerOptionLabel(selection: StickerSelection) {
   const flag = flagFromEmblem(selection.emblem);
   return `${flag || selection.emblem} ${selection.name}`;
+}
+
+export function stickerFlagImageForSelection(value?: string | null) {
+  const selection = STICKER_SELECTIONS.find((item) => item.name === value);
+  return flagImageFromEmblem(selection?.emblem);
+}
+
+export function stickerFlagImageForOption(selection: StickerSelection) {
+  return flagImageFromEmblem(selection.emblem);
 }
 
 export function stickerGroups() {

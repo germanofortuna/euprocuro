@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Filter, Plus, Search, Sparkles, Trash2, Trophy, Users, Zap } from "lucide-react";
+import { ArrowRight, ChevronDown, Filter, Plus, Search, Sparkles, Trash2, Trophy, Users, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import { trackEvent } from "@/features/analytics/analytics";
@@ -14,7 +14,7 @@ import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
 import { BackButton } from "@/shared/ui/back-button";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
-import { SPECIAL_STICKER_SELECTIONS, STICKERS_CATEGORY, stickerGroupForSelection, stickerGroups, stickerOptionLabel, stickerSelectionLabel, normalizeStickerNumbers, normalizeStickerPlayers } from "./stickers-data";
+import { SPECIAL_STICKER_SELECTIONS, STICKERS_CATEGORY, stickerFlagImageForOption, stickerFlagImageForSelection, stickerGroupForSelection, stickerGroups, stickerSelectionLabel, normalizeStickerNumbers, normalizeStickerPlayers } from "./stickers-data";
 
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 type StickerPublishEntry = { id: string; selection: string; numbers: string; players: string };
@@ -34,6 +34,89 @@ function stickerTypeLabel(type?: string | null) {
 
 function selectionOptions() {
   return Object.entries(stickerGroups());
+}
+
+function StickerSelectionDisplay({ value, fallback = "Copa 2026" }: { value?: string | null; fallback?: string }) {
+  const label = stickerSelectionLabel(value) || fallback;
+  const flagSrc = stickerFlagImageForSelection(value);
+  return (
+    <span className="sticker-selection-display">
+      {flagSrc ? <img src={flagSrc} alt="" loading="lazy" /> : null}
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function StickerSelectionSelect({
+  value,
+  onChange,
+  groups,
+  placeholder,
+  includeSpecial = false,
+  specialOptions = []
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  groups: ReturnType<typeof selectionOptions>;
+  placeholder: string;
+  includeSpecial?: boolean;
+  specialOptions?: string[];
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedLabel = value ? stickerSelectionLabel(value) : "";
+  const selectedFlagSrc = stickerFlagImageForSelection(value);
+
+  function choose(nextValue: string) {
+    onChange(nextValue);
+    setIsOpen(false);
+  }
+
+  return (
+    <div className="sticker-selection-select" onBlur={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+        setIsOpen(false);
+      }
+    }}>
+      <button type="button" className="sticker-selection-select__button" onClick={() => setIsOpen((current) => !current)} aria-expanded={isOpen}>
+        <span className={selectedLabel ? "sticker-selection-select__value" : "sticker-selection-select__placeholder"}>
+          {selectedFlagSrc ? <img src={selectedFlagSrc} alt="" loading="lazy" /> : null}
+          <span>{selectedLabel || placeholder}</span>
+        </span>
+        <ChevronDown size={18} aria-hidden="true" />
+      </button>
+      {isOpen ? (
+        <div className="sticker-selection-select__menu" role="listbox">
+          <button type="button" className="sticker-selection-select__option" onClick={() => choose("")}>
+            {placeholder}
+          </button>
+          {groups.map(([group, selections]) => (
+            <div className="sticker-selection-select__group" key={group}>
+              <strong>Grupo {group}</strong>
+              {selections.map((selection) => {
+                const flagSrc = stickerFlagImageForOption(selection);
+                return (
+                  <button type="button" className="sticker-selection-select__option" key={selection.name} onClick={() => choose(selection.name)} role="option" aria-selected={value === selection.name}>
+                    {flagSrc ? <img src={flagSrc} alt="" loading="lazy" /> : null}
+                    <span>{selection.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+          {includeSpecial ? (
+            <div className="sticker-selection-select__group">
+              <strong>Especiais</strong>
+              {specialOptions.map((item) => (
+                <button type="button" className="sticker-selection-select__option" key={item} onClick={() => choose(item)} role="option" aria-selected={value === item}>
+                  <span>{item}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function createStickerPublishEntry(): StickerPublishEntry {
@@ -228,7 +311,7 @@ export function StickersLandingPage() {
             <form className="stack-form" onSubmit={applyFilters}>
               <label>Tipo<select value={filters.stickerType} onChange={(event) => updateFilters({ ...filters, stickerType: event.target.value })}><option value="">Todos</option><option value="MISSING">Faltantes</option><option value="AVAILABLE">Repetidas</option></select></label>
               <label>Grupo<select value={filters.stickerGroup} onChange={(event) => updateFilters({ ...filters, stickerGroup: event.target.value, stickerSelection: "" })}><option value="">Todos os grupos</option>{groups.map(([group]) => <option key={group} value={group}>Grupo {group}</option>)}<option value="SPECIAL">Especiais</option></select></label>
-              <label>Seleção<select value={filters.stickerSelection} onChange={(event) => updateFilters({ ...filters, stickerSelection: event.target.value })}><option value="">Todas</option>{visibleSelectionGroups.map(([group, selections]) => <optgroup key={group} label={`Grupo ${group}`}>{selections.map((selection) => <option key={selection.name} value={selection.name}>{stickerOptionLabel(selection)}</option>)}</optgroup>)}{filters.stickerGroup === "" || filters.stickerGroup === "SPECIAL" ? <optgroup label="Especiais">{SPECIAL_STICKER_SELECTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</optgroup> : null}</select></label>
+              <label>Seleção<StickerSelectionSelect value={filters.stickerSelection} onChange={(value) => updateFilters({ ...filters, stickerSelection: value })} groups={visibleSelectionGroups} placeholder="Todas" includeSpecial={filters.stickerGroup === "" || filters.stickerGroup === "SPECIAL"} specialOptions={SPECIAL_STICKER_SELECTIONS} /></label>
               <label>Número<input value={filters.stickerNumber} onChange={(event) => updateFilters({ ...filters, stickerNumber: event.target.value })} placeholder="Ex: 12 ou FW26" /></label>
               <label>Jogador<input value={filters.stickerPlayer} onChange={(event) => updateFilters({ ...filters, stickerPlayer: event.target.value })} placeholder="Ex: Lionel Messi" /></label>
               <div className="form-grid form-grid--3 stickers-location-grid">
@@ -252,12 +335,12 @@ export function StickersLandingPage() {
                   </div>
                   <h3 className="sticker-card__title">
                     <span>{titleParts.action}{titleParts.separator}</span>
-                    <span className="sticker-card__selection">{stickerSelectionLabel(titleParts.selection)}</span>
+                    <span className="sticker-card__selection"><StickerSelectionDisplay value={titleParts.selection} /></span>
                     {titleParts.identifiers ? <span>: {titleParts.identifiers}</span> : null}
                   </h3>
                   <p>{item.description}</p>
                   <div className="sticker-card__meta-grid">
-                    <span><small>Seleção</small>{stickerSelectionLabel(item.stickerDetails?.selection) || "Copa 2026"}</span>
+                    <span><small>Seleção</small><StickerSelectionDisplay value={item.stickerDetails?.selection} /></span>
                     <span><small>Grupo</small>{item.stickerDetails?.group === "SPECIAL" ? "Especiais" : `Grupo ${item.stickerDetails?.group ?? "-"}`}</span>
                     {stickerLocationParts(item).map((part) => <span key={part}><small>{part.split(":")[0]}</small>{part.split(":").slice(1).join(":").trim()}</span>)}
                   </div>
@@ -558,7 +641,7 @@ export function PublishStickersPage() {
             {entries.map((entry, index) => (
               <div className={isEditing ? "sticker-entry-row sticker-entry-row--editing" : "sticker-entry-row"} key={entry.id}>
                 <span className="sticker-entry-index">Seleção {index + 1}</span>
-                <label>Seleção ou especial<select value={entry.selection} onChange={(event) => updateEntry(entry.id, { selection: event.target.value })} required><option value="">Escolha a seleção/especiais</option>{groups.map(([group, selections]) => <optgroup key={group} label={`Grupo ${group}`}>{selections.map((selection) => <option key={selection.name} value={selection.name}>{stickerOptionLabel(selection)}</option>)}</optgroup>)}<optgroup label="Especiais">{SPECIAL_STICKER_SELECTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</optgroup></select></label>
+                <label>Seleção ou especial<StickerSelectionSelect value={entry.selection} onChange={(value) => updateEntry(entry.id, { selection: value })} groups={groups} placeholder="Escolha a seleção/especiais" includeSpecial specialOptions={SPECIAL_STICKER_SELECTIONS} /></label>
                 <label>Números ou códigos<input value={entry.numbers} onChange={(event) => updateEntry(entry.id, { numbers: event.target.value })} placeholder="Ex: 12, 45, 78, FW26" /></label>
                 <label>Jogadores<input value={entry.players} onChange={(event) => updateEntry(entry.id, { players: event.target.value })} placeholder="Ex: Lionel Messi, Neymar, Cristiano Ronaldo" /></label>
                 {!isEditing ? <Button type="button" variant="outline" className="sticker-entry-remove" onClick={() => removeEntry(entry.id)} disabled={entries.length === 1} title={entries.length === 1 ? "Mantenha pelo menos uma seleção" : "Remover seleção"} aria-label={entries.length === 1 ? "Mantenha pelo menos uma seleção" : "Remover seleção"}><Trash2 size={17} /></Button> : null}

@@ -28,5 +28,6 @@ public class SaveOperationalFlagsRequest {
     @Data
     public static class OperationalFieldsRequest {
         private Integer initialFreeCredits;
+        private Integer listingRenewalCredits;
     }
 }

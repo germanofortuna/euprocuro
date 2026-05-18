@@ -241,6 +241,9 @@ public final class RestMapper {
                         .initialFreeCredits(request.getOperationalFields() == null
                                 ? null
                                 : request.getOperationalFields().getInitialFreeCredits())
+                        .listingRenewalCredits(request.getOperationalFields() == null
+                                ? null
+                                : request.getOperationalFields().getListingRenewalCredits())
                         .build())
                 .build();
     }
@@ -538,10 +541,12 @@ public final class RestMapper {
         if (view == null) {
             return OperationalFieldsResponse.builder()
                     .initialFreeCredits(15)
+                    .listingRenewalCredits(1)
                     .build();
         }
         return OperationalFieldsResponse.builder()
                 .initialFreeCredits(view.getInitialFreeCredits())
+                .listingRenewalCredits(view.getListingRenewalCredits())
                 .build();
     }
 

@@ -193,6 +193,7 @@ export type OperationalSettings = {
   };
   operationalFields?: {
     initialFreeCredits?: number;
+    listingRenewalCredits?: number;
   };
 };
 

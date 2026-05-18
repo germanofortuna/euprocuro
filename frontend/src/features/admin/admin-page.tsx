@@ -31,7 +31,7 @@ type AdminCatalog = {
   monetizationSettings?: { creditPurchasesEnabled?: boolean; boostPurchasesEnabled?: boolean };
   moderationSettings?: { userBlockListEnabled?: boolean };
   featureFlags?: { stickersPageEnabled?: boolean };
-  operationalFields?: { initialFreeCredits?: number };
+  operationalFields?: { initialFreeCredits?: number; listingRenewalCredits?: number };
   categories?: Array<Record<string, unknown>>;
   products?: Array<Record<string, unknown>>;
   updatedAt?: string;
@@ -81,7 +81,8 @@ function normalizeAdminCatalog(payload: AdminCatalog | null): AdminCatalog | nul
       stickersPageEnabled: payload.featureFlags?.stickersPageEnabled ?? true
     },
     operationalFields: {
-      initialFreeCredits: payload.operationalFields?.initialFreeCredits ?? 15
+      initialFreeCredits: payload.operationalFields?.initialFreeCredits ?? 15,
+      listingRenewalCredits: payload.operationalFields?.listingRenewalCredits ?? 1
     }
   };
 }
@@ -422,6 +423,7 @@ export function AdminPage() {
                 <label className="checkbox-row"><input type="checkbox" checked={catalog.featureFlags?.stickersPageEnabled !== false} onChange={(event) => updateCatalogFlag("featureFlags", "stickersPageEnabled", event.target.checked)} /><span>Exibir pagina de figurinhas</span></label>
                 <h3>Campos Operacionais</h3>
                 <label>Creditos iniciais gratis<input type="number" min="0" max="1000" value={Number(catalog.operationalFields?.initialFreeCredits ?? 15)} onChange={(event) => updateOperationalField("initialFreeCredits", Number(event.target.value))} /></label>
+                <label>Creditos para renovar anuncio<input type="number" min="0" max="1000" value={Number(catalog.operationalFields?.listingRenewalCredits ?? 1)} onChange={(event) => updateOperationalField("listingRenewalCredits", Number(event.target.value))} /></label>
                 <Button onClick={() => saveOperationalFlagSettings()} disabled={busyAction === "flags:save"}><Save size={16} /> {busyAction === "flags:save" ? "Salvando..." : "Salvar flags"}</Button>
               </div>
             ) : <EmptyState title="Catalogo indisponivel" description="Nao foi possivel carregar as flags operacionais." />}

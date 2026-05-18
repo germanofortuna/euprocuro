@@ -79,6 +79,7 @@ class OperationalCatalogServiceIntegrationStyleTest {
         assertThat(service.getModerationSettings().isUserBlockListEnabled()).isTrue();
         assertThat(service.getFeatureFlags().isStickersPageEnabled()).isTrue();
         assertThat(service.getOperationalFields().getInitialFreeCredits()).isEqualTo(15);
+        assertThat(service.getOperationalFields().getListingRenewalCredits()).isEqualTo(1);
         assertThat(contentEntryGateway.findAll()).hasSize(6);
         assertThat(contentRevisionGateway.revisions).hasSize(6);
     }

@@ -847,6 +847,18 @@ select:focus {
   white-space: nowrap;
 }
 
+.detail-title__sticker-selection img,
+.interest-card__sticker-selection img,
+.sticker-selection-display img,
+.sticker-selection-select img {
+  width: 20px;
+  height: 14px;
+  border-radius: 2px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
+  flex: 0 0 auto;
+}
+
 .detail-title__sticker-selection {
   padding: 6px 10px;
   border-radius: 999px;
@@ -1209,6 +1221,101 @@ select:focus {
   font-family: var(--emoji-font), Sora, Arial, sans-serif;
 }
 
+.sticker-selection-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.sticker-selection-select {
+  position: relative;
+}
+
+.sticker-selection-select__button {
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-strong);
+  color: var(--text);
+  padding: 8px 10px;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+}
+
+.sticker-selection-select__value,
+.sticker-selection-select__placeholder {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sticker-selection-select__value span,
+.sticker-selection-select__placeholder span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sticker-selection-select__placeholder {
+  color: var(--muted);
+}
+
+.sticker-selection-select__menu {
+  position: absolute;
+  z-index: 25;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-strong);
+  box-shadow: var(--shadow);
+}
+
+.sticker-selection-select__group {
+  display: grid;
+  gap: 2px;
+  padding-top: 6px;
+}
+
+.sticker-selection-select__group strong {
+  padding: 7px 8px 5px;
+  color: var(--primary-strong);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.sticker-selection-select__option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  padding: 8px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.sticker-selection-select__option:hover,
+.sticker-selection-select__option[aria-selected="true"] {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
 .sticker-card p {
   margin: 0;
   color: var(--muted);
@@ -1291,9 +1398,65 @@ select:focus {
   text-align: center;
 }
 
+.stickers-publish {
+  position: relative;
+}
+
+.stickers-publish::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 100vw;
+  height: 260px;
+  transform: translateX(-50%);
+  background:
+    linear-gradient(135deg, rgba(49, 87, 246, 0.18), rgba(147, 51, 234, 0.18) 52%, rgba(236, 72, 153, 0.16)),
+    linear-gradient(rgba(255, 255, 255, 0.13) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.13) 1px, transparent 1px);
+  background-size: auto, 36px 36px, 36px 36px;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.stickers-publish .form-heading .pill {
+  background: linear-gradient(135deg, rgba(49, 87, 246, 0.15), rgba(236, 72, 153, 0.18));
+  border: 1px solid color-mix(in srgb, #8b5cf6 42%, var(--border));
+  color: var(--primary-strong);
+}
+
+.stickers-publish .form-heading h1 {
+  color: var(--text);
+}
+
 .stickers-form {
   max-width: 920px;
   margin: 0 auto;
+}
+
+.stickers-form .form-section {
+  border-color: color-mix(in srgb, #8b5cf6 30%, var(--border));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, rgba(139, 92, 246, 0.18)), var(--surface) 70%),
+    var(--surface);
+}
+
+.stickers-form .form-section h2 {
+  color: var(--primary-strong);
+}
+
+.stickers-form input,
+.stickers-form textarea,
+.stickers-form .sticker-selection-select__button {
+  border-color: color-mix(in srgb, #8b5cf6 25%, var(--border));
+  background: color-mix(in srgb, var(--bg-strong) 92%, rgba(255, 255, 255, 0.16));
+}
+
+.stickers-form input:focus,
+.stickers-form textarea:focus,
+.stickers-form .sticker-selection-select__button:focus-visible {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
 }
 
 .sticker-entry-list {
@@ -1308,9 +1471,9 @@ select:focus {
   align-items: end;
   position: relative;
   padding: 14px;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, #8b5cf6 28%, var(--border));
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--surface-raised) 86%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--surface-raised) 88%, rgba(49, 87, 246, 0.14)), color-mix(in srgb, var(--surface-raised) 90%, rgba(236, 72, 153, 0.10)));
 }
 
 .sticker-entry-index {
@@ -1319,8 +1482,9 @@ select:focus {
   left: 14px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--primary-soft);
+  background: linear-gradient(135deg, #3157f6, #8b5cf6);
   color: var(--primary-strong);
+  color: #fff;
   font-size: 0.7rem;
   font-weight: 900;
 }
@@ -1367,6 +1531,9 @@ select:focus {
 
 .sticker-entry-add {
   justify-content: center;
+  border-color: color-mix(in srgb, #8b5cf6 38%, var(--border));
+  color: var(--primary-strong);
+  background: color-mix(in srgb, var(--primary-soft) 72%, transparent);
 }
 
 .sticker-entry-add-row small {
@@ -1379,9 +1546,9 @@ select:focus {
 .sticker-preview {
   display: grid;
   gap: 10px;
-  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border));
+  border: 1px solid color-mix(in srgb, #8b5cf6 45%, var(--border));
   border-radius: var(--radius);
-  background: var(--primary-soft);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary-soft) 82%, rgba(49, 87, 246, 0.14)), color-mix(in srgb, var(--surface) 84%, rgba(236, 72, 153, 0.16)));
   padding: 16px;
 }
 
@@ -3510,6 +3677,21 @@ small {
 .segmented-control button.is-active {
   background: var(--primary);
   color: #fff;
+}
+
+.stickers-form .segmented-control {
+  border-color: color-mix(in srgb, #8b5cf6 36%, var(--border));
+  background: color-mix(in srgb, var(--primary-soft) 58%, var(--surface));
+}
+
+.stickers-form .segmented-control button {
+  color: color-mix(in srgb, var(--primary-strong) 78%, var(--muted));
+}
+
+.stickers-form .segmented-control button.is-active {
+  background: linear-gradient(135deg, #3157f6, #8b5cf6 58%, #ec4899);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(139, 92, 246, 0.22);
 }
 
 .empty-state {

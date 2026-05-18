@@ -171,11 +171,7 @@ export function statusTone(status?: string | null) {
 }
 
 export function listingExpirationLabel(interest: Pick<Interest, "createdAt" | "expiresAt">) {
-  const explicitDate = interest.expiresAt ? new Date(interest.expiresAt) : null;
-  const baseDate = explicitDate && !Number.isNaN(explicitDate.getTime()) ? explicitDate : null;
-  const createdDate = interest.createdAt ? new Date(interest.createdAt) : null;
-  const days = Number(process.env.NEXT_PUBLIC_LISTING_EXPIRATION_DAYS ?? process.env.VITE_LISTING_EXPIRATION_DAYS ?? 30);
-  const expiresAt = baseDate ?? (createdDate && !Number.isNaN(createdDate.getTime()) ? new Date(createdDate.getTime() + days * 24 * 60 * 60 * 1000) : null);
+  const expiresAt = listingExpiresAt(interest);
 
   if (!expiresAt) {
     return "Prazo de expiracao indisponivel";
@@ -189,6 +185,19 @@ export function listingExpirationLabel(interest: Pick<Interest, "createdAt" | "e
     return "Expira hoje";
   }
   return `Expira em ${diffDays} ${diffDays === 1 ? "dia" : "dias"}`;
+}
+
+export function listingExpiresAt(interest: Pick<Interest, "createdAt" | "expiresAt">) {
+  const explicitDate = interest.expiresAt ? new Date(interest.expiresAt) : null;
+  const baseDate = explicitDate && !Number.isNaN(explicitDate.getTime()) ? explicitDate : null;
+  const createdDate = interest.createdAt ? new Date(interest.createdAt) : null;
+  const days = Number(process.env.NEXT_PUBLIC_LISTING_EXPIRATION_DAYS ?? process.env.VITE_LISTING_EXPIRATION_DAYS ?? 30);
+  return baseDate ?? (createdDate && !Number.isNaN(createdDate.getTime()) ? new Date(createdDate.getTime() + days * 24 * 60 * 60 * 1000) : null);
+}
+
+export function isListingExpired(interest: Pick<Interest, "createdAt" | "expiresAt">) {
+  const expiresAt = listingExpiresAt(interest);
+  return Boolean(expiresAt && expiresAt.getTime() <= Date.now());
 }
 
 export function isAdminUser(user?: User | null, hasAdminAccess = false) {

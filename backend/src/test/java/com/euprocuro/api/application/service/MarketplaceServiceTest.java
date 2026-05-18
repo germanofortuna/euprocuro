@@ -96,6 +96,7 @@ class MarketplaceServiceTest {
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
         lenient().when(blockedTermValidationGateway.validateBlockedTerms(any(InterestPost.class)))
                 .thenReturn(Optional.empty());
+        lenient().when(operationalCatalogService.listingRenewalCredits()).thenReturn(1);
     }
 
     @Test
@@ -179,13 +180,14 @@ class MarketplaceServiceTest {
     }
 
     @Test
-    void renewInterestShouldConsumeOneCreditAndExtendExpiration() {
+    void renewInterestShouldConsumeConfiguredCreditsAndExtendExpiration() {
         InterestPost existingInterest = baseInterest();
-        existingInterest.setExpiresAt(Instant.now().plus(5, ChronoUnit.DAYS));
+        existingInterest.setExpiresAt(Instant.now().minus(1, ChronoUnit.DAYS));
         ReflectionTestUtils.setField(marketplaceService, "listingExpirationDays", 5L);
         ReflectionTestUtils.setField(marketplaceService, "listingRenewalDays", 30L);
+        when(operationalCatalogService.listingRenewalCredits()).thenReturn(2);
         UserProfile owner = baseBuyer().toBuilder()
-                .sellerCredits(2)
+                .sellerCredits(5)
                 .build();
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(existingInterest));
         when(userGateway.findById("buyer-1")).thenReturn(Optional.of(owner));
@@ -194,14 +196,30 @@ class MarketplaceServiceTest {
 
         InterestPost result = marketplaceService.renewInterest("buyer-1", "interest-1");
 
-        assertThat(result.getExpiresAt()).isAfter(existingInterest.getExpiresAt().plus(29, ChronoUnit.DAYS));
-        verify(userGateway).save(any(UserProfile.class));
+        assertThat(result.getExpiresAt()).isAfter(Instant.now().plus(29, ChronoUnit.DAYS));
+        verify(userGateway).save(argThat(savedOwner -> savedOwner.getSellerCredits() == 3));
         verify(eventPublisherGateway).publish(eq("interest.renewed"), any(Map.class));
     }
 
     @Test
+    void renewInterestShouldRejectWhenListingIsStillActive() {
+        InterestPost existingInterest = baseInterest();
+        existingInterest.setExpiresAt(Instant.now().plus(5, ChronoUnit.DAYS));
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(existingInterest));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer().toBuilder()
+                .sellerCredits(2)
+                .build()));
+
+        assertThatThrownBy(() -> marketplaceService.renewInterest("buyer-1", "interest-1"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ainda esta dentro do prazo");
+    }
+
+    @Test
     void renewInterestShouldRejectOwnerWithoutCredits() {
-        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        InterestPost existingInterest = baseInterest();
+        existingInterest.setExpiresAt(Instant.now().minus(1, ChronoUnit.DAYS));
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(existingInterest));
         when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer().toBuilder()
                 .sellerCredits(0)
                 .build()));

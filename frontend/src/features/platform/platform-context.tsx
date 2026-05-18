@@ -104,7 +104,7 @@ type PlatformContextValue = {
 const PlatformContext = createContext<PlatformContextValue | null>(null);
 const DEFAULT_OPERATIONAL_SETTINGS: OperationalSettings = {
   featureFlags: { stickersPageEnabled: true },
-  operationalFields: { initialFreeCredits: 15 }
+  operationalFields: { initialFreeCredits: 15, listingRenewalCredits: 1 }
 };
 
 function normalizeMe(me: Record<string, unknown>, previousSession: StoredSession | null): StoredSession {
@@ -225,7 +225,11 @@ function creditOnboardingMessage(
         .map((product) => `${product.name}: ${Number(product.credits)} créditos${product.durationDays ? ` por ${product.durationDays} dias` : ""}`)
         .join("; ")
     : "os custos de boost aparecem na página de detalhes da sua procura";
-  return `Você tem ${balance} créditos disponíveis. Publicar uma procura não desconta créditos. Eles servem para manter suas procuras ativas e com mais destaque: renovar uma procura custa 1 crédito e os boosts seguem a configuração atual (${boostSummary}). Para comprar mais créditos ou consultar os planos, acesse "Créditos e Plano" no painel.`;
+  const renewalCredits = Math.max(0, Number(settings.operationalFields?.listingRenewalCredits ?? 1));
+  const renewalSummary = renewalCredits === 0
+    ? "renovar uma procura nao consome creditos"
+    : `renovar uma procura custa ${renewalCredits} ${renewalCredits === 1 ? "credito" : "creditos"}`;
+  return `Você tem ${balance} créditos disponíveis. Publicar uma procura não desconta créditos. Eles servem para manter suas procuras ativas e com mais destaque: ${renewalSummary} e os boosts seguem a configuração atual (${boostSummary}). Para comprar mais créditos ou consultar os planos, acesse "Créditos e Plano" no painel.`;
 }
 
 export function PlatformProvider({ children }: { children: React.ReactNode }) {
@@ -278,7 +282,8 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
         stickersPageEnabled: settings.featureFlags?.stickersPageEnabled ?? true
       },
       operationalFields: {
-        initialFreeCredits: settings.operationalFields?.initialFreeCredits ?? 15
+        initialFreeCredits: settings.operationalFields?.initialFreeCredits ?? 15,
+        listingRenewalCredits: settings.operationalFields?.listingRenewalCredits ?? 1
       }
     });
   }, []);

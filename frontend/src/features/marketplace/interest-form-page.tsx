@@ -19,6 +19,25 @@ const TITLE_MAX_LENGTH = 80;
 const DESCRIPTION_MAX_LENGTH = 250;
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 
+function parseCurrencyInput(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) {
+    return "";
+  }
+  return (Number(digits) / 100).toFixed(2);
+}
+
+function formatCurrencyInput(value: string) {
+  if (!value) {
+    return "";
+  }
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return "";
+  }
+  return numericValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 function initialInterestForm(currentUser?: { city?: string; state?: string; neighborhood?: string; country?: string } | null) {
   return {
     title: "",
@@ -48,8 +67,8 @@ function interestToForm(interest: Interest, currentForm: ReturnType<typeof initi
     description: interest.description ?? "",
     category: interest.category ?? "",
     tags: (interest.tags ?? []).join(", "),
-    budgetMin: interest.budgetMin == null ? "" : String(interest.budgetMin),
-    budgetMax: interest.budgetMax == null ? "" : String(interest.budgetMax),
+    budgetMin: interest.budgetMin == null ? "" : Number(interest.budgetMin).toFixed(2),
+    budgetMax: interest.budgetMax == null ? "" : Number(interest.budgetMax).toFixed(2),
     postalCode: formatCep(String(interest.location?.postalCode ?? "")),
     city: String(interest.location?.city ?? ""),
     state: String(interest.location?.state ?? "").toUpperCase().slice(0, 2),
@@ -282,8 +301,8 @@ export function InterestFormPage() {
         <section className="form-section">
           <h2>Orçamento e localização</h2>
           <div className="form-grid">
-            <label>Orçamento minimo<input type="number" min="0" value={form.budgetMin} onChange={(event) => update("budgetMin", event.target.value)} /></label>
-            <label>Orçamento maximo<input type="number" min="0" value={form.budgetMax} onChange={(event) => update("budgetMax", event.target.value)} required /></label>
+            <label>Orçamento minimo<input type="text" inputMode="numeric" value={formatCurrencyInput(form.budgetMin)} onChange={(event) => update("budgetMin", parseCurrencyInput(event.target.value))} placeholder="R$ 0,00" /></label>
+            <label>Orçamento maximo<input type="text" inputMode="numeric" value={formatCurrencyInput(form.budgetMax)} onChange={(event) => update("budgetMax", parseCurrencyInput(event.target.value))} placeholder="R$ 0,00" required /></label>
           </div>
           <div className="form-grid form-grid--3">
             <label>CEP<input value={form.postalCode} onChange={(event) => update("postalCode", formatCep(event.target.value))} onBlur={() => handlePostalCodeLookup()} placeholder="00000-000" /></label>

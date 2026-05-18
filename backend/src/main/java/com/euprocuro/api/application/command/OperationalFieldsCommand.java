@@ -7,4 +7,5 @@ import lombok.Value;
 @Builder
 public class OperationalFieldsCommand {
     Integer initialFreeCredits;
+    Integer listingRenewalCredits;
 }

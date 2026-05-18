@@ -9,7 +9,7 @@ import mercadoPagoLogo from "@/assets/mercado-pago.svg";
 import { usePlatform } from "@/features/platform/platform-context";
 import { fetchInterest, fetchOfferConversation, sendOfferMessage } from "@/shared/api/client";
 import type { Interest, MonetizationProduct, Offer, OfferConversation } from "@/shared/api/types";
-import { budgetLabel, categoryLabel, formatDateTime, listingExpirationLabel, locationLabel, statusLabel, statusTone } from "@/shared/lib/format";
+import { budgetLabel, categoryLabel, formatDateTime, isListingExpired, listingExpirationLabel, locationLabel, statusLabel, statusTone } from "@/shared/lib/format";
 import { readImageFile } from "@/shared/lib/image-upload";
 import { referenceImageSrc } from "@/shared/lib/images";
 import { readInterestListHref } from "@/shared/lib/interest-list-navigation";
@@ -17,7 +17,7 @@ import { Button } from "@/shared/ui/button";
 import { BackButton } from "@/shared/ui/back-button";
 import { FieldCounter } from "@/shared/ui/field-counter";
 import { trackEvent } from "@/features/analytics/analytics";
-import { STICKERS_CATEGORY, stickerSelectionLabel } from "@/features/stickers/stickers-data";
+import { STICKERS_CATEGORY, stickerFlagImageForSelection, stickerSelectionLabel } from "@/features/stickers/stickers-data";
 
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 const REPORT_REASON_MAX_LENGTH = 120;
@@ -73,7 +73,7 @@ function FacebookIcon() {
 }
 
 export function InterestDetailPage({ interestId, initialInterest }: { interestId: string; initialInterest?: Interest | null }) {
-  const { categories, dashboard, isLoadingPrivate, currentUser, monetization, submitOffer, submitReport, openAuthModal, setFeedback, closeOwnInterest, activateOwnInterest, renewOwnInterest, boostOwnInterest } = usePlatform();
+  const { categories, dashboard, isLoadingPrivate, currentUser, monetization, operationalSettings, submitOffer, submitReport, openAuthModal, setFeedback, closeOwnInterest, activateOwnInterest, renewOwnInterest, boostOwnInterest } = usePlatform();
   const [routeInterest, setRouteInterest] = useState<Interest | null>(null);
   const [isLoadingRouteInterest, setIsLoadingRouteInterest] = useState(false);
   const [isImageOpen, setIsImageOpen] = useState(false);
@@ -184,10 +184,16 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
   const isBoostActive = Boolean(boostedUntil && boostedUntil.getTime() > Date.now());
   const interestStatus = String(resolvedInterest.status ?? "OPEN").toUpperCase();
   const isPublishedInterest = ["OPEN", "APPROVED"].includes(interestStatus);
+  const renewalCreditCost = Math.max(0, Number(operationalSettings.operationalFields?.listingRenewalCredits ?? 1));
+  const renewalButtonLabel = renewalCreditCost === 0
+    ? "Renovar gratis"
+    : `Renovar por ${renewalCreditCost} ${renewalCreditCost === 1 ? "credito" : "creditos"}`;
+  const canRenewInterest = isPublishedInterest && isListingExpired(resolvedInterest);
   const shouldShowBoostWaitMessage = isMine && ["PENDING", "REVIEW_REQUIRED", "IN_REVIEW"].includes(interestStatus);
   const existingSentOffer = (dashboard?.sentOffers ?? dashboard?.offersSent ?? []).find((offer) => (offer.interestPostId ?? offer.interestId) === resolvedInterest.id) ?? null;
   const shouldWaitForSentOfferCheck = Boolean(currentUser?.id && !isMine && !dashboard && isLoadingPrivate);
   const stickerSelection = resolvedInterest.category === STICKERS_CATEGORY ? stickerSelectionLabel(resolvedInterest.stickerDetails?.selection) : "";
+  const stickerFlagSrc = resolvedInterest.category === STICKERS_CATEGORY ? stickerFlagImageForSelection(resolvedInterest.stickerDetails?.selection) : "";
 
   const submitOfferForm: FormSubmitHandler = async (event) => {
     event.preventDefault();
@@ -329,7 +335,7 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
           ) : null}
           <h1 className="detail-title">
             <span>{resolvedInterest.title}</span>
-            {stickerSelection ? <span className="detail-title__sticker-selection">{stickerSelection}</span> : null}
+            {stickerSelection ? <span className="detail-title__sticker-selection">{stickerFlagSrc ? <img src={stickerFlagSrc} alt="" loading="lazy" /> : null}{stickerSelection}</span> : null}
             {isBoostActive ? <span className="detail-title__boost" title="Boost ativo"><Zap size={20} aria-hidden="true" /></span> : null}
           </h1>
           <div className="interest-meta interest-meta--large">
@@ -401,7 +407,7 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
               ) : null}
               <div className="owner-action-grid">
                 <Link className="button button--primary" href={resolvedInterest.category === STICKERS_CATEGORY ? `/figurinhas/publicar?editar=${resolvedInterest.id}` : `/cadastrar-interesse?editar=${resolvedInterest.id}`}><Pencil size={16} /> Editar</Link>
-                {isPublishedInterest ? <Button type="button" variant="outline" onClick={() => renewOwnInterest(resolvedInterest.id)} title="Usa 1 credito para adicionar mais 30 dias a procura"><RefreshCw size={16} /> Renovar por 1 credito</Button> : null}
+                {canRenewInterest ? <Button type="button" variant="outline" onClick={() => renewOwnInterest(resolvedInterest.id)} title={renewalCreditCost === 0 ? "Adiciona mais 30 dias a procura" : `Usa ${renewalCreditCost} ${renewalCreditCost === 1 ? "credito" : "creditos"} para adicionar mais 30 dias a procura`}><RefreshCw size={16} /> {renewalButtonLabel}</Button> : null}
                 {resolvedInterest.status === "CLOSED" ? (
                   <Button type="button" variant="outline" onClick={() => activateOwnInterest(resolvedInterest.id)}>Ativar</Button>
                 ) : (
