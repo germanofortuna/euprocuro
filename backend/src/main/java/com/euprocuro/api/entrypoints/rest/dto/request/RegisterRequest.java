@@ -37,4 +37,6 @@ public class RegisterRequest {
 
     private String termsVersion;
 
+    private String turnstileToken;
+
 }

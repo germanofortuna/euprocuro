@@ -8,4 +8,5 @@ import lombok.Value;
 public class FeatureFlagsCommand {
     Boolean stickersPageEnabled;
     Boolean sellerProPlanEnabled;
+    Boolean captchaEnabled;
 }

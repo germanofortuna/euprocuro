@@ -477,6 +477,9 @@ public class OperationalCatalogService {
                 .sellerProPlanEnabled(command.getSellerProPlanEnabled() == null
                         ? defaults.isSellerProPlanEnabled()
                         : command.getSellerProPlanEnabled())
+                .captchaEnabled(command.getCaptchaEnabled() == null
+                        ? defaults.isCaptchaEnabled()
+                        : command.getCaptchaEnabled())
                 .build();
     }
 
@@ -541,6 +544,7 @@ public class OperationalCatalogService {
         return FeatureFlagsView.builder()
                 .stickersPageEnabled(true)
                 .sellerProPlanEnabled(false)
+                .captchaEnabled(true)
                 .build();
     }
 
@@ -700,11 +704,13 @@ public class OperationalCatalogService {
     private static class FeatureFlagsRecord {
         private boolean stickersPageEnabled = true;
         private boolean sellerProPlanEnabled = false;
+        private boolean captchaEnabled = true;
 
         private FeatureFlagsView toView() {
             return FeatureFlagsView.builder()
                     .stickersPageEnabled(stickersPageEnabled)
                     .sellerProPlanEnabled(sellerProPlanEnabled)
+                    .captchaEnabled(captchaEnabled)
                     .build();
         }
     }

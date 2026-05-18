@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ComponentProps } from "react";
 import { X } from "lucide-react";
 import { useLegalContent } from "@/features/legal/use-legal-content";
@@ -8,7 +8,8 @@ import { usePlatform } from "@/features/platform/platform-context";
 import { formatCep, formatCpfCnpj } from "@/shared/lib/format";
 import { Button } from "@/shared/ui/button";
 import { LegalModal } from "@/features/legal/legal-modal";
-import { lookupAddressByPostalCode } from "@/shared/api/client";
+import { forgotPassword, lookupAddressByPostalCode } from "@/shared/api/client";
+import { isTurnstileEnabled, TurnstileWidget } from "@/features/auth/turnstile-widget";
 
 type LoginForm = {
   email: string;
@@ -62,7 +63,7 @@ function passwordStatus(password: string) {
 }
 
 export function AuthModal() {
-  const { authModal, closeAuthModal, setAuthMode, signIn, signUp, setFeedback } = usePlatform();
+  const { authModal, closeAuthModal, setAuthMode, signIn, signUp, setFeedback, operationalSettings } = usePlatform();
   const { termsVersion } = useLegalContent();
   const [loginForm, setLoginForm] = useState(initialLogin);
   const [registerForm, setRegisterForm] = useState(initialRegister);
@@ -71,6 +72,8 @@ export function AuthModal() {
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [termsReminder, setTermsReminder] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [lookupState, setLookupState] = useState<{ loading: boolean; message: string; tone: "muted" | "success" | "error" }>({
     loading: false,
     message: "",
@@ -91,16 +94,49 @@ export function AuthModal() {
     return () => window.clearTimeout(timer);
   }, [authModal.mode, authModal.visible, registerForm.postalCode]);
 
+  useEffect(() => {
+    setTurnstileToken("");
+    setTurnstileResetKey((current) => current + 1);
+  }, [authModal.mode, authModal.visible]);
+
+  const handleTurnstileToken = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
+
   if (!authModal.visible) {
     return null;
   }
 
+  const resetTurnstile = () => {
+    setTurnstileToken("");
+    setTurnstileResetKey((current) => current + 1);
+  };
+
+  const captchaEnabled = operationalSettings.featureFlags?.captchaEnabled !== false;
+  const shouldUseTurnstile = captchaEnabled && isTurnstileEnabled;
+
+  const requireTurnstile = () => {
+    if (!shouldUseTurnstile || turnstileToken) {
+      return true;
+    }
+    setFeedback({
+      type: "warning",
+      title: "Verificacao de seguranca",
+      message: "Confirme a verificacao de seguranca para continuar."
+    });
+    return false;
+  };
+
   const submitLogin: FormSubmitHandler = async (event) => {
     event.preventDefault();
+    if (!requireTurnstile()) {
+      return;
+    }
     setIsSubmitting(true);
     try {
-      await signIn(loginForm);
+      await signIn({ ...loginForm, turnstileToken });
     } catch (error) {
+      resetTurnstile();
       const message = error instanceof Error ? error.message : "Confira seu e-mail e senha.";
       setFeedback({
         type: message.toLowerCase().includes("confirme seu e-mail") ? "warning" : "error",
@@ -118,6 +154,9 @@ export function AuthModal() {
       setFeedback({ type: "error", title: "Aceite os termos", message: "Abra os Termos de Uso e marque o aceite para criar sua conta." });
       return;
     }
+    if (!requireTurnstile()) {
+      return;
+    }
     setIsSubmitting(true);
     try {
       await signUp({
@@ -131,15 +170,43 @@ export function AuthModal() {
         neighborhood: registerForm.neighborhood,
         country: registerForm.country,
         termsAccepted: true,
-        termsVersion
+        termsVersion,
+        turnstileToken
       });
       setLoginForm({ email: registerForm.email, password: "" });
     } catch (error) {
+      resetTurnstile();
       setFeedback({ type: "error", title: "Não foi possível criar a conta", message: error instanceof Error ? error.message : "Revise os dados e tente novamente." });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  async function submitForgot(event: SubmitHandlerEvent) {
+    event.preventDefault();
+    if (!requireTurnstile()) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await forgotPassword({ email: forgotEmail, turnstileToken });
+      setFeedback({
+        type: "info",
+        title: "Solicitacao enviada",
+        message: "Se o e-mail existir, as instrucoes serao enviadas."
+      });
+      setAuthMode("login");
+    } catch (error) {
+      resetTurnstile();
+      setFeedback({
+        type: "error",
+        title: "Falha ao solicitar redefinicao",
+        message: error instanceof Error ? error.message : "Tente novamente em instantes."
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   function submitLocalFeedback(event: SubmitHandlerEvent, kind: "forgot" | "reset") {
     event.preventDefault();
@@ -199,6 +266,10 @@ export function AuthModal() {
     reset: "Criar nova senha"
   }[authModal.mode];
 
+  const turnstile = shouldUseTurnstile && (authModal.mode === "login" || authModal.mode === "register" || authModal.mode === "forgot")
+    ? <TurnstileWidget onToken={handleTurnstileToken} resetKey={turnstileResetKey} />
+    : null;
+
   return (
     <>
       <div className="modal-overlay modal-overlay--auth" role="presentation" onClick={closeAuthModal}>
@@ -230,6 +301,7 @@ export function AuthModal() {
                 Senha
                 <input type="password" value={loginForm.password} onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))} required />
               </label>
+              {turnstile}
               <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Entrando..." : "Entrar na plataforma"}</Button>
               <button type="button" className="text-button" onClick={() => setAuthMode("forgot")}>Esqueci minha senha</button>
             </form>
@@ -258,13 +330,15 @@ export function AuthModal() {
                 </label>
                 <small id="terms-acceptance-helper" className={termsReminder ? "terms-helper terms-helper--warning" : "terms-helper"}>{registerForm.termsOpened ? `Versão dos termos: ${termsVersion}` : termsReminder || "Abra os termos para habilitar o aceite."}</small>
               </div>
+              {turnstile}
               <Button type="submit" disabled={isSubmitting || !registerForm.termsAccepted}>{isSubmitting ? "Criando..." : "Criar conta"}</Button>
             </form>
           ) : null}
 
           {authModal.mode === "forgot" ? (
-            <form className="stack-form" onSubmit={(event) => submitLocalFeedback(event, "forgot")}>
+            <form className="stack-form" onSubmit={submitForgot}>
               <label>E-mail da conta<input type="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} required /></label>
+              {turnstile}
               <Button type="submit">Enviar instruções</Button>
               <button type="button" className="text-button" onClick={() => setAuthMode("login")}>Voltar ao login</button>
             </form>

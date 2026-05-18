@@ -78,7 +78,7 @@ type PlatformContextValue = {
   openAuthModal: (mode?: AuthMode, redirectTo?: string | null) => void;
   closeAuthModal: () => void;
   setAuthMode: (mode: AuthMode) => void;
-  signIn: (payload: { email: string; password: string }) => Promise<void>;
+  signIn: (payload: { email: string; password: string; turnstileToken?: string }) => Promise<void>;
   signUp: (payload: Record<string, unknown>) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -103,7 +103,7 @@ type PlatformContextValue = {
 
 const PlatformContext = createContext<PlatformContextValue | null>(null);
 const DEFAULT_OPERATIONAL_SETTINGS: OperationalSettings = {
-  featureFlags: { stickersPageEnabled: true, sellerProPlanEnabled: false },
+  featureFlags: { stickersPageEnabled: true, sellerProPlanEnabled: false, captchaEnabled: true },
   operationalFields: { initialFreeCredits: 15, listingRenewalCredits: 1 }
 };
 
@@ -280,7 +280,8 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     setOperationalSettings({
       featureFlags: {
         stickersPageEnabled: settings.featureFlags?.stickersPageEnabled ?? true,
-        sellerProPlanEnabled: settings.featureFlags?.sellerProPlanEnabled ?? false
+        sellerProPlanEnabled: settings.featureFlags?.sellerProPlanEnabled ?? false,
+        captchaEnabled: settings.featureFlags?.captchaEnabled ?? true
       },
       operationalFields: {
         initialFreeCredits: settings.operationalFields?.initialFreeCredits ?? 15,
@@ -421,7 +422,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const closeAuthModal = useCallback(() => setAuthModal((current) => ({ ...current, visible: false })), []);
   const setAuthMode = useCallback((mode: AuthMode) => setAuthModal((current) => ({ ...current, mode })), []);
 
-  const signIn = useCallback(async (payload: { email: string; password: string }) => {
+  const signIn = useCallback(async (payload: { email: string; password: string; turnstileToken?: string }) => {
     const auth = await login(payload);
     const nextSession = auth?.user?.id ? auth : normalizeMe(await fetchMe(), auth);
     storeSession(nextSession);

@@ -22,6 +22,7 @@ import com.euprocuro.api.entrypoints.rest.dto.response.AuthResponse;
 import com.euprocuro.api.entrypoints.rest.mapper.RestMapper;
 import com.euprocuro.api.entrypoints.rest.security.AuthCookieManager;
 import com.euprocuro.api.entrypoints.rest.security.CurrentUserContext;
+import com.euprocuro.api.infrastructure.security.TurnstileVerificationService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -35,6 +36,7 @@ public class AuthController {
     private final AuthCookieManager authCookieManager;
     private final AuthTokenResolver authTokenResolver;
     private final ClientIpResolver clientIpResolver;
+    private final TurnstileVerificationService turnstileVerificationService;
 
     @Value("${application.auth.expose-session-token:false}")
     private boolean exposeSessionToken;
@@ -46,13 +48,19 @@ public class AuthController {
             HttpServletRequest httpRequest
     ) {
         String clientIp = clientIpResolver.resolve(httpRequest);
+        turnstileVerificationService.verify(request.getTurnstileToken(), clientIp);
         return RestMapper.toResponse(
                 authUseCase.register(RestMapper.toCommand(request, clientIp))
         );
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+    public AuthResponse login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response
+    ) {
+        turnstileVerificationService.verify(request.getTurnstileToken(), clientIpResolver.resolve(httpRequest));
         return toCookieAuthResponse(authUseCase.login(RestMapper.toCommand(request)), response);
     }
 
@@ -80,7 +88,11 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
-    public ActionMessageResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+    public ActionMessageResponse forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        turnstileVerificationService.verify(request.getTurnstileToken(), clientIpResolver.resolve(httpRequest));
         return RestMapper.toResponse(authUseCase.forgotPassword(RestMapper.toCommand(request)));
     }
 

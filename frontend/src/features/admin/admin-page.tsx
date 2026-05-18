@@ -30,7 +30,7 @@ import { EmptyState } from "@/shared/ui/empty-state";
 type AdminCatalog = {
   monetizationSettings?: { creditPurchasesEnabled?: boolean; boostPurchasesEnabled?: boolean };
   moderationSettings?: { userBlockListEnabled?: boolean };
-  featureFlags?: { stickersPageEnabled?: boolean; sellerProPlanEnabled?: boolean };
+  featureFlags?: { stickersPageEnabled?: boolean; sellerProPlanEnabled?: boolean; captchaEnabled?: boolean };
   operationalFields?: { initialFreeCredits?: number; listingRenewalCredits?: number };
   categories?: Array<Record<string, unknown>>;
   products?: Array<Record<string, unknown>>;
@@ -79,7 +79,8 @@ function normalizeAdminCatalog(payload: AdminCatalog | null): AdminCatalog | nul
     })),
     featureFlags: {
       stickersPageEnabled: payload.featureFlags?.stickersPageEnabled ?? true,
-      sellerProPlanEnabled: payload.featureFlags?.sellerProPlanEnabled ?? false
+      sellerProPlanEnabled: payload.featureFlags?.sellerProPlanEnabled ?? false,
+      captchaEnabled: payload.featureFlags?.captchaEnabled ?? true
     },
     operationalFields: {
       initialFreeCredits: payload.operationalFields?.initialFreeCredits ?? 15,
@@ -423,6 +424,7 @@ export function AdminPage() {
                 <label className="checkbox-row"><input type="checkbox" checked={Boolean(catalog.moderationSettings?.userBlockListEnabled)} onChange={(event) => updateCatalogFlag("moderationSettings", "userBlockListEnabled", event.target.checked)} /><span>Ativar block list de usuarios</span></label>
                 <label className="checkbox-row"><input type="checkbox" checked={catalog.featureFlags?.stickersPageEnabled !== false} onChange={(event) => updateCatalogFlag("featureFlags", "stickersPageEnabled", event.target.checked)} /><span>Exibir pagina de figurinhas</span></label>
                 <label className="checkbox-row"><input type="checkbox" checked={Boolean(catalog.featureFlags?.sellerProPlanEnabled)} onChange={(event) => updateCatalogFlag("featureFlags", "sellerProPlanEnabled", event.target.checked)} /><span>Exibir Plano vendedor Pro</span></label>
+                <label className="checkbox-row"><input type="checkbox" checked={catalog.featureFlags?.captchaEnabled !== false} onChange={(event) => updateCatalogFlag("featureFlags", "captchaEnabled", event.target.checked)} /><span>Ativar captcha nos acessos</span></label>
                 <h3>Campos Operacionais</h3>
                 <label>Creditos iniciais gratis<input type="number" min="0" max="1000" value={Number(catalog.operationalFields?.initialFreeCredits ?? 15)} onChange={(event) => updateOperationalField("initialFreeCredits", Number(event.target.value))} /></label>
                 <label>Creditos para renovar anuncio<input type="number" min="0" max="1000" value={Number(catalog.operationalFields?.listingRenewalCredits ?? 1)} onChange={(event) => updateOperationalField("listingRenewalCredits", Number(event.target.value))} /></label>
