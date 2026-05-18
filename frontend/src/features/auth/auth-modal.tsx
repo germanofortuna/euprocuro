@@ -9,6 +9,7 @@ import { formatCep, formatCpfCnpj } from "@/shared/lib/format";
 import { Button } from "@/shared/ui/button";
 import { LegalModal } from "@/features/legal/legal-modal";
 import { forgotPassword, lookupAddressByPostalCode } from "@/shared/api/client";
+import { GoogleSignInButton, isGoogleSignInEnabled } from "@/features/auth/google-sign-in-button";
 import { isTurnstileEnabled, TurnstileWidget } from "@/features/auth/turnstile-widget";
 
 type LoginForm = {
@@ -63,7 +64,7 @@ function passwordStatus(password: string) {
 }
 
 export function AuthModal() {
-  const { authModal, closeAuthModal, setAuthMode, signIn, signUp, setFeedback, operationalSettings } = usePlatform();
+  const { authModal, closeAuthModal, setAuthMode, signIn, signInWithGoogle, signUp, setFeedback, operationalSettings } = usePlatform();
   const { termsVersion } = useLegalContent();
   const [loginForm, setLoginForm] = useState(initialLogin);
   const [registerForm, setRegisterForm] = useState(initialRegister);
@@ -102,6 +103,21 @@ export function AuthModal() {
   const handleTurnstileToken = useCallback((token: string) => {
     setTurnstileToken(token);
   }, []);
+
+  const handleGoogleCredential = useCallback(async (idToken: string) => {
+    setIsSubmitting(true);
+    try {
+      await signInWithGoogle(idToken);
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        title: "Nao foi possivel entrar com Google",
+        message: error instanceof Error ? error.message : "Tente novamente em instantes."
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [setFeedback, signInWithGoogle]);
 
   if (!authModal.visible) {
     return null;
@@ -288,6 +304,17 @@ export function AuthModal() {
             <div className="segmented-control">
               <button type="button" className={authModal.mode === "login" ? "is-active" : ""} onClick={() => setAuthMode("login")}>Entrar</button>
               <button type="button" className={authModal.mode === "register" ? "is-active" : ""} onClick={() => setAuthMode("register")}>Criar conta</button>
+            </div>
+          ) : null}
+
+          {isGoogleSignInEnabled && (authModal.mode === "login" || authModal.mode === "register") ? (
+            <div className="auth-social-block">
+              <GoogleSignInButton
+                disabled={isSubmitting}
+                label={authModal.mode === "register" ? "signup_with" : "continue_with"}
+                onCredential={handleGoogleCredential}
+              />
+              <span>ou continue com e-mail</span>
             </div>
           ) : null}
 

@@ -1,6 +1,7 @@
 package com.euprocuro.api.application.usecase;
 
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
+import com.euprocuro.api.application.command.GoogleLoginCommand;
 import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
@@ -13,6 +14,8 @@ public interface AuthUseCase {
     RegistrationView register(RegisterUserCommand command);
 
     AuthenticatedSessionView login(LoginCommand command);
+
+    AuthenticatedSessionView loginWithGoogle(GoogleLoginCommand command);
 
     UserProfile meByUserId(String userId);
 

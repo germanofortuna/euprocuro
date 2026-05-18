@@ -26,6 +26,7 @@ import {
   fetchMonetizationAccount,
   fetchSellerItems,
   getStoredSession,
+  googleLogin,
   isAuthError,
   login,
   logout,
@@ -79,6 +80,7 @@ type PlatformContextValue = {
   closeAuthModal: () => void;
   setAuthMode: (mode: AuthMode) => void;
   signIn: (payload: { email: string; password: string; turnstileToken?: string }) => Promise<void>;
+  signInWithGoogle: (idToken: string) => Promise<void>;
   signUp: (payload: Record<string, unknown>) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -446,6 +448,33 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authModal.redirectTo, closeAuthModal, operationalSettings, router]);
 
+  const signInWithGoogle = useCallback(async (idToken: string) => {
+    const auth = await googleLogin({ idToken });
+    const nextSession = auth?.user?.id ? auth : normalizeMe(await fetchMe(), auth);
+    storeSession(nextSession);
+    setSession(nextSession);
+
+    const email = normalizedEmail(nextSession.user?.email);
+    if (email && window.localStorage.getItem(`${SEEN_CREDIT_ONBOARDING_PREFIX}${email}`) !== "1") {
+      const monetizationAccount = normalizeMonetizationAccount(await fetchMonetizationAccount().catch(() => null));
+      if (monetizationAccount) {
+        setMonetization(monetizationAccount);
+      }
+      setFeedback({
+        type: "info",
+        title: "Seus creditos iniciais",
+        message: creditOnboardingMessage(nextSession.user, monetizationAccount, operationalSettings),
+        afterClose: () => markCreditOnboardingSeen(nextSession.user)
+      });
+    }
+
+    const redirectTo = authModal.redirectTo;
+    closeAuthModal();
+    if (redirectTo) {
+      router.push(redirectTo);
+    }
+  }, [authModal.redirectTo, closeAuthModal, operationalSettings, router]);
+
   const signUp = useCallback(async (payload: Record<string, unknown>) => {
     await register(payload);
     markPendingCreditOnboarding(payload.email);
@@ -602,6 +631,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     closeAuthModal,
     setAuthMode,
     signIn,
+    signInWithGoogle,
     signUp,
     signOut,
     deleteAccount,
@@ -658,6 +688,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     hasAdminAccess,
     setAuthMode,
     signIn,
+    signInWithGoogle,
     signOut,
     signUp,
     submitOffer,
