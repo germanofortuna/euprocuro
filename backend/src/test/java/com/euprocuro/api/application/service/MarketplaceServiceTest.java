@@ -388,21 +388,24 @@ class MarketplaceServiceTest {
                 StickerListingType.AVAILABLE,
                 "SPECIAL",
                 "Mascotes",
-                List.of("FW26", "12")
+                List.of("FW26", "12"),
+                List.of("Lionel Messi", "Neymar")
         );
         InterestPost wrongType = stickerInterest(
                 "wrong-type",
                 StickerListingType.MISSING,
                 "SPECIAL",
                 "Mascotes",
-                List.of("FW26")
+                List.of("FW26"),
+                List.of("Lionel Messi")
         );
         InterestPost wrongGroup = stickerInterest(
                 "wrong-group",
                 StickerListingType.AVAILABLE,
                 "A",
                 "Mascotes",
-                List.of("FW26")
+                List.of("FW26"),
+                List.of("Lionel Messi")
         );
         InterestPost withoutStickerDetails = baseInterest().toBuilder()
                 .id("without-details")
@@ -419,6 +422,7 @@ class MarketplaceServiceTest {
                 .stickerGroup("especiais")
                 .stickerSelection("mascotes")
                 .stickerNumber(" fw 26 ")
+                .stickerPlayer("messi")
                 .build());
 
         assertThat(results).extracting(InterestPost::getId).containsExactly("matching");
@@ -471,6 +475,7 @@ class MarketplaceServiceTest {
                         .group(null)
                         .selection("Mascotes")
                         .numbers(List.of(" 12 ", "12", "fw 26", ""))
+                        .players(List.of(" Lionel  Messi ", "Lionel Messi", "Neymar", ""))
                         .build())
                 .build());
 
@@ -478,6 +483,37 @@ class MarketplaceServiceTest {
         assertThat(result.getStickerDetails().getGroup()).isEqualTo("SPECIAL");
         assertThat(result.getStickerDetails().getSelection()).isEqualTo("Mascotes");
         assertThat(result.getStickerDetails().getNumbers()).containsExactly("12", "FW26");
+        assertThat(result.getStickerDetails().getPlayers()).containsExactly("Lionel Messi", "Neymar");
+    }
+
+    @Test
+    void createInterestShouldAcceptStickerPlayersWithoutNumbers() {
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(operationalCatalogService.requireActiveCategory(OperationalCatalogService.STICKERS_CATEGORY_CODE))
+                .thenReturn(OperationalCatalogService.STICKERS_CATEGORY_CODE);
+        when(operationalCatalogService.stickersPageEnabled()).thenReturn(true);
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> {
+            InterestPost interest = invocation.getArgument(0);
+            interest.setId("sticker-player-1");
+            return interest;
+        });
+
+        InterestPost result = marketplaceService.createInterest("buyer-1", CreateInterestCommand.builder()
+                .title("Procuro Messi")
+                .description("Procuro figurinha do jogador")
+                .category(OperationalCatalogService.STICKERS_CATEGORY_CODE)
+                .budgetMax(BigDecimal.ZERO)
+                .city("Erechim")
+                .state("RS")
+                .stickerDetails(StickerDetailsCommand.builder()
+                        .type(StickerListingType.MISSING)
+                        .selection("Argentina")
+                        .players(List.of(" Lionel  Messi "))
+                        .build())
+                .build());
+
+        assertThat(result.getStickerDetails().getNumbers()).isEmpty();
+        assertThat(result.getStickerDetails().getPlayers()).containsExactly("Lionel Messi");
     }
 
     @Test
@@ -986,6 +1022,17 @@ class MarketplaceServiceTest {
             String selection,
             List<String> numbers
     ) {
+        return stickerInterest(id, type, group, selection, numbers, List.of());
+    }
+
+    private InterestPost stickerInterest(
+            String id,
+            StickerListingType type,
+            String group,
+            String selection,
+            List<String> numbers,
+            List<String> players
+    ) {
         return baseInterest().toBuilder()
                 .id(id)
                 .category(OperationalCatalogService.STICKERS_CATEGORY_CODE)
@@ -995,6 +1042,7 @@ class MarketplaceServiceTest {
                         .group(group)
                         .selection(selection)
                         .numbers(numbers)
+                        .players(players)
                         .build())
                 .build();
     }

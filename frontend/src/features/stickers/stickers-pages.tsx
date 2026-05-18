@@ -14,13 +14,13 @@ import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
 import { BackButton } from "@/shared/ui/back-button";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
-import { SPECIAL_STICKER_SELECTIONS, STICKERS_CATEGORY, stickerGroupForSelection, stickerGroups, normalizeStickerNumbers } from "./stickers-data";
+import { SPECIAL_STICKER_SELECTIONS, STICKERS_CATEGORY, stickerGroupForSelection, stickerGroups, normalizeStickerNumbers, normalizeStickerPlayers } from "./stickers-data";
 
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
-type StickerPublishEntry = { id: string; selection: string; numbers: string };
+type StickerPublishEntry = { id: string; selection: string; numbers: string; players: string };
 
 const STICKERS_PAGE_SIZE = 24;
-const emptyStickerFilters = { stickerType: "", stickerGroup: "", stickerSelection: "", stickerNumber: "", state: "", city: "", neighborhood: "" };
+const emptyStickerFilters = { stickerType: "", stickerGroup: "", stickerSelection: "", stickerNumber: "", stickerPlayer: "", state: "", city: "", neighborhood: "" };
 
 const benefits = [
   { icon: Users, title: "Encontre colecionadores", description: "Veja quem procura ou tem repetidas da Copa 2026 na sua região." },
@@ -37,7 +37,11 @@ function selectionOptions() {
 }
 
 function createStickerPublishEntry(): StickerPublishEntry {
-  return { id: `stickers-${Date.now()}-${Math.random().toString(36).slice(2)}`, selection: "", numbers: "" };
+  return { id: `stickers-${Date.now()}-${Math.random().toString(36).slice(2)}`, selection: "", numbers: "", players: "" };
+}
+
+function stickerIdentifiers(numbers: string[] = [], players: string[] = [], limit = 8) {
+  return [...numbers, ...players].slice(0, limit).join(", ");
 }
 
 function selectionsForGroup(group: string, groups: ReturnType<typeof selectionOptions>) {
@@ -63,8 +67,8 @@ function stickerTitleParts(item: Interest) {
   const action = type === "AVAILABLE" ? "Tenho repetidas" : "Procuro figurinhas";
   const separator = type === "AVAILABLE" ? " - " : ": ";
   const selection = item.stickerDetails?.selection ?? "Copa 2026";
-  const numbers = (item.stickerDetails?.numbers ?? []).slice(0, 8).join(", ");
-  return { action, separator, selection, numbers };
+  const identifiers = stickerIdentifiers(item.stickerDetails?.numbers ?? [], item.stickerDetails?.players ?? []);
+  return { action, separator, selection, identifiers };
 }
 
 function normalizeFilterText(value?: string | null) {
@@ -226,6 +230,7 @@ export function StickersLandingPage() {
               <label>Grupo<select value={filters.stickerGroup} onChange={(event) => updateFilters({ ...filters, stickerGroup: event.target.value, stickerSelection: "" })}><option value="">Todos os grupos</option>{groups.map(([group]) => <option key={group} value={group}>Grupo {group}</option>)}<option value="SPECIAL">Especiais</option></select></label>
               <label>Seleção<select value={filters.stickerSelection} onChange={(event) => updateFilters({ ...filters, stickerSelection: event.target.value })}><option value="">Todas</option>{visibleSelectionGroups.map(([group, selections]) => <optgroup key={group} label={`Grupo ${group}`}>{selections.map((selection) => <option key={selection.name} value={selection.name}>{selection.emblem} {selection.name}</option>)}</optgroup>)}{filters.stickerGroup === "" || filters.stickerGroup === "SPECIAL" ? <optgroup label="Especiais">{SPECIAL_STICKER_SELECTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</optgroup> : null}</select></label>
               <label>Número<input value={filters.stickerNumber} onChange={(event) => updateFilters({ ...filters, stickerNumber: event.target.value })} placeholder="Ex: 12 ou FW26" /></label>
+              <label>Jogador<input value={filters.stickerPlayer} onChange={(event) => updateFilters({ ...filters, stickerPlayer: event.target.value })} placeholder="Ex: Lionel Messi" /></label>
               <div className="form-grid form-grid--3 stickers-location-grid">
                 <label>UF<input value={filters.state} onChange={(event) => updateFilters({ ...filters, state: event.target.value.toUpperCase().slice(0, 2) })} placeholder="SP" /></label>
                 <label>Cidade<input value={filters.city} onChange={(event) => updateFilters({ ...filters, city: event.target.value })} placeholder="Cidade" /></label>
@@ -248,7 +253,7 @@ export function StickersLandingPage() {
                   <h3 className="sticker-card__title">
                     <span>{titleParts.action}{titleParts.separator}</span>
                     <span className="sticker-card__selection">{titleParts.selection}</span>
-                    {titleParts.numbers ? <span>: {titleParts.numbers}</span> : null}
+                    {titleParts.identifiers ? <span>: {titleParts.identifiers}</span> : null}
                   </h3>
                   <p>{item.description}</p>
                   <div className="sticker-card__meta-grid">
@@ -256,7 +261,10 @@ export function StickersLandingPage() {
                     <span><small>Grupo</small>{item.stickerDetails?.group === "SPECIAL" ? "Especiais" : `Grupo ${item.stickerDetails?.group ?? "-"}`}</span>
                     {stickerLocationParts(item).map((part) => <span key={part}><small>{part.split(":")[0]}</small>{part.split(":").slice(1).join(":").trim()}</span>)}
                   </div>
-                  <div className="sticker-number-list">{(item.stickerDetails?.numbers ?? []).slice(0, 10).map((number) => <span key={number}>{number}</span>)}</div>
+                  <div className="sticker-number-list">
+                    {(item.stickerDetails?.numbers ?? []).slice(0, 10).map((number) => <span key={number}>{number}</span>)}
+                    {(item.stickerDetails?.players ?? []).slice(0, 6).map((player) => <span key={player}>{player}</span>)}
+                  </div>
                   <strong>Ver detalhes e fazer proposta <ArrowRight size={16} /></strong>
                 </Link>
               );
@@ -285,15 +293,22 @@ export function StickersLandingPage() {
   );
 }
 
-function buildTitle(type: "MISSING" | "AVAILABLE", selection: string, numbers: string[]) {
+function buildTitle(type: "MISSING" | "AVAILABLE", selection: string, numbers: string[], players: string[] = []) {
   const verb = type === "MISSING" ? "Procuro figurinhas" : "Tenho repetidas";
   const target = selection ? `${selection}` : "Copa 2026";
-  return limitText(`${verb} - ${target}: ${numbers.slice(0, 8).join(", ")}`, 80);
+  const identifiers = stickerIdentifiers(numbers, players);
+  return limitText(`${verb} - ${target}: ${identifiers}`, 80);
 }
 
-function buildDescription(type: "MISSING" | "AVAILABLE", selection: string, numbers: string[], extra: string) {
+function buildDescription(type: "MISSING" | "AVAILABLE", selection: string, numbers: string[], players: string[], extra: string) {
   const action = type === "MISSING" ? "Figurinhas faltantes" : "Figurinhas disponíveis para troca ou venda";
-  const base = `${action}:\n${numbers.join(", ")}${selection ? ` - ${selection}` : ""}.${extra ? `\n${extra}` : ""}`.trim();
+  const lines = [
+    `${action}:`,
+    numbers.length ? `${numbers.join(", ")}${selection ? ` - ${selection}` : ""}.` : "",
+    players.length ? `Jogadores: ${players.join(", ")}${selection ? ` - ${selection}` : ""}.` : "",
+    extra
+  ].filter(Boolean);
+  const base = lines.join("\n").trim();
   return limitText(base, 120);
 }
 
@@ -310,13 +325,13 @@ export function PublishStickersPage() {
     description: "",
     tags: ""
   });
-  const [entries, setEntries] = useState<StickerPublishEntry[]>([{ id: "stickers-1", selection: "", numbers: "" }]);
+  const [entries, setEntries] = useState<StickerPublishEntry[]>([{ id: "stickers-1", selection: "", numbers: "", players: "" }]);
   const [isSaving, setIsSaving] = useState(false);
   const [publishLookupState, setPublishLookupState] = useState<{ loading: boolean; message: string; tone: "muted" | "success" | "error" }>({ loading: false, message: "", tone: "muted" });
   const groups = useMemo(selectionOptions, []);
   const previewEntries = entries
-    .map((entry) => ({ ...entry, numbers: normalizeStickerNumbers(entry.numbers), group: stickerGroupForSelection(entry.selection) }))
-    .filter((entry) => entry.selection || entry.numbers.length);
+    .map((entry) => ({ ...entry, numbers: normalizeStickerNumbers(entry.numbers), players: normalizeStickerPlayers(entry.players), group: stickerGroupForSelection(entry.selection) }))
+    .filter((entry) => entry.selection || entry.numbers.length || entry.players.length);
   const stickersEnabled = operationalSettings.featureFlags?.stickersPageEnabled !== false;
 
   useEffect(() => {
@@ -378,11 +393,12 @@ export function PublishStickersPage() {
       .map((entry) => ({
         selection: entry.selection,
         numbers: normalizeStickerNumbers(entry.numbers),
+        players: normalizeStickerPlayers(entry.players),
         group: stickerGroupForSelection(entry.selection)
       }))
-      .filter((entry) => entry.selection || entry.numbers.length);
-    if (!publishEntries.length || publishEntries.some((entry) => !entry.selection || !entry.numbers.length)) {
-      setFeedback({ type: "error", title: "Informe as figurinhas", message: "Digite pelo menos um número ou código de figurinha." });
+      .filter((entry) => entry.selection || entry.numbers.length || entry.players.length);
+    if (!publishEntries.length || publishEntries.some((entry) => !entry.selection || (!entry.numbers.length && !entry.players.length))) {
+      setFeedback({ type: "error", title: "Informe as figurinhas", message: "Digite pelo menos um número, código de figurinha ou nome de jogador." });
       return;
     }
     setIsSaving(true);
@@ -391,8 +407,8 @@ export function PublishStickersPage() {
       const savedItems = [];
       for (const entry of publishEntries) {
         const saved = await saveInterest({
-          title: buildTitle(form.type, entry.selection, entry.numbers),
-          description: buildDescription(form.type, entry.selection, entry.numbers, form.description),
+          title: buildTitle(form.type, entry.selection, entry.numbers, entry.players),
+          description: buildDescription(form.type, entry.selection, entry.numbers, entry.players, form.description),
           category: STICKERS_CATEGORY,
           budgetMin: null,
           budgetMax: 0,
@@ -404,12 +420,13 @@ export function PublishStickersPage() {
           desiredRadiusKm: 25,
           preferredCondition: form.type === "MISSING" ? "Faltantes" : "Repetidas",
           preferredContactMode: "CHAT",
-          tags: ["copa-2026", "figurinhas", form.type === "MISSING" ? "faltantes" : "repetidas", entry.selection, ...form.tags.split(",")].map((tag) => tag.trim()).filter(Boolean),
+          tags: ["copa-2026", "figurinhas", form.type === "MISSING" ? "faltantes" : "repetidas", entry.selection, ...entry.players, ...form.tags.split(",")].map((tag) => tag.trim()).filter(Boolean),
           stickerDetails: {
             type: form.type,
             group: entry.group || "SPECIAL",
             selection: entry.selection || null,
-            numbers: entry.numbers
+            numbers: entry.numbers,
+            players: entry.players
           }
         });
         savedItems.push(saved);
@@ -464,8 +481,9 @@ export function PublishStickersPage() {
               <div className="sticker-entry-row" key={entry.id}>
                 <span className="sticker-entry-index">Seleção {index + 1}</span>
                 <label>Seleção ou especial<select value={entry.selection} onChange={(event) => updateEntry(entry.id, { selection: event.target.value })} required><option value="">Selecione a seleção ou tipo especial...</option>{groups.map(([group, selections]) => <optgroup key={group} label={`Grupo ${group}`}>{selections.map((selection) => <option key={selection.name} value={selection.name}>{selection.emblem} {selection.name}</option>)}</optgroup>)}<optgroup label="Especiais">{SPECIAL_STICKER_SELECTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</optgroup></select></label>
-                <label>Números das figurinhas<input value={entry.numbers} onChange={(event) => updateEntry(entry.id, { numbers: event.target.value })} placeholder="Ex: 12, 45, 78, FW26" required /></label>
-                <Button type="button" variant="outline" className="sticker-entry-remove" onClick={() => removeEntry(entry.id)} disabled={entries.length === 1} title={entries.length === 1 ? "Mantenha pelo menos uma seleção" : "Remover seleção"}><Trash2 size={16} /><span>Remover</span></Button>
+                <label>Números ou códigos<input value={entry.numbers} onChange={(event) => updateEntry(entry.id, { numbers: event.target.value })} placeholder="Ex: 12, 45, 78, FW26" /></label>
+                <label>Jogadores<input value={entry.players} onChange={(event) => updateEntry(entry.id, { players: event.target.value })} placeholder="Ex: Lionel Messi, Neymar, Cristiano Ronaldo" /></label>
+                <Button type="button" variant="outline" className="sticker-entry-remove" onClick={() => removeEntry(entry.id)} disabled={entries.length === 1} title={entries.length === 1 ? "Mantenha pelo menos uma seleção" : "Remover seleção"} aria-label={entries.length === 1 ? "Mantenha pelo menos uma seleção" : "Remover seleção"}><Trash2 size={17} /></Button>
               </div>
             ))}
           </div>
@@ -494,8 +512,11 @@ export function PublishStickersPage() {
               <strong>Prévia do anúncio</strong>
               {previewEntries.slice(0, 4).map((entry) => (
                 <div className="sticker-preview-entry" key={entry.id}>
-                  <p>{buildTitle(form.type, entry.selection, entry.numbers)}</p>
-                  <div className="sticker-number-list">{entry.numbers.slice(0, 12).map((number) => <span key={number}>{number}</span>)}</div>
+                  <p>{buildTitle(form.type, entry.selection, entry.numbers, entry.players)}</p>
+                  <div className="sticker-number-list">
+                    {entry.numbers.slice(0, 12).map((number) => <span key={number}>{number}</span>)}
+                    {entry.players.slice(0, 8).map((player) => <span key={player}>{player}</span>)}
+                  </div>
                 </div>
               ))}
             </div>

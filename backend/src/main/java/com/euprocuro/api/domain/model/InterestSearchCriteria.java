@@ -18,5 +18,6 @@ public class InterestSearchCriteria {
     String stickerGroup;
     String stickerSelection;
     String stickerNumber;
+    String stickerPlayer;
     boolean openOnly;
 }

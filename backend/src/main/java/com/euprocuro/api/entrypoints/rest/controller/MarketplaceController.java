@@ -79,6 +79,7 @@ public class MarketplaceController {
             @RequestParam(required = false) String stickerGroup,
             @RequestParam(required = false) String stickerSelection,
             @RequestParam(required = false) String stickerNumber,
+            @RequestParam(required = false) String stickerPlayer,
             @RequestParam(defaultValue = "true") boolean openOnly,
             @RequestParam(defaultValue = "false") boolean includeOwn,
             @RequestParam(defaultValue = "0") int offset,
@@ -96,6 +97,7 @@ public class MarketplaceController {
                 .stickerGroup(stickerGroup)
                 .stickerSelection(stickerSelection)
                 .stickerNumber(stickerNumber)
+                .stickerPlayer(stickerPlayer)
                 .openOnly(true)
                 .build();
 

@@ -319,6 +319,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .stickerGroup(filter.getStickerGroup())
                 .stickerSelection(filter.getStickerSelection())
                 .stickerNumber(filter.getStickerNumber())
+                .stickerPlayer(filter.getStickerPlayer())
                 .openOnly(true)
                 .build();
         int safeOffset = Math.max(0, offset);
@@ -485,11 +486,14 @@ public class MarketplaceService implements MarketplaceUseCase {
     private boolean containsIgnoreCase(InterestPost post, String query) {
         String normalizedQuery = query.toLowerCase(Locale.ROOT);
         List<String> tags = Optional.ofNullable(post.getTags()).orElse(List.of());
+        StickerDetails stickerDetails = post.getStickerDetails();
+        List<String> stickerPlayers = stickerDetails == null ? List.of() : Optional.ofNullable(stickerDetails.getPlayers()).orElse(List.of());
         return safe(post.getTitle()).contains(normalizedQuery)
                 || safe(post.getDescription()).contains(normalizedQuery)
                 || safe(post.getOwnerName()).contains(normalizedQuery)
                 || safe(post.getLocation() == null ? null : post.getLocation().getCity()).contains(normalizedQuery)
-                || tags.stream().map(this::safe).anyMatch(tag -> tag.contains(normalizedQuery));
+                || tags.stream().map(this::safe).anyMatch(tag -> tag.contains(normalizedQuery))
+                || stickerPlayers.stream().map(this::safe).anyMatch(player -> player.contains(normalizedQuery));
     }
 
     private StickerDetails normalizeStickerDetails(String category, com.euprocuro.api.application.command.StickerDetailsCommand command) {
@@ -508,14 +512,21 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .filter(StringUtils::hasText)
                 .distinct()
                 .collect(Collectors.toList());
-        if (numbers.isEmpty()) {
-            throw new BusinessException("Informe pelo menos uma figurinha.");
+        List<String> players = Optional.ofNullable(command.getPlayers()).orElse(List.of())
+                .stream()
+                .map(this::normalizeStickerPlayer)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .collect(Collectors.toList());
+        if (numbers.isEmpty() && players.isEmpty()) {
+            throw new BusinessException("Informe pelo menos um numero de figurinha ou nome de jogador.");
         }
         return StickerDetails.builder()
                 .type(command.getType())
                 .group(normalizeStickerGroup(command.getGroup()))
                 .selection(trimToNull(command.getSelection()))
                 .numbers(numbers)
+                .players(players)
                 .build();
     }
 
@@ -536,6 +547,13 @@ public class MarketplaceService implements MarketplaceUseCase {
             return "";
         }
         return value.trim().toUpperCase(Locale.ROOT).replaceAll("\\s+", "");
+    }
+
+    private String normalizeStickerPlayer(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
+        return value.trim().replaceAll("\\s+", " ");
     }
 
     private boolean matchesStickerFilters(InterestPost post, InterestSearchFilter filter) {
@@ -562,9 +580,19 @@ public class MarketplaceService implements MarketplaceUseCase {
         }
         if (StringUtils.hasText(filter.getStickerNumber())) {
             String normalizedNumber = normalizeStickerNumber(filter.getStickerNumber());
-            return Optional.ofNullable(details.getNumbers()).orElse(List.of()).stream()
+            boolean numberMatches = Optional.ofNullable(details.getNumbers()).orElse(List.of()).stream()
                     .map(this::normalizeStickerNumber)
                     .anyMatch(normalizedNumber::equals);
+            if (!numberMatches) {
+                return false;
+            }
+        }
+        if (StringUtils.hasText(filter.getStickerPlayer())) {
+            String normalizedPlayer = normalizeStickerPlayer(filter.getStickerPlayer()).toLowerCase(Locale.ROOT);
+            return Optional.ofNullable(details.getPlayers()).orElse(List.of()).stream()
+                    .map(this::normalizeStickerPlayer)
+                    .map(player -> player.toLowerCase(Locale.ROOT))
+                    .anyMatch(player -> player.contains(normalizedPlayer));
         }
         return true;
     }
@@ -573,7 +601,8 @@ public class MarketplaceService implements MarketplaceUseCase {
         return StringUtils.hasText(filter.getStickerType())
                 || StringUtils.hasText(filter.getStickerGroup())
                 || StringUtils.hasText(filter.getStickerSelection())
-                || StringUtils.hasText(filter.getStickerNumber());
+                || StringUtils.hasText(filter.getStickerNumber())
+                || StringUtils.hasText(filter.getStickerPlayer());
     }
 
     private StickerListingType parseStickerType(String value) {
@@ -697,6 +726,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                 "stickerGroup=" + safe(criteria.getStickerGroup()),
                 "stickerSelection=" + safe(criteria.getStickerSelection()),
                 "stickerNumber=" + safe(criteria.getStickerNumber()),
+                "stickerPlayer=" + safe(criteria.getStickerPlayer()),
                 "maxBudget=" + Optional.ofNullable(criteria.getMaxBudget()).map(BigDecimal::toPlainString).orElse(""),
                 "openOnly=" + criteria.isOpenOnly(),
                 "offset=" + offset,

@@ -918,6 +918,7 @@ public final class RestMapper {
                 .group(request.getGroup())
                 .selection(request.getSelection())
                 .numbers(Optional.ofNullable(request.getNumbers()).orElse(List.of()))
+                .players(Optional.ofNullable(request.getPlayers()).orElse(List.of()))
                 .build();
     }
 
@@ -930,6 +931,7 @@ public final class RestMapper {
                 .group(details.getGroup())
                 .selection(details.getSelection())
                 .numbers(Optional.ofNullable(details.getNumbers()).orElse(List.of()))
+                .players(Optional.ofNullable(details.getPlayers()).orElse(List.of()))
                 .build();
     }
 

@@ -16,4 +16,5 @@ public class StickerDetails {
     private String group;
     private String selection;
     private List<String> numbers;
+    private List<String> players;
 }

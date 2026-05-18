@@ -134,9 +134,9 @@ export function InterestFormPage() {
         neighborhood: String(address.neighborhood ?? current.neighborhood ?? ""),
         country: String(address.country ?? current.country ?? "Brasil")
       }));
-      setLookupState({ loading: false, message: "Endereco preenchido pelo CEP.", tone: "success" });
+      setLookupState({ loading: false, message: "Endereço preenchido pelo CEP.", tone: "success" });
     } catch (error) {
-      setLookupState({ loading: false, message: error instanceof Error ? error.message : "Nao encontramos esse CEP. Preencha cidade e UF manualmente.", tone: "error" });
+      setLookupState({ loading: false, message: error instanceof Error ? error.message : "Não encontramos esse CEP. Preencha cidade e UF manualmente.", tone: "error" });
     }
   }
 
@@ -151,7 +151,7 @@ export function InterestFormPage() {
       return;
     }
     if (form.budgetMin && form.budgetMax && Number(form.budgetMin) > Number(form.budgetMax)) {
-      setFeedback({ type: "error", title: "Orcamento invalido", message: "O orcamento minimo nao pode ser maior que o orcamento maximo." });
+      setFeedback({ type: "error", title: "Orçamento inválido", message: "O orçamento mínimo não pode ser maior que o orçamento máximo." });
       return;
     }
     setIsSaving(true);
@@ -178,8 +178,8 @@ export function InterestFormPage() {
       if (savedInterest?.id) {
         setFeedback({
           type: "success",
-          title: editingInterestId ? "Alteracao recebida" : "Procura recebida",
-          message: "Vamos validar sua procura agora. Se houver recusa, voce recebera um aviso para ajustar.",
+          title: editingInterestId ? "Alteração recebida" : "Procura recebida",
+          message: "Vamos validar sua procura agora. Se houver recusa, voce receberá um aviso para ajustar.",
           afterClose: () => router.push(`/interesses/${savedInterest.id}`)
         });
       }
@@ -189,9 +189,9 @@ export function InterestFormPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       const friendlyMessage = /city|state|cidade|uf/i.test(message)
-        ? "Confira cidade e UF. Se voce informou o CEP, aguarde o preenchimento automatico ou revise os campos de localizacao."
+        ? "Confira cidade e UF. Se você informou o CEP, aguarde o preenchimento automático ou revise os campos de localização."
         : message || "Revise os dados e tente novamente.";
-      setFeedback({ type: "error", title: "Nao foi possivel publicar", message: friendlyMessage });
+      setFeedback({ type: "error", title: "Não foi possível publicar", message: friendlyMessage });
     } finally {
       setIsSaving(false);
     }
@@ -209,7 +209,7 @@ export function InterestFormPage() {
     try {
       update("referenceImageUrl", await readImageFile(file));
     } catch (error) {
-      setFeedback({ type: "error", title: "Imagem invalida", message: error instanceof Error ? error.message : "Selecione outra imagem." });
+      setFeedback({ type: "error", title: "Imagem inválida", message: error instanceof Error ? error.message : "Selecione outra imagem." });
     }
   }
 
@@ -218,16 +218,16 @@ export function InterestFormPage() {
       <BackButton />
       <div className="form-heading">
         <h1>{editingInterestId ? "Editar procura" : "O que voce procura?"}</h1>
-        <p>{editingInterestId ? "Ajuste os dados da procura e envie novamente para validacao." : "Descreva detalhadamente o que voce precisa para receber as melhores propostas."}</p>
+        <p>{editingInterestId ? "Ajuste os dados da procura e envie novamente para validação." : "Descreva detalhadamente o que você precisa para receber as melhores propostas."}</p>
       </div>
-      {isLoadingInterest ? <div className="section-loading" role="status">Carregando procura para edicao...</div> : null}
+      {isLoadingInterest ? <div className="section-loading" role="status">Carregando procura para edição...</div> : null}
       <form className="feature-form" onSubmit={submit}>
         <section className="form-section">
-          <h2>Informacoes principais</h2>
-          <p>O titulo e a descricao sao os itens mais importantes da sua procura.</p>
+          <h2>Informações principais</h2>
+          <p>O título e a descrição são os itens mais importantes da sua procura.</p>
           <label>
-            Titulo da procura
-            <input value={form.title} onChange={(event) => update("title", limitText(event.target.value, TITLE_MAX_LENGTH))} placeholder="Ex: Procuro eletricista para instalacao residencial" required />
+            Título da procura
+            <input value={form.title} onChange={(event) => update("title", limitText(event.target.value, TITLE_MAX_LENGTH))} placeholder="Ex: Procuro eletricista para instalação residencial" required />
             <FieldCounter value={form.title} max={TITLE_MAX_LENGTH} />
           </label>
           <label>
@@ -238,9 +238,9 @@ export function InterestFormPage() {
             </select>
           </label>
           <label>
-            Descricao detalhada
+            Descrição detalhada
             <textarea rows={5} value={form.description} onChange={(event) => update("description", limitText(event.target.value, DESCRIPTION_MAX_LENGTH))} placeholder="Descreva marca, modelo, condicao esperada, urgencia..." required />
-            <span className="inline-help"><Info size={14} /> Links e contatos nao sao permitidos.</span>
+            <span className="inline-help"><Info size={14} /> Links e contatos não são permitidos.</span>
             <FieldCounter value={form.description} max={DESCRIPTION_MAX_LENGTH} />
           </label>
           <label>
@@ -248,18 +248,18 @@ export function InterestFormPage() {
             <input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="Ex: urgente, usado, conserto" />
           </label>
           <label className="upload-box">
-            {form.referenceImageUrl ? <img className="upload-preview" src={form.referenceImageUrl} alt="Previa da imagem de referencia" /> : <Upload size={28} />}
-            <strong>{form.referenceImageUrl ? "Trocar imagem de referencia" : "Imagem de referencia"}</strong>
-            <p>Use JPG ou PNG. A compressao sera aplicada antes do envio quando houver imagem selecionada.</p>
+            {form.referenceImageUrl ? <img className="upload-preview" src={form.referenceImageUrl} alt="Previa da imagem de referência" /> : <Upload size={28} />}
+            <strong>{form.referenceImageUrl ? "Trocar imagem de referência" : "Imagem de referência"}</strong>
+            <p>Use JPG ou PNG. A compressão será aplicada antes do envio quando houver imagem selecionada.</p>
             <span className="button button--outline button--sm">Selecionar imagem</span>
             <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleReferenceImageChange} />
           </label>
         </section>
         <section className="form-section">
-          <h2>Orcamento e localizacao</h2>
+          <h2>Orçamento e localização</h2>
           <div className="form-grid">
-            <label>Orcamento minimo<input type="number" min="0" value={form.budgetMin} onChange={(event) => update("budgetMin", event.target.value)} /></label>
-            <label>Orcamento maximo<input type="number" min="0" value={form.budgetMax} onChange={(event) => update("budgetMax", event.target.value)} required /></label>
+            <label>Orçamento minimo<input type="number" min="0" value={form.budgetMin} onChange={(event) => update("budgetMin", event.target.value)} /></label>
+            <label>Orçamento maximo<input type="number" min="0" value={form.budgetMax} onChange={(event) => update("budgetMax", event.target.value)} required /></label>
           </div>
           <div className="form-grid form-grid--3">
             <label>CEP<input value={form.postalCode} onChange={(event) => update("postalCode", formatCep(event.target.value))} onBlur={() => handlePostalCodeLookup()} placeholder="00000-000" /></label>
@@ -269,10 +269,10 @@ export function InterestFormPage() {
           {lookupState.message ? <span className={`address-lookup-note address-lookup-note--${lookupState.tone}`} role="status" aria-live="polite" aria-busy={lookupState.loading}>{lookupState.message}</span> : null}
           <div className="form-grid">
             <label>Bairro<input value={form.neighborhood} onChange={(event) => update("neighborhood", event.target.value)} /></label>
-            <label>Pais<input value={form.country} onChange={(event) => update("country", event.target.value)} /></label>
+            <label>País<input value={form.country} onChange={(event) => update("country", event.target.value)} /></label>
           </div>
           <div className="form-grid">
-            <label>Condicao preferida<input value={form.preferredCondition} onChange={(event) => update("preferredCondition", event.target.value)} placeholder="Novo, usado, indiferente" /></label>
+            <label>Condição preferida<input value={form.preferredCondition} onChange={(event) => update("preferredCondition", event.target.value)} placeholder="Novo, usado, indiferente" /></label>
             <label>Modo de contato<select value={form.preferredContactMode} onChange={(event) => update("preferredContactMode", event.target.value)}><option value="">Selecione...</option><option value="CHAT">Chat da plataforma</option><option value="WHATSAPP">WhatsApp</option><option value="EMAIL">E-mail</option></select></label>
           </div>
           <label className="checkbox-row">
@@ -280,7 +280,7 @@ export function InterestFormPage() {
             <span>Permitir contato via WhatsApp</span>
           </label>
           {form.allowsWhatsappContact ? <label>WhatsApp<input value={form.whatsappContact} onChange={(event) => update("whatsappContact", event.target.value)} /></label> : null}
-          <div className="notice-box">Esta procura ficara ativa por ate 30 dias e depois podera ser renovada com credito.</div>
+          <div className="notice-box">Esta procura ficará ativa por até 30 dias e depois poderá ser renovada com crédito.</div>
         </section>
         <div className="form-actions">
           <Link className="button button--outline" href="/meus-interesses">Cancelar</Link>

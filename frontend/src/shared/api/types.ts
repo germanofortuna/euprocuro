@@ -66,6 +66,7 @@ export type Interest = {
     group?: string | null;
     selection?: string | null;
     numbers?: string[];
+    players?: string[];
   } | null;
   desiredRadiusKm?: number | null;
   allowsWhatsappContact?: boolean;

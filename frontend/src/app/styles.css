@@ -1288,10 +1288,22 @@ select:focus {
 }
 
 .sticker-entry-remove {
+  width: 42px;
+  min-width: 42px;
   min-height: 40px;
-  padding-inline: 12px;
+  padding: 0;
   align-self: center;
+  justify-content: center;
   margin-top: 15px;
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.sticker-entry-remove:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: #fff;
+  background: var(--danger);
 }
 
 .sticker-entry-add-row {
@@ -1512,12 +1524,25 @@ select:focus {
 }
 
 .back-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  width: fit-content;
   margin-bottom: 24px;
+  padding: 0;
   color: var(--muted);
   font-weight: 800;
+  cursor: pointer;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  background: transparent;
+  transform: none;
 }
 
 .back-link--button {
@@ -3535,7 +3560,7 @@ small {
   }
 
   .sticker-entry-remove {
-    width: 100%;
+    width: 42px;
     justify-content: center;
   }
 

@@ -85,3 +85,10 @@ export function normalizeStickerNumbers(value: string) {
     .map((item) => item.trim().toUpperCase())
     .filter(Boolean);
 }
+
+export function normalizeStickerPlayers(value: string) {
+  return value
+    .split(/[,;\n]+/)
+    .map((item) => item.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+}

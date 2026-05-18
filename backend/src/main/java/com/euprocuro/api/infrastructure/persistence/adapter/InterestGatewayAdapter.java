@@ -210,7 +210,8 @@ public class InterestGatewayAdapter implements InterestGateway, InterestSearchGa
             criteria.add(new Criteria().orOperator(
                     Criteria.where("title").regex(queryRegex, "i"),
                     Criteria.where("description").regex(queryRegex, "i"),
-                    Criteria.where("tags").regex(queryRegex, "i")
+                    Criteria.where("tags").regex(queryRegex, "i"),
+                    Criteria.where("stickerDetails.players").regex(queryRegex, "i")
             ));
         }
 
@@ -233,6 +234,11 @@ public class InterestGatewayAdapter implements InterestGateway, InterestSearchGa
 
         if (searchCriteria.getStickerNumber() != null && !searchCriteria.getStickerNumber().isBlank()) {
             criteria.add(Criteria.where("stickerDetails.numbers").is(normalizeStickerNumber(searchCriteria.getStickerNumber())));
+        }
+
+        if (searchCriteria.getStickerPlayer() != null && !searchCriteria.getStickerPlayer().isBlank()) {
+            criteria.add(Criteria.where("stickerDetails.players")
+                    .regex(containsRegex(searchCriteria.getStickerPlayer()), "i"));
         }
 
         return new Criteria().andOperator(criteria.toArray(new Criteria[0]));

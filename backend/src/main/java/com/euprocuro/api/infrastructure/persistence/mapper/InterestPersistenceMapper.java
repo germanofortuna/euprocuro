@@ -156,6 +156,7 @@ public final class InterestPersistenceMapper {
                 .group(document.getGroup())
                 .selection(document.getSelection())
                 .numbers(document.getNumbers() == null ? new ArrayList<>() : document.getNumbers())
+                .players(document.getPlayers() == null ? new ArrayList<>() : document.getPlayers())
                 .build();
     }
 
@@ -169,6 +170,7 @@ public final class InterestPersistenceMapper {
                 .group(domain.getGroup())
                 .selection(domain.getSelection())
                 .numbers(domain.getNumbers())
+                .players(domain.getPlayers())
                 .build();
     }
 }

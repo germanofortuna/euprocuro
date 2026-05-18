@@ -19,6 +19,7 @@ public class InterestSearchFilter {
     String stickerGroup;
     String stickerSelection;
     String stickerNumber;
+    String stickerPlayer;
     boolean openOnly;
     String currentUserId;
 }

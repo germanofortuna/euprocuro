@@ -62,6 +62,7 @@ class MarketplaceControllerTest {
                 null,
                 null,
                 null,
+                null,
                 false,
                 false,
                 0,
@@ -92,6 +93,7 @@ class MarketplaceControllerTest {
 
         List<InterestResponse> response = controller.listInterests(
                 request,
+                null,
                 null,
                 null,
                 null,

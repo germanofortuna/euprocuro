@@ -13,4 +13,5 @@ public class StickerDetailsRequest {
     private String group;
     private String selection;
     private List<String> numbers = new ArrayList<>();
+    private List<String> players = new ArrayList<>();
 }

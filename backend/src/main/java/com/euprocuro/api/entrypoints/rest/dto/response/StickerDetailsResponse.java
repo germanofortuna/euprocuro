@@ -14,4 +14,5 @@ public class StickerDetailsResponse {
     String group;
     String selection;
     List<String> numbers;
+    List<String> players;
 }
