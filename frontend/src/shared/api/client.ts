@@ -34,6 +34,7 @@ const NETWORK_REQUEST_ERROR = defaultContent.entries["errors.request.network"];
 const inFlightGetRequests = new Map<string, Promise<unknown>>();
 const PUBLIC_GET_PATHS = [
   /^\/addresses\/postal-code\/[^/]+$/,
+  /^\/auth\/verify-email(?:\?|$)/,
   /^\/categories$/,
   /^\/content\/public(?:\?|$)/,
   /^\/operational\/public$/,

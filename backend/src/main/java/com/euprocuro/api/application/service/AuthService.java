@@ -430,6 +430,11 @@ public class AuthService implements AuthUseCase {
                 .orElseThrow(() -> new ResourceNotFoundException("Token de verificacao nao encontrado."));
 
         if (verificationToken.getUsedAt() != null) {
+            UserProfile user = userGateway.findById(verificationToken.getUserId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado."));
+            if (user.isEmailVerified()) {
+                return;
+            }
             throw new BusinessException("Este e-mail ja foi verificado.");
         }
 

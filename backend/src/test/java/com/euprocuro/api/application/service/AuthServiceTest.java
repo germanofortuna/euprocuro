@@ -776,15 +776,41 @@ class AuthServiceTest {
     }
 
     @Test
-    void verifyEmailShouldRejectUsedToken() {
+    void verifyEmailShouldAcceptUsedTokenWhenUserIsAlreadyVerified() {
         EmailVerificationToken token = EmailVerificationToken.builder()
                 .token("verify-123")
                 .userId("user-1")
                 .usedAt(Instant.now())
                 .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
                 .build();
+        UserProfile user = baseUser().toBuilder()
+                .emailVerified(true)
+                .build();
 
         when(emailVerificationTokenGateway.findByToken("verify-123")).thenReturn(Optional.of(token));
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+
+        authService.verifyEmail("verify-123");
+
+        verify(userGateway, never()).save(any(UserProfile.class));
+        verify(emailVerificationTokenGateway, never()).save(any(EmailVerificationToken.class));
+        verify(eventPublisherGateway, never()).publish(eq("auth.email-verified"), any(Map.class));
+    }
+
+    @Test
+    void verifyEmailShouldRejectUsedTokenWhenUserIsNotVerified() {
+        EmailVerificationToken token = EmailVerificationToken.builder()
+                .token("verify-123")
+                .userId("user-1")
+                .usedAt(Instant.now())
+                .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+        UserProfile user = baseUser().toBuilder()
+                .emailVerified(false)
+                .build();
+
+        when(emailVerificationTokenGateway.findByToken("verify-123")).thenReturn(Optional.of(token));
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> authService.verifyEmail("verify-123"))
                 .isInstanceOf(BusinessException.class)

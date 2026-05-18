@@ -11,6 +11,7 @@ import { ThemeProvider } from "@/features/theme/theme-provider";
 import { FeedbackModal } from "@/shared/ui/feedback-modal";
 import { usePlatform } from "@/features/platform/platform-context";
 import { AuthModal } from "@/features/auth/auth-modal";
+import { EmailVerificationHandler } from "@/features/auth/email-verification-handler";
 import { NavigationLoading } from "@/shared/ui/navigation-loading";
 
 function GlobalModals() {
@@ -32,6 +33,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <Suspense fallback={null}>
               <OptionalScripts />
               <NavigationLoading />
+              <EmailVerificationHandler />
             </Suspense>
             {children}
             <CookieConsentBanner />
