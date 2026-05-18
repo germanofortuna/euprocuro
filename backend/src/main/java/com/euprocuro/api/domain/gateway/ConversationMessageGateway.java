@@ -10,4 +10,10 @@ public interface ConversationMessageGateway {
     List<ConversationMessage> findByOfferIdOrderByCreatedAtAsc(String offerId);
 
     List<ConversationMessage> findByOfferIdInOrderByCreatedAtAsc(List<String> offerIds);
+
+    void deleteByOfferIdIn(List<String> offerIds);
+
+    void deleteBySenderIdOrRecipientId(String userId);
+
+    void anonymizeByUserId(String userId);
 }

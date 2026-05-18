@@ -56,6 +56,14 @@ class MarketplaceControllerTest {
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
                 false,
                 0,
                 10
@@ -89,11 +97,23 @@ class MarketplaceControllerTest {
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 true,
+                false,
                 0,
                 10
         );
 
+        ArgumentCaptor<InterestSearchFilter> filterCaptor = ArgumentCaptor.forClass(InterestSearchFilter.class);
+        org.mockito.Mockito.verify(marketplaceUseCase).listInterests(filterCaptor.capture(), eq(0), eq(10));
+
+        assertThat(filterCaptor.getValue().getCurrentUserId()).isNull();
         assertThat(response).extracting(InterestResponse::getId).containsExactly("other-interest");
     }
 

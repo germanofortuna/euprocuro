@@ -22,6 +22,8 @@ public interface AuthUseCase {
 
     void logoutIfPresent(String token);
 
+    void deleteCurrentUser(String userId);
+
     PasswordResetRequestView forgotPassword(ForgotPasswordCommand command);
 
     void resetPassword(ResetPasswordCommand command);

@@ -36,6 +36,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ConversationService implements ConversationUseCase {
 
+    private static final int MAX_MESSAGE_LENGTH = 1000;
+    private static final int MAX_IMAGE_DATA_URL_LENGTH = 1_000_000;
+
     private final OfferGateway offerGateway;
     private final InterestGateway interestGateway;
     private final UserGateway userGateway;
@@ -68,7 +71,9 @@ public class ConversationService implements ConversationUseCase {
 
     @Override
     public ConversationMessageView sendMessage(String currentUserId, String offerId, SendConversationMessageCommand command) {
-        if (!StringUtils.hasText(command.getContent())) {
+        String content = normalizeContent(command.getContent());
+        String imageUrl = normalizeImageUrl(command.getImageUrl());
+        if (!StringUtils.hasText(content) && !StringUtils.hasText(imageUrl)) {
             throw new BusinessException("A mensagem nao pode estar vazia.");
         }
 
@@ -89,7 +94,8 @@ public class ConversationService implements ConversationUseCase {
                 .senderName(sender.getName())
                 .recipientId(recipient.getId())
                 .recipientName(recipient.getName())
-                .content(command.getContent().trim())
+                .content(content)
+                .imageUrl(imageUrl)
                 .createdAt(Instant.now())
                 .build());
 
@@ -97,7 +103,7 @@ public class ConversationService implements ConversationUseCase {
                 recipient,
                 sender.getName(),
                 interest.getTitle(),
-                command.getContent().trim()
+                StringUtils.hasText(content) ? content : "Imagem enviada no chat."
         );
         eventPublisherGateway.publish("conversation.message.created", Map.of(
                 "messageId", message.getId(),
@@ -105,6 +111,7 @@ public class ConversationService implements ConversationUseCase {
                 "interestPostId", message.getInterestPostId(),
                 "senderId", message.getSenderId(),
                 "recipientId", message.getRecipientId(),
+                "hasImage", StringUtils.hasText(message.getImageUrl()),
                 "createdAt", message.getCreatedAt().toString()
         ));
         realtimeMessageGateway.publishConversationMessage(recipient.getId(), message);
@@ -129,7 +136,9 @@ public class ConversationService implements ConversationUseCase {
     }
 
     private Optional<ConversationMessageView> initialOfferMessage(Offer offer, InterestPost interest) {
-        if (!StringUtils.hasText(offer.getMessage())) {
+        String content = normalizeContent(offer.getMessage());
+        String imageUrl = normalizeImageUrl(offer.getOfferImageUrl());
+        if (!StringUtils.hasText(content) && !StringUtils.hasText(imageUrl)) {
             return Optional.empty();
         }
 
@@ -140,7 +149,8 @@ public class ConversationService implements ConversationUseCase {
                 .senderName(offer.getSellerName())
                 .recipientId(interest.getOwnerId())
                 .recipientName(interest.getOwnerName())
-                .content(offer.getMessage().trim())
+                .content(content)
+                .imageUrl(imageUrl)
                 .createdAt(offer.getCreatedAt())
                 .build());
     }
@@ -169,7 +179,33 @@ public class ConversationService implements ConversationUseCase {
                 .recipientId(message.getRecipientId())
                 .recipientName(message.getRecipientName())
                 .content(message.getContent())
+                .imageUrl(message.getImageUrl())
                 .createdAt(message.getCreatedAt())
                 .build();
+    }
+
+    private String normalizeContent(String content) {
+        if (!StringUtils.hasText(content)) {
+            return "";
+        }
+        String normalized = content.trim();
+        if (normalized.length() > MAX_MESSAGE_LENGTH) {
+            throw new BusinessException("A mensagem deve ter no maximo 1000 caracteres.");
+        }
+        return normalized;
+    }
+
+    private String normalizeImageUrl(String imageUrl) {
+        if (!StringUtils.hasText(imageUrl)) {
+            return null;
+        }
+        String normalized = imageUrl.trim();
+        if (normalized.length() > MAX_IMAGE_DATA_URL_LENGTH) {
+            throw new BusinessException("A imagem do chat deve ter no maximo 1 MB.");
+        }
+        if (!normalized.matches("^data:image/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=\\r\\n]+$")) {
+            throw new BusinessException("Envie apenas imagens JPG, PNG ou WebP.");
+        }
+        return normalized;
     }
 }

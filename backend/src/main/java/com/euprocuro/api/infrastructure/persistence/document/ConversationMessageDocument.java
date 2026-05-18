@@ -25,5 +25,6 @@ public class ConversationMessageDocument {
     private String recipientId;
     private String recipientName;
     private String content;
+    private String imageUrl;
     private Instant createdAt;
 }

@@ -54,6 +54,14 @@ public class OfferGatewayAdapter implements OfferGateway {
     }
 
     @Override
+    public void deleteByIdIn(List<String> offerIds) {
+        if (offerIds == null || offerIds.isEmpty()) {
+            return;
+        }
+        repository.deleteByIdIn(offerIds);
+    }
+
+    @Override
     public long count() {
         return repository.count();
     }

@@ -13,4 +13,6 @@ public interface SpringDataInterestRepository extends MongoRepository<InterestPo
     List<InterestPostDocument> findByOwnerIdOrderByCreatedAtDesc(String ownerId);
 
     List<InterestPostDocument> findByStatusOrderByCreatedAtDesc(InterestStatus status);
+
+    void deleteByOwnerId(String ownerId);
 }

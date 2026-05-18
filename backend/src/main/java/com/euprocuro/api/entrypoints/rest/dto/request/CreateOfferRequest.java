@@ -18,10 +18,11 @@ public class CreateOfferRequest {
     private BigDecimal offeredPrice;
 
     @Size(max = 40)
+    @NotBlank
     private String sellerPhone;
 
+    @Size(max = 1000)
     @NotBlank
-    @Size(max = 120)
     private String message;
 
     @Size(max = 1500000)

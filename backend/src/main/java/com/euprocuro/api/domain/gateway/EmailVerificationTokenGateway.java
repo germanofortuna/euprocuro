@@ -10,4 +10,6 @@ public interface EmailVerificationTokenGateway {
     Optional<EmailVerificationToken> findByToken(String token);
 
     void deleteByToken(String token);
+
+    void deleteByUserId(String userId);
 }

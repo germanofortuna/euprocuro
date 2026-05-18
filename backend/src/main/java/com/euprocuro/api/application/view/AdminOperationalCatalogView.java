@@ -11,6 +11,8 @@ import lombok.Value;
 public class AdminOperationalCatalogView {
     MonetizationSettingsView monetizationSettings;
     ModerationSettingsView moderationSettings;
+    FeatureFlagsView featureFlags;
+    OperationalFieldsView operationalFields;
     List<CatalogCategoryView> categories;
     List<MonetizationProductView> products;
     Instant updatedAt;

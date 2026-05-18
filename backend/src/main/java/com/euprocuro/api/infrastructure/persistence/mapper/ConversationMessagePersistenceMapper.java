@@ -22,6 +22,7 @@ public final class ConversationMessagePersistenceMapper {
                 .recipientId(document.getRecipientId())
                 .recipientName(document.getRecipientName())
                 .content(document.getContent())
+                .imageUrl(document.getImageUrl())
                 .createdAt(document.getCreatedAt())
                 .build();
     }
@@ -40,6 +41,7 @@ public final class ConversationMessagePersistenceMapper {
                 .recipientId(domain.getRecipientId())
                 .recipientName(domain.getRecipientName())
                 .content(domain.getContent())
+                .imageUrl(domain.getImageUrl())
                 .createdAt(domain.getCreatedAt())
                 .build();
     }

@@ -2,6 +2,7 @@ package com.euprocuro.api.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -95,7 +96,7 @@ class DashboardServiceTest {
                         .content("Ainda disponivel")
                         .createdAt(Instant.now())
                         .build()));
-        when(interestGateway.findAll()).thenReturn(List.of(myInterest));
+        when(interestGateway.findByIdIn(anyList())).thenReturn(List.of(myInterest));
 
         PersonalDashboardView result = dashboardService.getDashboard("buyer-1");
 
@@ -114,7 +115,7 @@ class DashboardServiceTest {
         when(userGateway.findById("buyer-1")).thenReturn(Optional.of(user));
         when(interestGateway.findByOwnerIdOrderByCreatedAtDesc("buyer-1")).thenReturn(List.of());
         when(offerGateway.findBySellerIdOrderByCreatedAtDesc("buyer-1")).thenReturn(List.of());
-        when(interestGateway.findAll()).thenReturn(List.of());
+        when(interestGateway.findByIdIn(anyList())).thenReturn(List.of());
 
         PersonalDashboardView result = dashboardService.getDashboard("buyer-1");
 
@@ -177,7 +178,7 @@ class DashboardServiceTest {
         when(offerGateway.findBySellerIdOrderByCreatedAtDesc("buyer-1")).thenReturn(List.of(sentOffer));
         when(conversationMessageGateway.findByOfferIdInOrderByCreatedAtAsc(List.of("offer-r1", "offer-s1")))
                 .thenReturn(List.of(olderMessage, newestMessage));
-        when(interestGateway.findAll()).thenReturn(List.of(activeInterest, expiredInterest));
+        when(interestGateway.findByIdIn(anyList())).thenReturn(List.of(activeInterest, expiredInterest));
 
         PersonalDashboardView result = dashboardService.getDashboard("buyer-1");
 

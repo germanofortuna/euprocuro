@@ -28,4 +28,9 @@ public class PasswordResetTokenGatewayAdapter implements PasswordResetTokenGatew
     public Optional<PasswordResetToken> findByToken(String token) {
         return repository.findByToken(token).map(PasswordResetTokenPersistenceMapper::toDomain);
     }
+
+    @Override
+    public void deleteByUserId(String userId) {
+        repository.deleteByUserId(userId);
+    }
 }

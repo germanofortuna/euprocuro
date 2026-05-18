@@ -8,4 +8,6 @@ public interface PasswordResetTokenGateway {
     PasswordResetToken save(PasswordResetToken token);
 
     Optional<PasswordResetToken> findByToken(String token);
+
+    void deleteByUserId(String userId);
 }

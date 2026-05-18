@@ -5,12 +5,14 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,13 +31,20 @@ import com.euprocuro.api.application.view.AuthenticatedSessionView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.RegistrationView;
 import com.euprocuro.api.domain.gateway.AuthSessionGateway;
+import com.euprocuro.api.domain.gateway.ContentReportGateway;
+import com.euprocuro.api.domain.gateway.ConversationMessageGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.EmailVerificationTokenGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
+import com.euprocuro.api.domain.gateway.InterestGateway;
+import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.PasswordResetTokenGateway;
+import com.euprocuro.api.domain.gateway.SellerItemGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.AuthSession;
 import com.euprocuro.api.domain.model.EmailVerificationToken;
+import com.euprocuro.api.domain.model.InterestPost;
+import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.PasswordResetToken;
 import com.euprocuro.api.domain.model.UserProfile;
 
@@ -45,6 +54,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthService implements AuthUseCase {
 
+    private static final String DELETED_USER_LABEL = "Usuário excluído";
+    private static final String REMOVED_OFFER_MESSAGE = "[Proposta removida por exclusão de conta]";
     private static final Set<String> DISPOSABLE_EMAIL_DOMAINS = Set.of(
             "10minutemail.com",
             "guerrillamail.com",
@@ -59,10 +70,16 @@ public class AuthService implements AuthUseCase {
     private final AuthSessionGateway authSessionGateway;
     private final PasswordResetTokenGateway passwordResetTokenGateway;
     private final EmailVerificationTokenGateway emailVerificationTokenGateway;
+    private final InterestGateway interestGateway;
+    private final OfferGateway offerGateway;
+    private final ConversationMessageGateway conversationMessageGateway;
+    private final SellerItemGateway sellerItemGateway;
+    private final ContentReportGateway contentReportGateway;
     private final PasswordEncoder passwordEncoder;
     private final EmailGateway emailGateway;
     private final EventPublisherGateway eventPublisherGateway;
     private final AuditLogService auditLogService;
+    private final OperationalCatalogService operationalCatalogService;
 
     @Value("${application.auth.session-hours:168}")
     private long sessionHours;
@@ -129,7 +146,7 @@ public class AuthService implements AuthUseCase {
                 .emailVerified(!emailVerificationRequired)
                 .buyerRating(4.8)
                 .sellerRating(4.8)
-                .sellerCredits(3)
+                .sellerCredits(operationalCatalogService.initialFreeCredits())
                 .purchasedCreditsTotal(0)
                 .ipAddress(command.getIpAddress())
                 .termsAccepted(true)
@@ -172,11 +189,11 @@ public class AuthService implements AuthUseCase {
             }
         } catch (RuntimeException exception) {
             rollbackPendingRegistration(user, verificationToken);
-            throw new BusinessException("Nao foi possivel enviar o e-mail de confirmacao. Tente novamente mais tarde.");
+            throw new BusinessException("Não foi possível enviar o e-mail de confirmação. Tente novamente mais tarde.");
         }
 
         rollbackPendingRegistration(user, verificationToken);
-        throw new BusinessException("Nao foi possivel enviar o e-mail de confirmacao. Tente novamente mais tarde.");
+        throw new BusinessException("Não foi possível enviar o e-mail de confirmação. Tente novamente mais tarde.");
     }
 
     private EmailVerificationToken buildEmailVerificationToken(UserProfile user) {
@@ -272,6 +289,66 @@ public class AuthService implements AuthUseCase {
     }
 
     @Override
+    public void deleteCurrentUser(String userId) {
+        UserProfile user = userGateway.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Usuario nao encontrado."));
+
+        List<String> ownedInterestIds = interestGateway.findByOwnerIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(InterestPost::getId)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toList());
+
+        List<Offer> offersOnOwnedInterests = ownedInterestIds.isEmpty()
+                ? List.of()
+                : offerGateway.findByInterestPostIdInOrderByCreatedAtDesc(ownedInterestIds);
+        List<String> ownedOfferIds = offersOnOwnedInterests.stream()
+                .map(Offer::getId)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .collect(Collectors.toList());
+        List<Offer> anonymizedSentOffers = offerGateway.findBySellerIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .filter(offer -> !ownedInterestIds.contains(offer.getInterestPostId()))
+                .map(this::anonymizeDeletedUserOffer)
+                .collect(Collectors.toList());
+        anonymizedSentOffers.forEach(offerGateway::save);
+
+        conversationMessageGateway.deleteByOfferIdIn(ownedOfferIds);
+        offerGateway.deleteByIdIn(ownedOfferIds);
+        conversationMessageGateway.anonymizeByUserId(userId);
+        contentReportGateway.deleteByReportedByOrContentIdIn(userId, ownedInterestIds);
+        sellerItemGateway.deleteByOwnerId(userId);
+        interestGateway.deleteByOwnerId(userId);
+        passwordResetTokenGateway.deleteByUserId(userId);
+        emailVerificationTokenGateway.deleteByUserId(userId);
+        authSessionGateway.deleteByUserId(userId);
+        userGateway.deleteById(userId);
+
+        auditLogService.record("USER_ACCOUNT_DELETED", user.getId(), null, "USER", user.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of(
+                        "deletedInterests", ownedInterestIds.size(),
+                        "deletedOffers", ownedOfferIds.size(),
+                        "anonymizedOffers", anonymizedSentOffers.size()
+                ));
+        eventPublisherGateway.publish("user.account-deleted", Map.of(
+                "userId", user.getId()
+        ));
+    }
+
+    private Offer anonymizeDeletedUserOffer(Offer offer) {
+        return offer.toBuilder()
+                .sellerId(null)
+                .sellerName(DELETED_USER_LABEL)
+                .sellerEmail(null)
+                .sellerPhone(null)
+                .message(REMOVED_OFFER_MESSAGE)
+                .offerImageUrl(null)
+                .highlights(List.of())
+                .build();
+    }
+
+    @Override
     public PasswordResetRequestView forgotPassword(ForgotPasswordCommand command) {
         Optional<UserProfile> optionalUser = userGateway.findByEmail(command.getEmail().trim().toLowerCase());
         if (optionalUser.isEmpty()) {
@@ -353,6 +430,11 @@ public class AuthService implements AuthUseCase {
                 .orElseThrow(() -> new ResourceNotFoundException("Token de verificacao nao encontrado."));
 
         if (verificationToken.getUsedAt() != null) {
+            UserProfile user = userGateway.findById(verificationToken.getUserId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado."));
+            if (user.isEmailVerified()) {
+                return;
+            }
             throw new BusinessException("Este e-mail ja foi verificado.");
         }
 

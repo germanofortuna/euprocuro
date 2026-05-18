@@ -10,4 +10,6 @@ public interface AuthSessionGateway {
     Optional<AuthSession> findByToken(String token);
 
     void deleteByToken(String token);
+
+    void deleteByUserId(String userId);
 }

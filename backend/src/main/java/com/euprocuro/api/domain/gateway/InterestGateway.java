@@ -21,7 +21,11 @@ public interface InterestGateway {
 
     Optional<InterestPost> findById(String id);
 
+    List<InterestPost> findByIdIn(List<String> ids);
+
     void deleteById(String id);
+
+    void deleteByOwnerId(String ownerId);
 
     long countByStatus(InterestStatus status);
 

@@ -46,6 +46,7 @@ public class UpdateInterestRequest {
     private String neighborhood;
     private String country;
     private Integer desiredRadiusKm;
+    private StickerDetailsRequest stickerDetails;
     private boolean allowsWhatsappContact;
     private String whatsappContact;
     private String preferredCondition;

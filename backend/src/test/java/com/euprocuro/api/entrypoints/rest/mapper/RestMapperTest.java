@@ -50,7 +50,7 @@ class RestMapperTest {
 
         assertThat(response.getOwnerId()).isNull();
         assertThat(response.getOwnerName()).isNull();
-        assertThat(response.getReferenceImageUrl()).isNull();
+        assertThat(response.getReferenceImageUrl()).isEqualTo("data:image/png;base64,abc");
         assertThat(response.getWhatsappContact()).isNull();
         assertThat(response.isAllowsWhatsappContact()).isFalse();
         assertThat(response.getModeration()).isNull();
@@ -68,5 +68,24 @@ class RestMapperTest {
                 .doesNotContain("moderation")
                 .doesNotContain("postalCode")
                 .doesNotContain("neighborhood");
+    }
+
+    @Test
+    void toPublicInterestResponseShouldHideUnsafeReferenceImages() {
+        InterestPost svgDataImage = InterestPost.builder()
+                .id("interest-2")
+                .title("Procuro imagem")
+                .referenceImageUrl("data:image/svg+xml;base64,abc")
+                .status(InterestStatus.APPROVED)
+                .build();
+        InterestPost javascriptImage = InterestPost.builder()
+                .id("interest-3")
+                .title("Procuro imagem")
+                .referenceImageUrl("javascript:alert(1)")
+                .status(InterestStatus.APPROVED)
+                .build();
+
+        assertThat(RestMapper.toPublicInterestResponse(svgDataImage).getReferenceImageUrl()).isNull();
+        assertThat(RestMapper.toPublicInterestResponse(javascriptImage).getReferenceImageUrl()).isNull();
     }
 }

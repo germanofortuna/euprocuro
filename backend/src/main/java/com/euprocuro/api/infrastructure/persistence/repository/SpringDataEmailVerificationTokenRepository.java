@@ -8,4 +8,6 @@ import com.euprocuro.api.infrastructure.persistence.document.EmailVerificationTo
 
 public interface SpringDataEmailVerificationTokenRepository extends MongoRepository<EmailVerificationTokenDocument, String> {
     Optional<EmailVerificationTokenDocument> findByToken(String token);
+
+    void deleteByUserId(String userId);
 }

@@ -71,9 +71,17 @@ public class MarketplaceController {
             HttpServletRequest request,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String city,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String neighborhood,
             @RequestParam(required = false) BigDecimal maxBudget,
             @RequestParam(required = false) String query,
+            @RequestParam(required = false) String stickerType,
+            @RequestParam(required = false) String stickerGroup,
+            @RequestParam(required = false) String stickerSelection,
+            @RequestParam(required = false) String stickerNumber,
+            @RequestParam(required = false) String stickerPlayer,
             @RequestParam(defaultValue = "true") boolean openOnly,
+            @RequestParam(defaultValue = "false") boolean includeOwn,
             @RequestParam(defaultValue = "0") int offset,
             @RequestParam(defaultValue = "10") int limit
     ) {
@@ -81,15 +89,21 @@ public class MarketplaceController {
         InterestSearchFilter filter = InterestSearchFilter.builder()
                 .category(category)
                 .city(city)
+                .state(state)
+                .neighborhood(neighborhood)
                 .maxBudget(maxBudget)
                 .query(query)
+                .stickerType(stickerType)
+                .stickerGroup(stickerGroup)
+                .stickerSelection(stickerSelection)
+                .stickerNumber(stickerNumber)
+                .stickerPlayer(stickerPlayer)
                 .openOnly(true)
-                .currentUserId(currentUserId.orElse(null))
                 .build();
 
         return marketplaceUseCase.listInterests(filter, offset, limit)
                 .stream()
-                .filter(interest -> currentUserId
+                .filter(interest -> includeOwn || currentUserId
                         .map(userId -> !Objects.equals(userId, interest.getOwnerId()))
                         .orElse(true))
                 .map(RestMapper::toPublicInterestResponse)

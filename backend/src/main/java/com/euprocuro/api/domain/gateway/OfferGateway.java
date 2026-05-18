@@ -16,5 +16,7 @@ public interface OfferGateway {
 
     Optional<Offer> findById(String offerId);
 
+    void deleteByIdIn(List<String> offerIds);
+
     long count();
 }

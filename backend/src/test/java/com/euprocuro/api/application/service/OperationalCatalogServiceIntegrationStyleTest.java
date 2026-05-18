@@ -3,6 +3,7 @@ package com.euprocuro.api.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -27,6 +28,7 @@ import com.euprocuro.api.application.command.CatalogCategoryCommand;
 import com.euprocuro.api.application.command.CatalogProductCommand;
 import com.euprocuro.api.application.command.ModerationSettingsCommand;
 import com.euprocuro.api.application.command.MonetizationSettingsCommand;
+import com.euprocuro.api.application.command.OperationalFlagsCommand;
 import com.euprocuro.api.application.command.SaveOperationalCatalogCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.domain.gateway.ContentEntryGateway;
@@ -70,13 +72,16 @@ class OperationalCatalogServiceIntegrationStyleTest {
         var products = service.listActiveProducts();
 
         assertThat(categories).extracting("code")
-                .containsExactly("AUTOMOVEIS", "IMOVEIS", "SERVICOS", "ELETRONICOS", "INSTRUMENTOS", "OUTROS");
+                .containsExactly("AUTOMOVEIS", "IMOVEIS", "SERVICOS", "ELETRONICOS", "INSTRUMENTOS", "OUTROS", "FIGURINHAS");
         assertThat(products).isEmpty();
         assertThat(service.getMonetizationSettings().isCreditPurchasesEnabled()).isFalse();
         assertThat(service.getMonetizationSettings().isBoostPurchasesEnabled()).isFalse();
         assertThat(service.getModerationSettings().isUserBlockListEnabled()).isTrue();
-        assertThat(contentEntryGateway.findAll()).hasSize(4);
-        assertThat(contentRevisionGateway.revisions).hasSize(4);
+        assertThat(service.getFeatureFlags().isStickersPageEnabled()).isTrue();
+        assertThat(service.getOperationalFields().getInitialFreeCredits()).isEqualTo(15);
+        assertThat(service.getOperationalFields().getListingRenewalCredits()).isEqualTo(1);
+        assertThat(contentEntryGateway.findAll()).hasSize(6);
+        assertThat(contentRevisionGateway.revisions).hasSize(6);
     }
 
     @Test
@@ -86,6 +91,22 @@ class OperationalCatalogServiceIntegrationStyleTest {
         assertThatThrownBy(() -> service.requireActiveCategory("nao-existe"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Categoria invalida");
+    }
+
+    @Test
+    void requireActiveCategoryShouldBackfillStickersWhenExistingCatalogWasSeededBeforeFeature() {
+        contentEntryGateway.save(ContentEntry.builder()
+                .key("catalog.categories")
+                .locale("pt-BR")
+                .status(ContentEntryStatus.PUBLISHED)
+                .version(1)
+                .publishedValue("[{\"code\":\"SERVICOS\",\"label\":\"Servicos\",\"active\":true,\"sortOrder\":10}]")
+                .draftValue("[{\"code\":\"SERVICOS\",\"label\":\"Servicos\",\"active\":true,\"sortOrder\":10}]")
+                .build());
+
+        assertThat(service.requireActiveCategory("figurinhas")).isEqualTo("FIGURINHAS");
+        assertThat(service.listActiveCategories()).extracting("code").contains("SERVICOS", "FIGURINHAS");
+        verify(publicCacheService, atLeastOnce()).invalidate(PublicCacheService.CATALOG);
     }
 
     @Test
@@ -140,11 +161,38 @@ class OperationalCatalogServiceIntegrationStyleTest {
 
         var adminCatalog = service.saveAdminCatalog("admin-1", command);
 
-        assertThat(adminCatalog.getCategories()).hasSize(2);
-        assertThat(service.listActiveCategories()).extracting("code").containsExactly("AUTO");
-        assertThat(service.listActiveProducts()).extracting("code").containsExactly("CREDITS_10");
-        assertThat(service.listActiveProducts().get(0).getOriginalPrice()).isEqualByComparingTo("12.90");
-        assertThat(service.listActiveProducts().get(0).getPromotionLabel()).isEqualTo("Oferta");
+        assertThat(adminCatalog.getCategories()).hasSize(3);
+        assertThat(service.listActiveCategories()).extracting("code").containsExactly("AUTO", "FIGURINHAS");
+        assertThat(adminCatalog.getProducts()).extracting("code").containsExactly("CREDITS_10", "BOOST_3_DAYS");
+        assertThat(adminCatalog.getProducts().get(0).getOriginalPrice()).isEqualByComparingTo("12.90");
+        assertThat(adminCatalog.getProducts().get(0).getPromotionLabel()).isEqualTo("Oferta");
+        assertThat(service.getMonetizationSettings().isCreditPurchasesEnabled()).isFalse();
+        assertThat(service.getMonetizationSettings().isBoostPurchasesEnabled()).isFalse();
+        assertThat(service.getModerationSettings().isUserBlockListEnabled()).isTrue();
+        verify(publicCacheService, atLeastOnce()).invalidate(PublicCacheService.CATALOG);
+    }
+
+    @Test
+    void saveOperationalFlagsShouldNotValidateProductsOrCategories() {
+        when(adminAccessService.requireAdmin("admin-1"))
+                .thenReturn(UserProfile.builder().id("admin-1").email("admin@test.com").build());
+
+        var adminCatalog = service.saveOperationalFlags("admin-1", OperationalFlagsCommand.builder()
+                .monetizationSettings(MonetizationSettingsCommand.builder()
+                        .creditPurchasesEnabled(true)
+                        .boostPurchasesEnabled(true)
+                        .build())
+                .moderationSettings(ModerationSettingsCommand.builder()
+                        .userBlockListEnabled(false)
+                        .build())
+                .build());
+
+        assertThat(adminCatalog.getCategories()).extracting("code")
+                .containsExactly("AUTOMOVEIS", "IMOVEIS", "SERVICOS", "ELETRONICOS", "INSTRUMENTOS", "OUTROS", "FIGURINHAS");
+        assertThat(adminCatalog.getProducts()).extracting("code")
+                .contains("CREDITS_10", "BOOST_3_DAYS");
+        assertThat(service.getMonetizationSettings().isCreditPurchasesEnabled()).isTrue();
+        assertThat(service.getMonetizationSettings().isBoostPurchasesEnabled()).isTrue();
         assertThat(service.getModerationSettings().isUserBlockListEnabled()).isFalse();
         verify(publicCacheService).invalidate(PublicCacheService.CATALOG);
     }

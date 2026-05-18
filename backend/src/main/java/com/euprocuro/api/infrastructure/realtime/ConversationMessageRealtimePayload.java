@@ -17,6 +17,7 @@ public class ConversationMessageRealtimePayload {
     String recipientId;
     String recipientName;
     String content;
+    String imageUrl;
     Instant createdAt;
 
     public static ConversationMessageRealtimePayload from(ConversationMessage message) {
@@ -28,6 +29,7 @@ public class ConversationMessageRealtimePayload {
                 .recipientId(message.getRecipientId())
                 .recipientName(message.getRecipientName())
                 .content(message.getContent())
+                .imageUrl(message.getImageUrl())
                 .createdAt(message.getCreatedAt())
                 .build();
     }

@@ -72,6 +72,13 @@ public class AuthController {
         authCookieManager.clearSessionCookie(response);
     }
 
+    @DeleteMapping("/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteMe(HttpServletRequest request, HttpServletResponse response) {
+        authUseCase.deleteCurrentUser(CurrentUserContext.userId(request));
+        authCookieManager.clearSessionCookie(response);
+    }
+
     @PostMapping("/forgot-password")
     public ActionMessageResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         return RestMapper.toResponse(authUseCase.forgotPassword(RestMapper.toCommand(request)));

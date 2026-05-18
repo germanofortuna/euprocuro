@@ -10,4 +10,6 @@ public interface SpringDataAuthSessionRepository extends MongoRepository<AuthSes
     Optional<AuthSessionDocument> findByToken(String token);
 
     void deleteByToken(String token);
+
+    void deleteByUserId(String userId);
 }

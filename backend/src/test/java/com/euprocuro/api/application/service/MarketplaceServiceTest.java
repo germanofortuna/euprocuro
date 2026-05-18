@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +32,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.euprocuro.api.application.command.CreateInterestCommand;
 import com.euprocuro.api.application.command.CreateOfferCommand;
 import com.euprocuro.api.application.command.InterestSearchFilter;
+import com.euprocuro.api.application.command.StickerDetailsCommand;
 import com.euprocuro.api.application.command.UpdateInterestCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ForbiddenException;
@@ -51,6 +53,8 @@ import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.OfferStatus;
 import com.euprocuro.api.domain.model.SellerItem;
+import com.euprocuro.api.domain.model.StickerDetails;
+import com.euprocuro.api.domain.model.StickerListingType;
 import com.euprocuro.api.domain.model.UserProfile;
 
 @ExtendWith(MockitoExtension.class)
@@ -92,6 +96,7 @@ class MarketplaceServiceTest {
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
         lenient().when(blockedTermValidationGateway.validateBlockedTerms(any(InterestPost.class)))
                 .thenReturn(Optional.empty());
+        lenient().when(operationalCatalogService.listingRenewalCredits()).thenReturn(1);
     }
 
     @Test
@@ -175,13 +180,14 @@ class MarketplaceServiceTest {
     }
 
     @Test
-    void renewInterestShouldConsumeOneCreditAndExtendExpiration() {
+    void renewInterestShouldConsumeConfiguredCreditsAndExtendExpiration() {
         InterestPost existingInterest = baseInterest();
-        existingInterest.setExpiresAt(Instant.now().plus(5, ChronoUnit.DAYS));
+        existingInterest.setExpiresAt(Instant.now().minus(1, ChronoUnit.DAYS));
         ReflectionTestUtils.setField(marketplaceService, "listingExpirationDays", 5L);
         ReflectionTestUtils.setField(marketplaceService, "listingRenewalDays", 30L);
+        when(operationalCatalogService.listingRenewalCredits()).thenReturn(2);
         UserProfile owner = baseBuyer().toBuilder()
-                .sellerCredits(2)
+                .sellerCredits(5)
                 .build();
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(existingInterest));
         when(userGateway.findById("buyer-1")).thenReturn(Optional.of(owner));
@@ -190,14 +196,30 @@ class MarketplaceServiceTest {
 
         InterestPost result = marketplaceService.renewInterest("buyer-1", "interest-1");
 
-        assertThat(result.getExpiresAt()).isAfter(existingInterest.getExpiresAt().plus(29, ChronoUnit.DAYS));
-        verify(userGateway).save(any(UserProfile.class));
+        assertThat(result.getExpiresAt()).isAfter(Instant.now().plus(29, ChronoUnit.DAYS));
+        verify(userGateway).save(argThat(savedOwner -> savedOwner.getSellerCredits() == 3));
         verify(eventPublisherGateway).publish(eq("interest.renewed"), any(Map.class));
     }
 
     @Test
+    void renewInterestShouldRejectWhenListingIsStillActive() {
+        InterestPost existingInterest = baseInterest();
+        existingInterest.setExpiresAt(Instant.now().plus(5, ChronoUnit.DAYS));
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(existingInterest));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer().toBuilder()
+                .sellerCredits(2)
+                .build()));
+
+        assertThatThrownBy(() -> marketplaceService.renewInterest("buyer-1", "interest-1"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ainda esta dentro do prazo");
+    }
+
+    @Test
     void renewInterestShouldRejectOwnerWithoutCredits() {
-        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        InterestPost existingInterest = baseInterest();
+        existingInterest.setExpiresAt(Instant.now().minus(1, ChronoUnit.DAYS));
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(existingInterest));
         when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer().toBuilder()
                 .sellerCredits(0)
                 .build()));
@@ -378,6 +400,53 @@ class MarketplaceServiceTest {
     }
 
     @Test
+    void listInterestsShouldFilterStickerListingsByDetails() {
+        InterestPost matching = stickerInterest(
+                "matching",
+                StickerListingType.AVAILABLE,
+                "SPECIAL",
+                "Mascotes",
+                List.of("FW26", "12"),
+                List.of("Lionel Messi", "Neymar")
+        );
+        InterestPost wrongType = stickerInterest(
+                "wrong-type",
+                StickerListingType.MISSING,
+                "SPECIAL",
+                "Mascotes",
+                List.of("FW26"),
+                List.of("Lionel Messi")
+        );
+        InterestPost wrongGroup = stickerInterest(
+                "wrong-group",
+                StickerListingType.AVAILABLE,
+                "A",
+                "Mascotes",
+                List.of("FW26"),
+                List.of("Lionel Messi")
+        );
+        InterestPost withoutStickerDetails = baseInterest().toBuilder()
+                .id("without-details")
+                .category(OperationalCatalogService.STICKERS_CATEGORY_CODE)
+                .stickerDetails(null)
+                .build();
+
+        when(operationalCatalogService.stickersPageEnabled()).thenReturn(true);
+        when(interestGateway.findAll()).thenReturn(List.of(withoutStickerDetails, wrongGroup, wrongType, matching));
+
+        List<InterestPost> results = marketplaceService.listInterests(InterestSearchFilter.builder()
+                .openOnly(true)
+                .stickerType("repetidas")
+                .stickerGroup("especiais")
+                .stickerSelection("mascotes")
+                .stickerNumber(" fw 26 ")
+                .stickerPlayer("messi")
+                .build());
+
+        assertThat(results).extracting(InterestPost::getId).containsExactly("matching");
+    }
+
+    @Test
     void createInterestShouldNormalizePostalCodeWithDigitsOnly() {
         when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
         when(operationalCatalogService.requireActiveCategory("SERVICOS")).thenReturn("SERVICOS");
@@ -398,6 +467,90 @@ class MarketplaceServiceTest {
                 .build());
 
         assertThat(result.getLocation().getPostalCode()).isEqualTo("13010-111");
+    }
+
+    @Test
+    void createInterestShouldNormalizeStickerDetailsForStickerCategory() {
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(operationalCatalogService.requireActiveCategory(OperationalCatalogService.STICKERS_CATEGORY_CODE))
+                .thenReturn(OperationalCatalogService.STICKERS_CATEGORY_CODE);
+        when(operationalCatalogService.stickersPageEnabled()).thenReturn(true);
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> {
+            InterestPost interest = invocation.getArgument(0);
+            interest.setId("sticker-1");
+            return interest;
+        });
+
+        InterestPost result = marketplaceService.createInterest("buyer-1", CreateInterestCommand.builder()
+                .title("Tenho repetidas")
+                .description("Tenho figurinhas repetidas")
+                .category(OperationalCatalogService.STICKERS_CATEGORY_CODE)
+                .budgetMax(new BigDecimal("50"))
+                .city("Erechim")
+                .state("RS")
+                .stickerDetails(StickerDetailsCommand.builder()
+                        .type(StickerListingType.AVAILABLE)
+                        .group(null)
+                        .selection("Mascotes")
+                        .numbers(List.of(" 12 ", "12", "fw 26", ""))
+                        .players(List.of(" Lionel  Messi ", "Lionel Messi", "Neymar", ""))
+                        .build())
+                .build());
+
+        assertThat(result.getStickerDetails().getType()).isEqualTo(StickerListingType.AVAILABLE);
+        assertThat(result.getStickerDetails().getGroup()).isEqualTo("SPECIAL");
+        assertThat(result.getStickerDetails().getSelection()).isEqualTo("Mascotes");
+        assertThat(result.getStickerDetails().getNumbers()).containsExactly("12", "FW26");
+        assertThat(result.getStickerDetails().getPlayers()).containsExactly("Lionel Messi", "Neymar");
+    }
+
+    @Test
+    void createInterestShouldAcceptStickerPlayersWithoutNumbers() {
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(operationalCatalogService.requireActiveCategory(OperationalCatalogService.STICKERS_CATEGORY_CODE))
+                .thenReturn(OperationalCatalogService.STICKERS_CATEGORY_CODE);
+        when(operationalCatalogService.stickersPageEnabled()).thenReturn(true);
+        when(interestGateway.save(any(InterestPost.class))).thenAnswer(invocation -> {
+            InterestPost interest = invocation.getArgument(0);
+            interest.setId("sticker-player-1");
+            return interest;
+        });
+
+        InterestPost result = marketplaceService.createInterest("buyer-1", CreateInterestCommand.builder()
+                .title("Procuro Messi")
+                .description("Procuro figurinha do jogador")
+                .category(OperationalCatalogService.STICKERS_CATEGORY_CODE)
+                .budgetMax(BigDecimal.ZERO)
+                .city("Erechim")
+                .state("RS")
+                .stickerDetails(StickerDetailsCommand.builder()
+                        .type(StickerListingType.MISSING)
+                        .selection("Argentina")
+                        .players(List.of(" Lionel  Messi "))
+                        .build())
+                .build());
+
+        assertThat(result.getStickerDetails().getNumbers()).isEmpty();
+        assertThat(result.getStickerDetails().getPlayers()).containsExactly("Lionel Messi");
+    }
+
+    @Test
+    void createInterestShouldRejectStickerCategoryWhenStickerPageIsDisabled() {
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
+        when(operationalCatalogService.requireActiveCategory(OperationalCatalogService.STICKERS_CATEGORY_CODE))
+                .thenReturn(OperationalCatalogService.STICKERS_CATEGORY_CODE);
+        when(operationalCatalogService.stickersPageEnabled()).thenReturn(false);
+
+        assertThatThrownBy(() -> marketplaceService.createInterest("buyer-1", CreateInterestCommand.builder()
+                .title("Tenho repetidas")
+                .category(OperationalCatalogService.STICKERS_CATEGORY_CODE)
+                .stickerDetails(StickerDetailsCommand.builder()
+                        .type(StickerListingType.AVAILABLE)
+                        .numbers(List.of("12"))
+                        .build())
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("figurinhas");
     }
 
     @Test
@@ -458,6 +611,7 @@ class MarketplaceServiceTest {
 
         assertThatThrownBy(() -> marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
                 .message("Tenho um item")
+                .sellerPhone("11999999999")
                 .offeredPrice(new BigDecimal("400"))
                 .build()))
                 .isInstanceOf(BusinessException.class)
@@ -486,6 +640,7 @@ class MarketplaceServiceTest {
 
         Offer result = marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
                 .message("Tenho um item")
+                .sellerPhone("11999999999")
                 .offeredPrice(new BigDecimal("400"))
                 .build());
 
@@ -526,7 +681,7 @@ class MarketplaceServiceTest {
     }
 
     @Test
-    void createOfferShouldAllowMissingSellerPhone() {
+    void createOfferShouldRejectImageOnlyOfferWithoutMessageAndPhone() {
         InterestPost interest = baseInterest();
         UserProfile seller = UserProfile.builder()
                 .id("seller-1")
@@ -537,22 +692,62 @@ class MarketplaceServiceTest {
 
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
         when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
-        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(baseBuyer()));
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(offerGateway.save(any(Offer.class))).thenAnswer(invocation -> {
-            Offer offer = invocation.getArgument(0);
-            offer.setId("offer-1");
-            return offer;
-        });
 
-        Offer result = marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
+        assertThatThrownBy(() -> marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
+                .offeredPrice(new BigDecimal("450"))
+                .message("   ")
+                .offerImageUrl("  data:image/png;base64,aGVsbG8=  ")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("telefone");
+        verify(userGateway, never()).save(any(UserProfile.class));
+        verify(offerGateway, never()).save(any(Offer.class));
+    }
+
+    @Test
+    void createOfferShouldRejectBlankMessageWithoutImage() {
+        InterestPost interest = baseInterest();
+        UserProfile seller = UserProfile.builder()
+                .id("seller-1")
+                .name("Carlos")
+                .email("carlos@teste.com")
+                .sellerCredits(5)
+                .build();
+
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
+        assertThatThrownBy(() -> marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
+                .offeredPrice(new BigDecimal("450"))
+                .sellerPhone("11999999999")
+                .message("   ")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("mensagem");
+        verify(userGateway, never()).save(any(UserProfile.class));
+    }
+
+    @Test
+    void createOfferShouldRejectMissingSellerPhone() {
+        InterestPost interest = baseInterest();
+        UserProfile seller = UserProfile.builder()
+                .id("seller-1")
+                .name("Carlos")
+                .email("carlos@teste.com")
+                .sellerCredits(5)
+                .build();
+
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
+
+        assertThatThrownBy(() -> marketplaceService.createOffer("seller-1", "interest-1", CreateOfferCommand.builder()
                 .offeredPrice(new BigDecimal("450"))
                 .sellerPhone("   ")
                 .message("Tenho um violao nessa faixa")
-                .build());
-
-        assertThat(result.getSellerPhone()).isNull();
-        verify(offerGateway).save(argThat(offer -> offer.getSellerPhone() == null));
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("telefone");
+        verify(userGateway, never()).save(any(UserProfile.class));
+        verify(offerGateway, never()).save(any(Offer.class));
     }
 
     @Test
@@ -835,6 +1030,38 @@ class MarketplaceServiceTest {
                 .status(InterestStatus.OPEN)
                 .createdAt(Instant.now().minus(1, ChronoUnit.DAYS))
                 .updatedAt(Instant.now().minus(1, ChronoUnit.DAYS))
+                .build();
+    }
+
+    private InterestPost stickerInterest(
+            String id,
+            StickerListingType type,
+            String group,
+            String selection,
+            List<String> numbers
+    ) {
+        return stickerInterest(id, type, group, selection, numbers, List.of());
+    }
+
+    private InterestPost stickerInterest(
+            String id,
+            StickerListingType type,
+            String group,
+            String selection,
+            List<String> numbers,
+            List<String> players
+    ) {
+        return baseInterest().toBuilder()
+                .id(id)
+                .category(OperationalCatalogService.STICKERS_CATEGORY_CODE)
+                .title("Figurinhas " + id)
+                .stickerDetails(StickerDetails.builder()
+                        .type(type)
+                        .group(group)
+                        .selection(selection)
+                        .numbers(numbers)
+                        .players(players)
+                        .build())
                 .build();
     }
 }

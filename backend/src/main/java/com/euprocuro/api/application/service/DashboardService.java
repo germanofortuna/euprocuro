@@ -5,6 +5,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
@@ -60,10 +61,16 @@ public class DashboardService implements DashboardUseCase {
 
         List<Offer> offersSent = offerGateway.findBySellerIdOrderByCreatedAtDesc(userId);
         Map<String, ConversationMessage> latestMessagesByOfferId = latestMessagesByOfferId(offersReceived, offersSent);
-        Map<String, InterestPost> referencedInterests = interestGateway.findAll()
+        Set<String> referencedInterestIds = Stream.concat(
+                        myInterests.stream().map(InterestPost::getId),
+                        offersSent.stream().map(Offer::getInterestPostId)
+                )
+                .filter(id -> id != null && !id.isBlank())
+                .collect(Collectors.toSet());
+        Map<String, InterestPost> referencedInterests = interestGateway.findByIdIn(List.copyOf(referencedInterestIds))
                 .stream()
                 .filter(this::isNotExpired)
-                .collect(Collectors.toMap(InterestPost::getId, Function.identity()));
+                .collect(Collectors.toMap(InterestPost::getId, Function.identity(), (current, ignored) -> current));
 
         return PersonalDashboardView.builder()
                 .user(user)

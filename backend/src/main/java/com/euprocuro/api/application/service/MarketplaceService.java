@@ -39,6 +39,8 @@ import com.euprocuro.api.domain.model.LocationInfo;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.OfferStatus;
 import com.euprocuro.api.domain.model.SellerItem;
+import com.euprocuro.api.domain.model.StickerDetails;
+import com.euprocuro.api.domain.model.StickerListingType;
 import com.euprocuro.api.domain.model.UserProfile;
 
 import lombok.RequiredArgsConstructor;
@@ -75,6 +77,7 @@ public class MarketplaceService implements MarketplaceUseCase {
 
         validateBudgetRange(command.getBudgetMin(), command.getBudgetMax());
         String category = operationalCatalogService.requireActiveCategory(command.getCategory());
+        StickerDetails stickerDetails = normalizeStickerDetails(category, command.getStickerDetails());
         Instant now = Instant.now();
 
         InterestPost interestPost = InterestPost.builder()
@@ -95,6 +98,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                         .remote(false)
                         .build())
                 .tags(Optional.ofNullable(command.getTags()).orElse(List.of()))
+                .stickerDetails(stickerDetails)
                 .desiredRadiusKm(command.getDesiredRadiusKm())
                 .allowsWhatsappContact(command.isAllowsWhatsappContact())
                 .whatsappContact(command.isAllowsWhatsappContact() ? normalizeReferenceImage(command.getWhatsappContact()) : null)
@@ -195,6 +199,7 @@ public class MarketplaceService implements MarketplaceUseCase {
 
         validateBudgetRange(command.getBudgetMin(), command.getBudgetMax());
         String category = operationalCatalogService.requireActiveCategory(command.getCategory());
+        StickerDetails stickerDetails = normalizeStickerDetails(category, command.getStickerDetails());
 
         InterestPost updatedInterest = existingInterest.toBuilder()
                 .title(command.getTitle())
@@ -212,6 +217,7 @@ public class MarketplaceService implements MarketplaceUseCase {
                         .remote(false)
                         .build())
                 .tags(Optional.ofNullable(command.getTags()).orElse(List.of()))
+                .stickerDetails(stickerDetails)
                 .desiredRadiusKm(command.getDesiredRadiusKm())
                 .allowsWhatsappContact(command.isAllowsWhatsappContact())
                 .whatsappContact(command.isAllowsWhatsappContact() ? normalizeReferenceImage(command.getWhatsappContact()) : null)
@@ -238,34 +244,44 @@ public class MarketplaceService implements MarketplaceUseCase {
 
     @Override
     public InterestPost renewInterest(String currentUserId, String interestId) {
-        InterestPost existingInterest = loadInterest(interestId);
+        InterestPost existingInterest = interestGateway.findById(interestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Interesse nao encontrado."));
         if (!Objects.equals(existingInterest.getOwnerId(), currentUserId)) {
             throw new ForbiddenException("Apenas o dono do interesse pode renovar esse anuncio.");
         }
 
         UserProfile owner = userGateway.findById(currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado."));
+        Instant now = Instant.now();
+        Instant currentExpiration = Optional.ofNullable(existingInterest.getExpiresAt())
+                .orElseGet(() -> existingInterest.getCreatedAt() == null
+                        ? null
+                        : existingInterest.getCreatedAt().plus(safeExpirationDays(), ChronoUnit.DAYS));
+        if (currentExpiration != null && currentExpiration.isAfter(now)) {
+            throw new BusinessException("Este anuncio ainda esta dentro do prazo e nao precisa de renovacao.");
+        }
+        int renewalCreditCost = Math.max(0, operationalCatalogService.listingRenewalCredits());
         int availableCredits = owner.getSellerCredits() == null ? 0 : owner.getSellerCredits();
-        if (availableCredits <= 0) {
-            throw new BusinessException("Voce precisa de um credito para renovar este anuncio.");
+        if (availableCredits < renewalCreditCost) {
+            throw new BusinessException("Voce precisa de creditos suficientes para renovar este anuncio.");
         }
 
-        userGateway.save(owner.toBuilder()
-                .sellerCredits(availableCredits - 1)
-                .build());
+        if (renewalCreditCost > 0) {
+            userGateway.save(owner.toBuilder()
+                    .sellerCredits(availableCredits - renewalCreditCost)
+                    .build());
+        }
 
-        Instant now = Instant.now();
-        Instant renewalBase = Optional.ofNullable(existingInterest.getExpiresAt())
-                .filter(expiration -> expiration.isAfter(now))
-                .orElse(now);
         InterestPost renewedInterest = existingInterest.toBuilder()
-                .expiresAt(renewalExpiresAt(renewalBase))
+                .expiresAt(renewalExpiresAt(now))
                 .updatedAt(now)
                 .build();
 
         InterestPost saved = interestGateway.save(renewedInterest);
         auditLogService.record("INTEREST_RENEWED", currentUserId, owner.getEmail(), "INTEREST", saved.getId(),
-                AuditLogService.OUTCOME_SUCCESS, Map.of("creditsRemaining", availableCredits - 1));
+                AuditLogService.OUTCOME_SUCCESS, Map.of(
+                        "creditsUsed", renewalCreditCost,
+                        "creditsRemaining", availableCredits - renewalCreditCost));
         publicCacheService.invalidate(PublicCacheService.MARKETPLACE);
         eventPublisherGateway.publish("interest.renewed", Map.of(
                 "interestId", saved.getId(),
@@ -282,11 +298,17 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .filter(this::isNotExpired)
                 .filter(post -> filter.getCategory() == null || Objects.equals(post.getCategory(), filter.getCategory()))
                 .filter(post -> filter.getCity() == null || filter.getCity().isBlank()
-                        || equalsIgnoreCase(post.getLocation() == null ? null : post.getLocation().getCity(), filter.getCity()))
+                        || safe(post.getLocation() == null ? null : post.getLocation().getCity()).contains(safe(filter.getCity())))
+                .filter(post -> filter.getState() == null || filter.getState().isBlank()
+                        || equalsIgnoreCase(post.getLocation() == null ? null : post.getLocation().getState(), filter.getState()))
+                .filter(post -> filter.getNeighborhood() == null || filter.getNeighborhood().isBlank()
+                        || safe(post.getLocation() == null ? null : post.getLocation().getNeighborhood()).contains(safe(filter.getNeighborhood())))
                 .filter(post -> filter.getMaxBudget() == null || post.getBudgetMax() == null
                         || post.getBudgetMax().compareTo(filter.getMaxBudget()) <= 0)
                 .filter(post -> filter.getQuery() == null || filter.getQuery().isBlank()
                         || containsIgnoreCase(post, filter.getQuery()))
+                .filter(post -> matchesStickerFilters(post, filter))
+                .filter(this::isVisibleForEnabledFeatures)
                 .filter(post -> !filter.isOpenOnly() || isPubliclyVisible(post))
                 .filter(post -> isNotOwnedByCurrentUser(post, filter.getCurrentUserId()))
                 .collect(Collectors.toList());
@@ -299,8 +321,15 @@ public class MarketplaceService implements MarketplaceUseCase {
         InterestSearchCriteria criteria = InterestSearchCriteria.builder()
                 .category(filter.getCategory())
                 .city(filter.getCity())
+                .state(filter.getState())
+                .neighborhood(filter.getNeighborhood())
                 .maxBudget(filter.getMaxBudget())
                 .query(filter.getQuery())
+                .stickerType(filter.getStickerType())
+                .stickerGroup(filter.getStickerGroup())
+                .stickerSelection(filter.getStickerSelection())
+                .stickerNumber(filter.getStickerNumber())
+                .stickerPlayer(filter.getStickerPlayer())
                 .openOnly(true)
                 .build();
         int safeOffset = Math.max(0, offset);
@@ -352,6 +381,7 @@ public class MarketplaceService implements MarketplaceUseCase {
     private List<InterestPost> searchInterests(InterestSearchCriteria criteria, int offset, int limit) {
         return interestSearchGateway.search(criteria, offset, limit)
                 .stream()
+                .filter(this::isVisibleForEnabledFeatures)
                 .filter(this::isNotExpired)
                 .filter(this::isPubliclyVisible)
                 .collect(Collectors.toList());
@@ -360,7 +390,7 @@ public class MarketplaceService implements MarketplaceUseCase {
     @Override
     public InterestPost getInterest(String id) {
         InterestPost interest = loadInterest(id);
-        if (!isPubliclyVisible(interest)) {
+        if (!isVisibleForEnabledFeatures(interest) || !isPubliclyVisible(interest)) {
             throw new ResourceNotFoundException("Interesse nao encontrado.");
         }
         return interest;
@@ -390,6 +420,19 @@ public class MarketplaceService implements MarketplaceUseCase {
             throw new BusinessException("O mesmo usuario nao pode ofertar para si.");
         }
 
+        String sellerPhone = trimToNull(command.getSellerPhone());
+        String message = trimToNull(command.getMessage());
+        String offerImageUrl = normalizeReferenceImage(command.getOfferImageUrl());
+        if (command.getOfferedPrice() == null || command.getOfferedPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException("Informe o valor da proposta.");
+        }
+        if (!StringUtils.hasText(sellerPhone)) {
+            throw new BusinessException("Informe um telefone ou WhatsApp para contato.");
+        }
+        if (!StringUtils.hasText(message)) {
+            throw new BusinessException("A mensagem nao pode estar em branco.");
+        }
+
         boolean hasActivePlan = seller.getSubscriptionActiveUntil() != null
                 && seller.getSubscriptionActiveUntil().isAfter(Instant.now());
         if (!hasActivePlan) {
@@ -407,10 +450,10 @@ public class MarketplaceService implements MarketplaceUseCase {
                 .sellerId(seller.getId())
                 .sellerName(seller.getName())
                 .sellerEmail(seller.getEmail())
-                .sellerPhone(trimToNull(command.getSellerPhone()))
+                .sellerPhone(sellerPhone)
                 .offeredPrice(command.getOfferedPrice())
-                .message(command.getMessage())
-                .offerImageUrl(null)
+                .message(message)
+                .offerImageUrl(offerImageUrl)
                 .includesDelivery(command.isIncludesDelivery())
                 .highlights(Optional.ofNullable(command.getHighlights()).orElse(List.of()))
                 .status(OfferStatus.SENT)
@@ -453,11 +496,140 @@ public class MarketplaceService implements MarketplaceUseCase {
     private boolean containsIgnoreCase(InterestPost post, String query) {
         String normalizedQuery = query.toLowerCase(Locale.ROOT);
         List<String> tags = Optional.ofNullable(post.getTags()).orElse(List.of());
+        StickerDetails stickerDetails = post.getStickerDetails();
+        List<String> stickerPlayers = stickerDetails == null ? List.of() : Optional.ofNullable(stickerDetails.getPlayers()).orElse(List.of());
         return safe(post.getTitle()).contains(normalizedQuery)
                 || safe(post.getDescription()).contains(normalizedQuery)
                 || safe(post.getOwnerName()).contains(normalizedQuery)
                 || safe(post.getLocation() == null ? null : post.getLocation().getCity()).contains(normalizedQuery)
-                || tags.stream().map(this::safe).anyMatch(tag -> tag.contains(normalizedQuery));
+                || tags.stream().map(this::safe).anyMatch(tag -> tag.contains(normalizedQuery))
+                || stickerPlayers.stream().map(this::safe).anyMatch(player -> player.contains(normalizedQuery));
+    }
+
+    private StickerDetails normalizeStickerDetails(String category, com.euprocuro.api.application.command.StickerDetailsCommand command) {
+        if (!OperationalCatalogService.STICKERS_CATEGORY_CODE.equals(category)) {
+            return null;
+        }
+        if (!operationalCatalogService.stickersPageEnabled()) {
+            throw new BusinessException("Pagina de figurinhas esta temporariamente desabilitada.");
+        }
+        if (command == null || command.getType() == null) {
+            throw new BusinessException("Informe se voce procura ou tem figurinhas repetidas.");
+        }
+        List<String> numbers = Optional.ofNullable(command.getNumbers()).orElse(List.of())
+                .stream()
+                .map(this::normalizeStickerNumber)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .collect(Collectors.toList());
+        List<String> players = Optional.ofNullable(command.getPlayers()).orElse(List.of())
+                .stream()
+                .map(this::normalizeStickerPlayer)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .collect(Collectors.toList());
+        if (numbers.isEmpty() && players.isEmpty()) {
+            throw new BusinessException("Informe pelo menos um numero de figurinha ou nome de jogador.");
+        }
+        return StickerDetails.builder()
+                .type(command.getType())
+                .group(normalizeStickerGroup(command.getGroup()))
+                .selection(trimToNull(command.getSelection()))
+                .numbers(numbers)
+                .players(players)
+                .build();
+    }
+
+    private String normalizeStickerGroup(String group) {
+        String normalized = trimToNull(group);
+        if (normalized == null) {
+            return "SPECIAL";
+        }
+        normalized = normalized.toUpperCase(Locale.ROOT);
+        if ("ESPECIAIS".equals(normalized)) {
+            return "SPECIAL";
+        }
+        return normalized;
+    }
+
+    private String normalizeStickerNumber(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
+        return value.trim().toUpperCase(Locale.ROOT).replaceAll("\\s+", "");
+    }
+
+    private String normalizeStickerPlayer(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
+        return value.trim().replaceAll("\\s+", " ");
+    }
+
+    private boolean matchesStickerFilters(InterestPost post, InterestSearchFilter filter) {
+        if (!hasStickerFilter(filter)) {
+            return true;
+        }
+        StickerDetails details = post.getStickerDetails();
+        if (details == null) {
+            return false;
+        }
+        if (StringUtils.hasText(filter.getStickerType())) {
+            StickerListingType type = parseStickerType(filter.getStickerType());
+            if (type != null && details.getType() != type) {
+                return false;
+            }
+        }
+        if (StringUtils.hasText(filter.getStickerGroup())
+                && !normalizeStickerGroup(filter.getStickerGroup()).equalsIgnoreCase(safe(details.getGroup()))) {
+            return false;
+        }
+        if (StringUtils.hasText(filter.getStickerSelection())
+                && !filter.getStickerSelection().trim().equalsIgnoreCase(safe(details.getSelection()))) {
+            return false;
+        }
+        if (StringUtils.hasText(filter.getStickerNumber())) {
+            String normalizedNumber = normalizeStickerNumber(filter.getStickerNumber());
+            boolean numberMatches = Optional.ofNullable(details.getNumbers()).orElse(List.of()).stream()
+                    .map(this::normalizeStickerNumber)
+                    .anyMatch(normalizedNumber::equals);
+            if (!numberMatches) {
+                return false;
+            }
+        }
+        if (StringUtils.hasText(filter.getStickerPlayer())) {
+            String normalizedPlayer = normalizeStickerPlayer(filter.getStickerPlayer()).toLowerCase(Locale.ROOT);
+            return Optional.ofNullable(details.getPlayers()).orElse(List.of()).stream()
+                    .map(this::normalizeStickerPlayer)
+                    .map(player -> player.toLowerCase(Locale.ROOT))
+                    .anyMatch(player -> player.contains(normalizedPlayer));
+        }
+        return true;
+    }
+
+    private boolean hasStickerFilter(InterestSearchFilter filter) {
+        return StringUtils.hasText(filter.getStickerType())
+                || StringUtils.hasText(filter.getStickerGroup())
+                || StringUtils.hasText(filter.getStickerSelection())
+                || StringUtils.hasText(filter.getStickerNumber())
+                || StringUtils.hasText(filter.getStickerPlayer());
+    }
+
+    private StickerListingType parseStickerType(String value) {
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if ("FALTANTES".equals(normalized) || "MISSING".equals(normalized)) {
+            return StickerListingType.MISSING;
+        }
+        if ("REPETIDAS".equals(normalized) || "AVAILABLE".equals(normalized)) {
+            return StickerListingType.AVAILABLE;
+        }
+        return null;
+    }
+
+    private boolean isVisibleForEnabledFeatures(InterestPost post) {
+        return post == null
+                || !OperationalCatalogService.STICKERS_CATEGORY_CODE.equals(post.getCategory())
+                || operationalCatalogService.stickersPageEnabled();
     }
 
     private boolean isBoostActive(InterestPost post) {
@@ -557,7 +729,14 @@ public class MarketplaceService implements MarketplaceUseCase {
         return String.join("|",
                 "category=" + safe(criteria.getCategory()),
                 "city=" + safe(criteria.getCity()),
+                "state=" + safe(criteria.getState()),
+                "neighborhood=" + safe(criteria.getNeighborhood()),
                 "query=" + safe(criteria.getQuery()),
+                "stickerType=" + safe(criteria.getStickerType()),
+                "stickerGroup=" + safe(criteria.getStickerGroup()),
+                "stickerSelection=" + safe(criteria.getStickerSelection()),
+                "stickerNumber=" + safe(criteria.getStickerNumber()),
+                "stickerPlayer=" + safe(criteria.getStickerPlayer()),
                 "maxBudget=" + Optional.ofNullable(criteria.getMaxBudget()).map(BigDecimal::toPlainString).orElse(""),
                 "openOnly=" + criteria.isOpenOnly(),
                 "offset=" + offset,

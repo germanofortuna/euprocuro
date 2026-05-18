@@ -53,4 +53,9 @@ public class ContentReportGatewayAdapter implements ContentReportGateway {
     public Optional<ContentReport> findById(String id) {
         return repository.findById(id).map(ContentReportPersistenceMapper::toDomain);
     }
+
+    @Override
+    public void deleteByReportedByOrContentIdIn(String reportedBy, List<String> contentIds) {
+        repository.deleteByReportedByOrContentIdIn(reportedBy, contentIds == null ? List.of() : contentIds);
+    }
 }

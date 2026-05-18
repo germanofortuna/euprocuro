@@ -10,4 +10,10 @@ public interface SpringDataConversationMessageRepository extends MongoRepository
     List<ConversationMessageDocument> findByOfferIdOrderByCreatedAtAsc(String offerId);
 
     List<ConversationMessageDocument> findByOfferIdInOrderByCreatedAtAsc(List<String> offerIds);
+
+    List<ConversationMessageDocument> findBySenderIdOrRecipientId(String senderId, String recipientId);
+
+    void deleteByOfferIdIn(List<String> offerIds);
+
+    void deleteBySenderIdOrRecipientId(String senderId, String recipientId);
 }

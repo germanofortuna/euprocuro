@@ -96,6 +96,26 @@ class ConversationServiceTest {
     }
 
     @Test
+    void getOfferConversationShouldIncludeInitialOfferImageWhenMessageIsBlank() {
+        String imageUrl = "data:image/png;base64,aGVsbG8=";
+        Offer offer = baseOffer().toBuilder()
+                .message(" ")
+                .offerImageUrl(imageUrl)
+                .build();
+
+        when(offerGateway.findById("offer-1")).thenReturn(Optional.of(offer));
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
+        when(conversationMessageGateway.findByOfferIdOrderByCreatedAtAsc("offer-1")).thenReturn(List.of());
+
+        OfferConversationView result = conversationService.getOfferConversation("buyer-1", "offer-1");
+
+        assertThat(result.getMessages()).hasSize(1);
+        assertThat(result.getMessages().get(0).getId()).isEqualTo("offer-initial-offer-1");
+        assertThat(result.getMessages().get(0).getContent()).isEmpty();
+        assertThat(result.getMessages().get(0).getImageUrl()).isEqualTo(imageUrl);
+    }
+
+    @Test
     void getOfferConversationShouldRejectNonParticipant() {
         when(offerGateway.findById("offer-1")).thenReturn(Optional.of(baseOffer()));
         when(interestGateway.findById("interest-1")).thenReturn(Optional.of(baseInterest()));
@@ -140,6 +160,43 @@ class ConversationServiceTest {
         assertThat(result.getContent()).isEqualTo("Podemos combinar entrega.");
         verify(eventPublisherGateway).publish(eq("conversation.message.created"), any());
         verify(realtimeMessageGateway).publishConversationMessage(eq("buyer-1"), any(ConversationMessage.class));
+    }
+
+    @Test
+    void sendMessageShouldAllowImageOnlyMessage() {
+        Offer offer = baseOffer();
+        InterestPost interest = baseInterest();
+        UserProfile seller = UserProfile.builder().id("seller-1").name("Carlos").build();
+        UserProfile buyer = UserProfile.builder().id("buyer-1").name("Ana").build();
+        String imageUrl = "data:image/png;base64,aGVsbG8=";
+
+        when(offerGateway.findById("offer-1")).thenReturn(Optional.of(offer));
+        when(interestGateway.findById("interest-1")).thenReturn(Optional.of(interest));
+        when(userGateway.findById("seller-1")).thenReturn(Optional.of(seller));
+        when(userGateway.findById("buyer-1")).thenReturn(Optional.of(buyer));
+        when(conversationMessageGateway.save(any(ConversationMessage.class))).thenAnswer(invocation -> {
+            ConversationMessage message = invocation.getArgument(0);
+            message.setId("msg-image");
+            return message;
+        });
+
+        ConversationMessageView result = conversationService.sendMessage("seller-1", "offer-1", SendConversationMessageCommand.builder()
+                .imageUrl(imageUrl)
+                .build());
+
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getImageUrl()).isEqualTo(imageUrl);
+        verify(eventPublisherGateway).publish(eq("conversation.message.created"), any());
+        verify(realtimeMessageGateway).publishConversationMessage(eq("buyer-1"), any(ConversationMessage.class));
+    }
+
+    @Test
+    void sendMessageShouldRejectInvalidImageType() {
+        assertThatThrownBy(() -> conversationService.sendMessage("buyer-1", "offer-1", SendConversationMessageCommand.builder()
+                .imageUrl("data:image/svg+xml;base64,PHN2Zy8+")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("JPG, PNG ou WebP");
     }
 
     @Test
