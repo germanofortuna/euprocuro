@@ -11,6 +11,7 @@ import { fetchInterests, lookupAddressByPostalCode } from "@/shared/api/client";
 import type { Interest } from "@/shared/api/types";
 import { formatCep, limitText } from "@/shared/lib/format";
 import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
+import { BackButton } from "@/shared/ui/back-button";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { SPECIAL_STICKER_SELECTIONS, STICKERS_CATEGORY, stickerGroupForSelection, stickerGroups, normalizeStickerNumbers } from "./stickers-data";
@@ -18,6 +19,7 @@ import { SPECIAL_STICKER_SELECTIONS, STICKERS_CATEGORY, stickerGroupForSelection
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 type StickerPublishEntry = { id: string; selection: string; numbers: string };
 
+const STICKERS_PAGE_SIZE = 24;
 const emptyStickerFilters = { stickerType: "", stickerGroup: "", stickerSelection: "", stickerNumber: "", state: "", city: "", neighborhood: "" };
 
 const benefits = [
@@ -91,6 +93,9 @@ export function StickersLandingPage() {
   const [filters, setFilters] = useState(emptyStickerFilters);
   const [stickers, setStickers] = useState<Interest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [hasMoreStickers, setHasMoreStickers] = useState(false);
   const searchSequenceRef = useRef(0);
   const groups = useMemo(selectionOptions, []);
   const visibleSelectionGroups = useMemo(() => selectionsForGroup(filters.stickerGroup, groups), [filters.stickerGroup, groups]);
@@ -100,27 +105,42 @@ export function StickersLandingPage() {
   );
   const stickersEnabled = operationalSettings.featureFlags?.stickersPageEnabled !== false;
 
-  async function loadStickers(nextFilters = filters) {
+  async function loadStickers(nextFilters = filters, offset = 0, append = false) {
     const searchSequence = searchSequenceRef.current + 1;
     searchSequenceRef.current = searchSequence;
     if (!stickersEnabled) {
       setStickers([]);
+      setNextOffset(0);
+      setHasMoreStickers(false);
       return;
     }
-    setIsLoading(true);
+    if (append) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
     try {
       const payload = await fetchInterests({
         category: STICKERS_CATEGORY,
-        limit: 24,
+        limit: STICKERS_PAGE_SIZE,
+        offset,
         includeOwn: "true",
         ...nextFilters
       });
       if (searchSequenceRef.current === searchSequence) {
-        setStickers(payload.filter((item) => matchesLocationFilters(item, nextFilters)));
+        const filteredPayload = payload.filter((item) => matchesLocationFilters(item, nextFilters));
+        setStickers((current) => {
+          const merged = append ? [...current, ...filteredPayload] : filteredPayload;
+          const unique = new Map(merged.map((item) => [item.id, item]));
+          return Array.from(unique.values());
+        });
+        setNextOffset(offset + payload.length);
+        setHasMoreStickers(payload.length === STICKERS_PAGE_SIZE);
       }
     } finally {
       if (searchSequenceRef.current === searchSequence) {
         setIsLoading(false);
+        setIsLoadingMore(false);
       }
     }
   }
@@ -128,10 +148,16 @@ export function StickersLandingPage() {
   useEffect(() => {
     if (!stickersEnabled) {
       setStickers([]);
+      setNextOffset(0);
+      setHasMoreStickers(false);
       return;
     }
     const timer = window.setTimeout(() => {
-      loadStickers(filters).catch(() => setStickers([]));
+      loadStickers(filters, 0, false).catch(() => {
+        setStickers([]);
+        setNextOffset(0);
+        setHasMoreStickers(false);
+      });
     }, 380);
     return () => window.clearTimeout(timer);
   }, [filters, stickersEnabled]);
@@ -142,6 +168,8 @@ export function StickersLandingPage() {
 
   function updateFilters(nextFilters: typeof filters) {
     setStickers([]);
+    setNextOffset(0);
+    setHasMoreStickers(false);
     setFilters(nextFilters);
     const { city, state, neighborhood, ...analyticsFilters } = nextFilters;
     trackEvent("stickers_filter_applied", {
@@ -155,6 +183,14 @@ export function StickersLandingPage() {
   function clearFilters() {
     updateFilters(emptyStickerFilters);
   };
+
+  function loadMoreStickers() {
+    if (isLoading || isLoadingMore || !hasMoreStickers) {
+      return;
+    }
+    trackEvent("stickers_load_more_clicked", { offset: nextOffset });
+    loadStickers(filters, nextOffset, true).catch(() => undefined);
+  }
 
   if (!stickersEnabled) {
     return <section className="route-shell"><EmptyState title="Figurinhas indisponível" description="Esta página está temporariamente desabilitada." /></section>;
@@ -226,6 +262,13 @@ export function StickersLandingPage() {
               );
             }) : null}
             {!isLoading && !stickers.length ? <EmptyState title="Nenhuma figurinha encontrada" description="Ajuste os filtros ou publique a primeira procura de figurinhas." /> : null}
+            {!isLoading && stickers.length && hasMoreStickers ? (
+              <div className="stickers-load-more">
+                <Button type="button" variant="outline" onClick={loadMoreStickers} disabled={isLoadingMore}>
+                  {isLoadingMore ? "Carregando..." : "Ver mais figurinhas"}
+                </Button>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
@@ -403,7 +446,7 @@ export function PublishStickersPage() {
 
   return (
     <section className="route-shell stickers-publish">
-      <Link href="/figurinhas" className="back-link"><ArrowLeft size={16} /> Voltar para Figurinhas</Link>
+      <BackButton />
       <div className="form-heading">
         <span className="pill">Copa 2026</span>
         <h1>Publicar Figurinhas</h1>

@@ -14,6 +14,7 @@ import { readImageFile } from "@/shared/lib/image-upload";
 import { referenceImageSrc } from "@/shared/lib/images";
 import { readInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { Button } from "@/shared/ui/button";
+import { BackButton } from "@/shared/ui/back-button";
 import { FieldCounter } from "@/shared/ui/field-counter";
 import { trackEvent } from "@/features/analytics/analytics";
 
@@ -150,7 +151,7 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
         <div className="auth-card">
           <h1>Procura não encontrada</h1>
           <p>Essa procura pode não existir mais ou ainda não estar pública.</p>
-          <Link className="button button--primary" href={interestListHref}>Voltar para as procuras</Link>
+          <BackButton className="button button--primary" />
         </div>
       </section>
     );
@@ -309,7 +310,7 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
 
   return (
     <section className="route-shell detail-route">
-      <Link href={interestListHref} className="back-link"><ArrowLeft size={16} /> Voltar para as procuras</Link>
+      <BackButton />
       <div className="detail-grid">
         <article className="detail-main">
           <span className={`pill pill--${statusTone(resolvedInterest.status)}`}>{statusLabel(resolvedInterest.status ?? "OPEN")}</span>

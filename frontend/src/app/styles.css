@@ -1045,6 +1045,17 @@ select:focus {
   width: min(100%, 420px);
 }
 
+.stickers-load-more {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.stickers-load-more .button {
+  min-width: min(100%, 240px);
+}
+
 .stickers-section-publish {
   min-width: 108px;
   padding-inline: 20px;
@@ -1431,6 +1442,46 @@ select:focus {
   padding: 20px;
   display: grid;
   gap: 6px;
+}
+
+.category-tile--stickers {
+  position: relative;
+  overflow: hidden;
+  border-color: color-mix(in srgb, #8b5cf6 34%, var(--border));
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(120deg, #2563eb, #8b5cf6, #ec4899) border-box;
+}
+
+.category-tile--stickers::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.13;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.55) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.55) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.category-tile--stickers strong,
+.category-tile--stickers span {
+  position: relative;
+  z-index: 1;
+}
+
+.category-tile--stickers strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  background: linear-gradient(90deg, #2563eb, #8b5cf6, #ec4899);
+  background-size: 180% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: stickersNavGradient 3.8s linear infinite;
 }
 
 .category-tile span {
@@ -3118,6 +3169,20 @@ small {
   cursor: pointer;
 }
 
+.stack-form label.conversation-file-button,
+.conversation-form label.conversation-file-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+  margin-bottom: 0;
+}
+
+.conversation-file-button svg {
+  flex: 0 0 auto;
+}
+
 .conversation-file-button input {
   position: absolute;
   inset: 0;
@@ -3248,7 +3313,7 @@ small {
   min-height: 46px;
   padding: 0 18px;
   border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--border));
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: color-mix(in srgb, var(--primary) 8%, var(--surface));
   color: var(--primary-strong);
   text-decoration: none;
@@ -3278,6 +3343,56 @@ small {
 
 .status-icon {
   color: var(--primary-strong);
+}
+
+.feedback {
+  display: grid;
+  gap: 18px;
+  padding: 28px;
+}
+
+.feedback .modal-header {
+  margin-bottom: 0;
+}
+
+.feedback .modal-title {
+  align-items: flex-start;
+}
+
+.feedback .modal-title strong {
+  font-size: 1.18rem;
+  line-height: 1.25;
+}
+
+.feedback .status-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.feedback__message {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+}
+
+.feedback__message p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.feedback .modal-actions {
+  margin-top: 0;
+  justify-content: flex-end;
 }
 
 .segmented-control {

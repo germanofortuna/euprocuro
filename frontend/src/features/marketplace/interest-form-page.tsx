@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Info, Upload } from "lucide-react";
+import { Info, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import { usePlatform } from "@/features/platform/platform-context";
@@ -11,6 +11,7 @@ import type { Interest } from "@/shared/api/types";
 import { formatCep, hasLink, limitText } from "@/shared/lib/format";
 import { readImageFile } from "@/shared/lib/image-upload";
 import { Button } from "@/shared/ui/button";
+import { BackButton } from "@/shared/ui/back-button";
 import { FieldCounter } from "@/shared/ui/field-counter";
 
 const TITLE_MAX_LENGTH = 80;
@@ -214,7 +215,7 @@ export function InterestFormPage() {
 
   return (
     <section className="route-shell form-route">
-      <Link href="/meus-interesses" className="back-link"><ArrowLeft size={16} /> Voltar</Link>
+      <BackButton />
       <div className="form-heading">
         <h1>{editingInterestId ? "Editar procura" : "O que voce procura?"}</h1>
         <p>{editingInterestId ? "Ajuste os dados da procura e envie novamente para validacao." : "Descreva detalhadamente o que voce precisa para receber as melhores propostas."}</p>

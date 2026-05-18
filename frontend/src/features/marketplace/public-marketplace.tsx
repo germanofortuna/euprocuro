@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowRight, Search, TrendingUp } from "lucide-react";
+import { ArrowRight, Search, Sparkles, TrendingUp } from "lucide-react";
 import { useEffect } from "react";
 import { usePlatform } from "@/features/platform/platform-context";
 import { InterestCard } from "./interest-card";
@@ -11,6 +11,7 @@ import { budgetLabel, categoryLabel, categorySearchPlaceholder, locationLabel, s
 import { rememberInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { Button } from "@/shared/ui/button";
 import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
+import { STICKERS_CATEGORY } from "@/features/stickers/stickers-data";
 
 export function PublicHome() {
   const { categories, interests, selectedInterest, selectInterest, refreshPublicData, openAuthModal, isLoadingPublic, hasLoadedPublicData } = usePlatform();
@@ -108,12 +109,19 @@ export function CategoryLanding({ categorySlug }: { categorySlug?: string }) {
           <div className="feed-column">
             {!currentCategory && !isSearchPage ? (
               <div className="category-grid">
-                {categories.map((category) => (
-                  <Link className="category-tile" key={category.value} href={`/categorias/${slugifyCategory(category.value)}`}>
-                    <strong>{category.label}</strong>
-                    <span>Ver procuras indexáveis</span>
-                  </Link>
-                ))}
+                {categories.map((category) => {
+                  const isStickersCategory = category.value === STICKERS_CATEGORY;
+                  return (
+                    <Link
+                      className={isStickersCategory ? "category-tile category-tile--stickers" : "category-tile"}
+                      key={category.value}
+                      href={isStickersCategory ? "/figurinhas" : `/categorias/${slugifyCategory(category.value)}`}
+                    >
+                      <strong>{isStickersCategory ? <><Sparkles size={17} /> {category.label}</> : category.label}</strong>
+                      <span>{isStickersCategory ? "Troque faltantes e repetidas da Copa 2026" : "Ver procuras indexáveis"}</span>
+                    </Link>
+                  );
+                })}
               </div>
             ) : null}
             <div className="section-heading">

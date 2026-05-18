@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackButton } from "@/shared/ui/back-button";
 
 export default function NotFound() {
   return (
@@ -7,7 +7,7 @@ export default function NotFound() {
         <span className="pill">404</span>
         <h1>Pagina nao encontrada</h1>
         <p>O endereco acessado nao existe ou foi movido.</p>
-        <Link className="button button--primary button--md" href="/">Voltar para a home</Link>
+        <BackButton className="button button--primary button--md" />
       </section>
     </main>
   );

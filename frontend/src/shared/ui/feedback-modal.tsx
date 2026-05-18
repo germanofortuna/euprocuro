@@ -17,11 +17,19 @@ const icons = {
   info: Info
 };
 
+function splitMessage(message: string) {
+  return message
+    .split(/(?<=\.)\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 export function FeedbackModal({ modal, onClose }: { modal: FeedbackState; onClose: () => void }) {
   if (!modal) {
     return null;
   }
   const Icon = icons[modal.type ?? "info"];
+  const messageParts = splitMessage(modal.message);
   function close() {
     const afterClose = modal?.afterClose;
     onClose();
@@ -40,7 +48,11 @@ export function FeedbackModal({ modal, onClose }: { modal: FeedbackState; onClos
             <X size={18} />
           </button>
         </div>
-        <p>{modal.message}</p>
+        <div className="feedback__message">
+          {messageParts.map((part, index) => (
+            <p key={`${part}-${index}`}>{part}</p>
+          ))}
+        </div>
         <div className="modal-actions">
           <Button type="button" onClick={close}>Entendi</Button>
         </div>
