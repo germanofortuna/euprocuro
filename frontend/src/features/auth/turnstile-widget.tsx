@@ -83,7 +83,6 @@ export function TurnstileWidget({
         onReady={() => setScriptReady(true)}
       />
       <div ref={containerRef} />
-      <small>Protecao anti-spam por Cloudflare Turnstile.</small>
     </div>
   );
 }
