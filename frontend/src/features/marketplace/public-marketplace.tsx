@@ -9,17 +9,44 @@ import { InterestCard } from "./interest-card";
 import { MarketplaceFilters } from "./marketplace-filters";
 import { budgetLabel, categoryLabel, categorySearchPlaceholder, locationLabel, slugifyCategory } from "@/shared/lib/format";
 import { rememberInterestListHref } from "@/shared/lib/interest-list-navigation";
-import { Button } from "@/shared/ui/button";
 import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
 import { STICKERS_CATEGORY } from "@/features/stickers/stickers-data";
+import type { Interest } from "@/shared/api/types";
+
+function normalizeSearchText(value?: string | null) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function interestMatchesQuery(interest: Interest, query: string) {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) {
+    return true;
+  }
+  return [
+    interest.title,
+    interest.description,
+    interest.ownerName,
+    interest.location?.city,
+    interest.location?.state,
+    interest.location?.neighborhood,
+    interest.stickerDetails?.selection,
+    ...(interest.stickerDetails?.numbers ?? []),
+    ...(interest.stickerDetails?.players ?? []),
+    ...(interest.tags ?? [])
+  ].map(normalizeSearchText).join(" ").includes(normalizedQuery);
+}
 
 export function PublicHome() {
-  const { categories, interests, selectedInterest, selectInterest, refreshPublicData, openAuthModal, isLoadingPublic, hasLoadedPublicData } = usePlatform();
+  const { categories, interests, selectedInterest, selectInterest, refreshPublicData, isLoadingPublic, hasLoadedPublicData } = usePlatform();
   const searchParams = useSearchParams();
   const query = (searchParams.get("query") ?? "").trim().toLowerCase();
   const isResolvingResults = isLoadingPublic || !hasLoadedPublicData;
   const visibleInterests = query
-    ? interests.filter((interest) => [interest.title, interest.description, ...(interest.tags ?? [])].join(" ").toLowerCase().includes(query))
+    ? interests.filter((interest) => interestMatchesQuery(interest, query))
     : interests;
 
   return (
@@ -31,7 +58,7 @@ export function PublicHome() {
           <p>Diga o que você precisa. Receba propostas de quem tem o que você procura. Simples, rápido e direto ao ponto.</p>
           <div className="hero-actions">
             <AuthIntentLink className="button button--secondary button--lg" href="/cadastrar-interesse" mode="login">Publicar uma procura</AuthIntentLink>
-            <Button variant="primary" size="lg" type="button" onClick={() => openAuthModal("register")}>Responder procuras</Button>
+            <AuthIntentLink className="button button--primary button--lg" href="/categorias" mode="register">Responder procuras</AuthIntentLink>
           </div>
         </div>
       </section>
@@ -80,9 +107,21 @@ export function CategoryLanding({ categorySlug }: { categorySlug?: string }) {
   const currentCategory = categorySlug
     ? categories.find((category) => slugifyCategory(category.value) === categorySlug || slugifyCategory(category.label) === categorySlug)
     : null;
+
+  useEffect(() => {
+    if (!query && !currentCategory?.value) {
+      return;
+    }
+    refreshPublicData({
+      query: query || undefined,
+      category: currentCategory?.value,
+      limit: query ? 50 : undefined
+    }).catch(() => undefined);
+  }, [currentCategory?.value, query, refreshPublicData]);
+
   const baseInterests = currentCategory ? interests.filter((interest) => interest.category === currentCategory.value) : interests;
   const categoryInterests = query
-    ? baseInterests.filter((interest) => [interest.title, interest.description, ...(interest.tags ?? [])].join(" ").toLowerCase().includes(query))
+    ? baseInterests.filter((interest) => interestMatchesQuery(interest, query))
     : baseInterests;
   const title = currentCategory?.label ?? "Categorias";
   const isSearchPage = Boolean(query && !currentCategory);

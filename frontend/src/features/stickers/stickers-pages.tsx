@@ -1,20 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Filter, Plus, Search, Sparkles, Trash2, Trophy, Users, Zap } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowRight, Filter, Plus, Search, Sparkles, Trash2, Trophy, Users, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import { trackEvent } from "@/features/analytics/analytics";
 import { usePlatform } from "@/features/platform/platform-context";
-import { fetchInterests, lookupAddressByPostalCode } from "@/shared/api/client";
+import { fetchInterest, fetchInterests, lookupAddressByPostalCode } from "@/shared/api/client";
 import type { Interest } from "@/shared/api/types";
 import { formatCep, limitText } from "@/shared/lib/format";
 import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
 import { BackButton } from "@/shared/ui/back-button";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
-import { SPECIAL_STICKER_SELECTIONS, STICKERS_CATEGORY, stickerGroupForSelection, stickerGroups, normalizeStickerNumbers, normalizeStickerPlayers } from "./stickers-data";
+import { SPECIAL_STICKER_SELECTIONS, STICKERS_CATEGORY, stickerGroupForSelection, stickerGroups, stickerOptionLabel, stickerSelectionLabel, normalizeStickerNumbers, normalizeStickerPlayers } from "./stickers-data";
 
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 type StickerPublishEntry = { id: string; selection: string; numbers: string; players: string };
@@ -219,7 +219,7 @@ export function StickersLandingPage() {
 
       <section id="figurinhas-disponiveis" className="marketplace-section stickers-market">
         <div className="section-heading">
-          <h2><Search size={24} /> Figurinhas publicadas</h2>
+          <h2><Search size={24} /> Figurinhas</h2>
           <AuthIntentLink className="button button--primary button--sm stickers-section-publish" href="/figurinhas/publicar">Publicar</AuthIntentLink>
         </div>
         <div className="stickers-grid-layout">
@@ -228,7 +228,7 @@ export function StickersLandingPage() {
             <form className="stack-form" onSubmit={applyFilters}>
               <label>Tipo<select value={filters.stickerType} onChange={(event) => updateFilters({ ...filters, stickerType: event.target.value })}><option value="">Todos</option><option value="MISSING">Faltantes</option><option value="AVAILABLE">Repetidas</option></select></label>
               <label>Grupo<select value={filters.stickerGroup} onChange={(event) => updateFilters({ ...filters, stickerGroup: event.target.value, stickerSelection: "" })}><option value="">Todos os grupos</option>{groups.map(([group]) => <option key={group} value={group}>Grupo {group}</option>)}<option value="SPECIAL">Especiais</option></select></label>
-              <label>Seleção<select value={filters.stickerSelection} onChange={(event) => updateFilters({ ...filters, stickerSelection: event.target.value })}><option value="">Todas</option>{visibleSelectionGroups.map(([group, selections]) => <optgroup key={group} label={`Grupo ${group}`}>{selections.map((selection) => <option key={selection.name} value={selection.name}>{selection.emblem} {selection.name}</option>)}</optgroup>)}{filters.stickerGroup === "" || filters.stickerGroup === "SPECIAL" ? <optgroup label="Especiais">{SPECIAL_STICKER_SELECTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</optgroup> : null}</select></label>
+              <label>Seleção<select value={filters.stickerSelection} onChange={(event) => updateFilters({ ...filters, stickerSelection: event.target.value })}><option value="">Todas</option>{visibleSelectionGroups.map(([group, selections]) => <optgroup key={group} label={`Grupo ${group}`}>{selections.map((selection) => <option key={selection.name} value={selection.name}>{stickerOptionLabel(selection)}</option>)}</optgroup>)}{filters.stickerGroup === "" || filters.stickerGroup === "SPECIAL" ? <optgroup label="Especiais">{SPECIAL_STICKER_SELECTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</optgroup> : null}</select></label>
               <label>Número<input value={filters.stickerNumber} onChange={(event) => updateFilters({ ...filters, stickerNumber: event.target.value })} placeholder="Ex: 12 ou FW26" /></label>
               <label>Jogador<input value={filters.stickerPlayer} onChange={(event) => updateFilters({ ...filters, stickerPlayer: event.target.value })} placeholder="Ex: Lionel Messi" /></label>
               <div className="form-grid form-grid--3 stickers-location-grid">
@@ -252,12 +252,12 @@ export function StickersLandingPage() {
                   </div>
                   <h3 className="sticker-card__title">
                     <span>{titleParts.action}{titleParts.separator}</span>
-                    <span className="sticker-card__selection">{titleParts.selection}</span>
+                    <span className="sticker-card__selection">{stickerSelectionLabel(titleParts.selection)}</span>
                     {titleParts.identifiers ? <span>: {titleParts.identifiers}</span> : null}
                   </h3>
                   <p>{item.description}</p>
                   <div className="sticker-card__meta-grid">
-                    <span><small>Seleção</small>{item.stickerDetails?.selection ?? "Copa 2026"}</span>
+                    <span><small>Seleção</small>{stickerSelectionLabel(item.stickerDetails?.selection) || "Copa 2026"}</span>
                     <span><small>Grupo</small>{item.stickerDetails?.group === "SPECIAL" ? "Especiais" : `Grupo ${item.stickerDetails?.group ?? "-"}`}</span>
                     {stickerLocationParts(item).map((part) => <span key={part}><small>{part.split(":")[0]}</small>{part.split(":").slice(1).join(":").trim()}</span>)}
                   </div>
@@ -312,9 +312,31 @@ function buildDescription(type: "MISSING" | "AVAILABLE", selection: string, numb
   return limitText(base, 120);
 }
 
+function extractStickerExtraDescription(interest: Interest) {
+  const selection = interest.stickerDetails?.selection ?? "";
+  const numbers = interest.stickerDetails?.numbers ?? [];
+  const players = interest.stickerDetails?.players ?? [];
+  const generatedLines = new Set([
+    "figurinhas faltantes:",
+    "figurinhas disponiveis para troca ou venda:",
+    "figurinhas disponíveis para troca ou venda:",
+    numbers.length ? `${numbers.join(", ")}${selection ? ` - ${selection}` : ""}.`.toLowerCase() : "",
+    players.length ? `jogadores: ${players.join(", ")}${selection ? ` - ${selection}` : ""}.`.toLowerCase() : ""
+  ].filter(Boolean));
+
+  return String(interest.description ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !generatedLines.has(line.toLowerCase()))
+    .join("\n");
+}
+
 export function PublishStickersPage() {
   const router = useRouter();
-  const { currentUser, openAuthModal, saveInterest, setFeedback, operationalSettings } = usePlatform();
+  const searchParams = useSearchParams();
+  const editingInterestId = searchParams.get("editar") ?? searchParams.get("edit");
+  const isEditing = Boolean(editingInterestId);
+  const { currentUser, dashboard, openAuthModal, saveInterest, setFeedback, operationalSettings } = usePlatform();
   const [form, setForm] = useState({
     type: "MISSING" as "MISSING" | "AVAILABLE",
     postalCode: "",
@@ -327,12 +349,62 @@ export function PublishStickersPage() {
   });
   const [entries, setEntries] = useState<StickerPublishEntry[]>([{ id: "stickers-1", selection: "", numbers: "", players: "" }]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingInterest, setIsLoadingInterest] = useState(false);
+  const loadedEditingInterestRef = useRef<string | null>(null);
   const [publishLookupState, setPublishLookupState] = useState<{ loading: boolean; message: string; tone: "muted" | "success" | "error" }>({ loading: false, message: "", tone: "muted" });
   const groups = useMemo(selectionOptions, []);
   const previewEntries = entries
     .map((entry) => ({ ...entry, numbers: normalizeStickerNumbers(entry.numbers), players: normalizeStickerPlayers(entry.players), group: stickerGroupForSelection(entry.selection) }))
     .filter((entry) => entry.selection || entry.numbers.length || entry.players.length);
   const stickersEnabled = operationalSettings.featureFlags?.stickersPageEnabled !== false;
+
+  function applyEditingInterest(interest: Interest) {
+    if (interest.category !== STICKERS_CATEGORY) {
+      setFeedback({ type: "error", title: "Procura incompatível", message: "Esta edição deve ser feita pelo formulário comum." });
+      router.replace(`/cadastrar-interesse?editar=${interest.id}`);
+      return;
+    }
+    setForm((current) => ({
+      ...current,
+      type: interest.stickerDetails?.type === "AVAILABLE" ? "AVAILABLE" : "MISSING",
+      postalCode: formatCep(String(interest.location?.postalCode ?? "")),
+      city: String(interest.location?.city ?? ""),
+      state: String(interest.location?.state ?? "").toUpperCase().slice(0, 2),
+      neighborhood: String(interest.location?.neighborhood ?? ""),
+      country: String(interest.location?.country ?? "Brasil"),
+      description: extractStickerExtraDescription(interest),
+      tags: (interest.tags ?? [])
+        .filter((tag) => !["copa-2026", "figurinhas", "faltantes", "repetidas", interest.stickerDetails?.selection].includes(tag))
+        .join(", ")
+    }));
+    setEntries([{
+      id: `stickers-edit-${interest.id}`,
+      selection: String(interest.stickerDetails?.selection ?? ""),
+      numbers: (interest.stickerDetails?.numbers ?? []).join(", "),
+      players: (interest.stickerDetails?.players ?? []).join(", ")
+    }]);
+    loadedEditingInterestRef.current = interest.id;
+  }
+
+  useEffect(() => {
+    if (!editingInterestId) {
+      loadedEditingInterestRef.current = null;
+      return;
+    }
+    if (loadedEditingInterestRef.current === editingInterestId) {
+      return;
+    }
+    const cachedInterest = dashboard?.myInterests?.find((interest) => interest.id === editingInterestId);
+    if (cachedInterest) {
+      applyEditingInterest(cachedInterest);
+      return;
+    }
+    setIsLoadingInterest(true);
+    fetchInterest(editingInterestId)
+      .then(applyEditingInterest)
+      .catch((error) => setFeedback({ type: "error", title: "Procura indisponível", message: error instanceof Error ? error.message : "Não foi possível carregar esta procura para edição." }))
+      .finally(() => setIsLoadingInterest(false));
+  }, [dashboard?.myInterests, editingInterestId]);
 
   useEffect(() => {
     setForm((current) => ({
@@ -386,7 +458,7 @@ export function PublishStickersPage() {
   const submit: FormSubmitHandler = async (event) => {
     event.preventDefault();
     if (!currentUser?.id) {
-      openAuthModal("login", "/figurinhas/publicar");
+      openAuthModal("login", editingInterestId ? `/figurinhas/publicar?editar=${editingInterestId}` : "/figurinhas/publicar");
       return;
     }
     const publishEntries = entries
@@ -428,11 +500,16 @@ export function PublishStickersPage() {
             numbers: entry.numbers,
             players: entry.players
           }
-        });
+        }, editingInterestId);
         savedItems.push(saved);
+        if (editingInterestId) {
+          break;
+        }
       }
       trackEvent("stickers_publish_completed", { type: form.type, totalSelections: savedItems.length, interestId: savedItems[0]?.id });
-      if (savedItems.length > 1) {
+      if (editingInterestId && savedItems[0]?.id) {
+        router.push(`/interesses/${savedItems[0].id}`);
+      } else if (savedItems.length > 1) {
         router.push("/meus-interesses");
       } else if (savedItems[0]?.id) {
         const saved = savedItems[0];
@@ -466,9 +543,10 @@ export function PublishStickersPage() {
       <BackButton />
       <div className="form-heading">
         <span className="pill">Copa 2026</span>
-        <h1>Publicar Figurinhas</h1>
-        <p>Informe suas faltantes ou repetidas para receber propostas de outros colecionadores.</p>
+        <h1>{isEditing ? "Editar Figurinhas" : "Publicar Figurinhas"}</h1>
+        <p>{isEditing ? "Ajuste seleção, números ou jogadores e envie para nova validação." : "Informe suas faltantes ou repetidas para receber propostas de outros colecionadores."}</p>
       </div>
+      {isLoadingInterest ? <div className="section-loading" role="status">Carregando procura para edição...</div> : null}
       <form className="feature-form stickers-form" onSubmit={submit}>
         <section className="form-section">
           <h2>Informações das figurinhas</h2>
@@ -478,19 +556,19 @@ export function PublishStickersPage() {
           </div>
           <div className="sticker-entry-list">
             {entries.map((entry, index) => (
-              <div className="sticker-entry-row" key={entry.id}>
+              <div className={isEditing ? "sticker-entry-row sticker-entry-row--editing" : "sticker-entry-row"} key={entry.id}>
                 <span className="sticker-entry-index">Seleção {index + 1}</span>
-                <label>Seleção ou especial<select value={entry.selection} onChange={(event) => updateEntry(entry.id, { selection: event.target.value })} required><option value="">Selecione a seleção ou tipo especial...</option>{groups.map(([group, selections]) => <optgroup key={group} label={`Grupo ${group}`}>{selections.map((selection) => <option key={selection.name} value={selection.name}>{selection.emblem} {selection.name}</option>)}</optgroup>)}<optgroup label="Especiais">{SPECIAL_STICKER_SELECTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</optgroup></select></label>
+                <label>Seleção ou especial<select value={entry.selection} onChange={(event) => updateEntry(entry.id, { selection: event.target.value })} required><option value="">Escolha a seleção/especiais</option>{groups.map(([group, selections]) => <optgroup key={group} label={`Grupo ${group}`}>{selections.map((selection) => <option key={selection.name} value={selection.name}>{stickerOptionLabel(selection)}</option>)}</optgroup>)}<optgroup label="Especiais">{SPECIAL_STICKER_SELECTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</optgroup></select></label>
                 <label>Números ou códigos<input value={entry.numbers} onChange={(event) => updateEntry(entry.id, { numbers: event.target.value })} placeholder="Ex: 12, 45, 78, FW26" /></label>
                 <label>Jogadores<input value={entry.players} onChange={(event) => updateEntry(entry.id, { players: event.target.value })} placeholder="Ex: Lionel Messi, Neymar, Cristiano Ronaldo" /></label>
-                <Button type="button" variant="outline" className="sticker-entry-remove" onClick={() => removeEntry(entry.id)} disabled={entries.length === 1} title={entries.length === 1 ? "Mantenha pelo menos uma seleção" : "Remover seleção"} aria-label={entries.length === 1 ? "Mantenha pelo menos uma seleção" : "Remover seleção"}><Trash2 size={17} /></Button>
+                {!isEditing ? <Button type="button" variant="outline" className="sticker-entry-remove" onClick={() => removeEntry(entry.id)} disabled={entries.length === 1} title={entries.length === 1 ? "Mantenha pelo menos uma seleção" : "Remover seleção"} aria-label={entries.length === 1 ? "Mantenha pelo menos uma seleção" : "Remover seleção"}><Trash2 size={17} /></Button> : null}
               </div>
             ))}
           </div>
-          <div className="sticker-entry-add-row">
+          {!isEditing ? <div className="sticker-entry-add-row">
             <Button type="button" variant="outline" className="sticker-entry-add" onClick={addEntry}><Plus size={16} /> Adicionar outra seleção</Button>
             <small>A cada seleção adicionada, outro card de interesse será criado.</small>
-          </div>
+          </div> : null}
           <label>Descrição adicional<textarea rows={4} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: limitText(event.target.value, 80) }))} placeholder="Ex: aceito troca presencial, envio por correio ou compra em lote." /></label>
           <label>Tags<input value={form.tags} onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))} placeholder="Ex: troca presencial, urgente, lote" /></label>
         </section>
@@ -523,8 +601,8 @@ export function PublishStickersPage() {
           ) : null}
         </section>
         <div className="form-actions">
-          <Link className="button button--outline" href="/figurinhas">Cancelar</Link>
-          <Button type="submit" disabled={isSaving}>{isSaving ? "Publicando..." : "Publicar Procura - Grátis"}</Button>
+          <Link className="button button--outline" href={editingInterestId ? `/interesses/${editingInterestId}` : "/figurinhas"}>Cancelar</Link>
+          <Button type="submit" disabled={isSaving || isLoadingInterest}>{isSaving ? (isEditing ? "Salvando..." : "Publicando...") : (isEditing ? "Salvar Alterações" : "Publicar Procura - Grátis")}</Button>
         </div>
       </form>
     </section>

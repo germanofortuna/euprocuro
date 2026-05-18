@@ -1,6 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap");
 
 :root {
+  --emoji-font: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji";
   --bg: #f6f8fc;
   --bg-strong: #ffffff;
   --surface: #ffffff;
@@ -719,11 +720,16 @@ select:focus {
 }
 
 .text-button {
-  color: white;
+  color: var(--primary-strong);
   background: transparent;
   border: 0;
   padding: 0;
   font-weight: 800;
+  cursor: pointer;
+}
+
+.text-button:hover {
+  color: var(--primary);
 }
 
 .section-heading a {
@@ -827,6 +833,32 @@ select:focus {
   color: #fff;
   box-shadow: 0 12px 30px rgba(238, 77, 122, 0.28);
   flex: 0 0 auto;
+}
+
+.detail-title__sticker-selection,
+.interest-card__sticker-selection {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--primary-strong);
+  font-family: var(--emoji-font), Sora, Arial, sans-serif;
+  font-weight: 900;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.detail-title__sticker-selection {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  font-size: clamp(0.78rem, 1.7vw, 1rem);
+}
+
+.interest-card__sticker-selection {
+  margin-left: 8px;
+  font-size: 0.78rem;
+  vertical-align: middle;
 }
 
 .interest-card p,
@@ -1080,6 +1112,11 @@ select:focus {
   padding-block: 8px;
 }
 
+.stickers-filter-panel select,
+.stickers-form select {
+  font-family: var(--emoji-font), Sora, Arial, sans-serif;
+}
+
 .sticker-card {
   position: relative;
   min-height: 270px;
@@ -1169,6 +1206,7 @@ select:focus {
 
 .sticker-card__selection {
   color: #f7c948;
+  font-family: var(--emoji-font), Sora, Arial, sans-serif;
 }
 
 .sticker-card p {
@@ -1265,11 +1303,11 @@ select:focus {
 
 .sticker-entry-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: minmax(170px, 1.05fr) minmax(132px, 0.78fr) minmax(170px, 1fr) 42px;
+  gap: 10px;
   align-items: end;
   position: relative;
-  padding: 16px;
+  padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: color-mix(in srgb, var(--surface-raised) 86%, transparent);
@@ -1298,6 +1336,21 @@ select:focus {
   border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.sticker-entry-row--editing {
+  grid-template-columns: minmax(170px, 1.05fr) minmax(132px, 0.78fr) minmax(170px, 1fr);
+}
+
+.sticker-entry-row label {
+  min-width: 0;
+}
+
+.sticker-entry-row input,
+.sticker-entry-row select {
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
 }
 
 .sticker-entry-remove:hover:not(:disabled) {
@@ -1874,6 +1927,20 @@ select:focus {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.boost-payment-note {
+  margin: -2px 0 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.boost-payment-note span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .boost-option-list input {

@@ -64,6 +64,41 @@ export const SPECIAL_STICKER_SELECTIONS = [
   "Historia da Copa"
 ];
 
+const SPECIAL_FLAG_EMBLEMS: Record<string, string> = {
+  ENG: "\uD83C\uDDEC\uD83C\uDDE7",
+  SCO: "\uD83C\uDDEC\uD83C\uDDE7"
+};
+
+function flagFromEmblem(emblem?: string | null) {
+  const normalized = String(emblem ?? "").trim().toUpperCase();
+  if (SPECIAL_FLAG_EMBLEMS[normalized]) {
+    return SPECIAL_FLAG_EMBLEMS[normalized];
+  }
+  if (!/^[A-Z]{2}$/.test(normalized)) {
+    return "";
+  }
+  return String.fromCodePoint(...[...normalized].map((char) => 0x1f1e6 + char.charCodeAt(0) - 65));
+}
+
+export function stickerFlagForSelection(value?: string | null) {
+  const selection = STICKER_SELECTIONS.find((item) => item.name === value);
+  return flagFromEmblem(selection?.emblem);
+}
+
+export function stickerSelectionLabel(value?: string | null) {
+  const selectionName = String(value ?? "").trim();
+  if (!selectionName) {
+    return "";
+  }
+  const flag = stickerFlagForSelection(selectionName);
+  return flag ? `${flag} ${selectionName}` : selectionName;
+}
+
+export function stickerOptionLabel(selection: StickerSelection) {
+  const flag = flagFromEmblem(selection.emblem);
+  return `${flag || selection.emblem} ${selection.name}`;
+}
+
 export function stickerGroups() {
   return STICKER_SELECTIONS.reduce<Record<string, StickerSelection[]>>((groups, selection) => {
     groups[selection.group] = [...(groups[selection.group] ?? []), selection];

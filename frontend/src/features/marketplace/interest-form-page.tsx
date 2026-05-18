@@ -13,6 +13,7 @@ import { readImageFile } from "@/shared/lib/image-upload";
 import { Button } from "@/shared/ui/button";
 import { BackButton } from "@/shared/ui/back-button";
 import { FieldCounter } from "@/shared/ui/field-counter";
+import { STICKERS_CATEGORY } from "@/features/stickers/stickers-data";
 
 const TITLE_MAX_LENGTH = 80;
 const DESCRIPTION_MAX_LENGTH = 250;
@@ -71,6 +72,7 @@ export function InterestFormPage() {
   const [form, setForm] = useState(() => initialInterestForm(currentUser));
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingInterest, setIsLoadingInterest] = useState(false);
+  const [isRedirectingToStickers, setIsRedirectingToStickers] = useState(false);
   const loadedEditingInterestRef = useRef<string | null>(null);
   const [lookupState, setLookupState] = useState<{ loading: boolean; message: string; tone: "muted" | "success" | "error" }>({
     loading: false,
@@ -99,6 +101,10 @@ export function InterestFormPage() {
     }
     const cachedInterest = dashboard?.myInterests?.find((interest) => interest.id === editingInterestId);
     if (cachedInterest) {
+      if (cachedInterest.category === STICKERS_CATEGORY) {
+        router.replace(`/figurinhas/publicar?editar=${editingInterestId}`);
+        return;
+      }
       setForm((current) => interestToForm(cachedInterest, current));
       loadedEditingInterestRef.current = editingInterestId;
       return;
@@ -106,12 +112,16 @@ export function InterestFormPage() {
     setIsLoadingInterest(true);
     fetchInterest(editingInterestId)
       .then((interest) => {
+        if (interest.category === STICKERS_CATEGORY) {
+          router.replace(`/figurinhas/publicar?editar=${editingInterestId}`);
+          return;
+        }
         setForm((current) => interestToForm(interest, current));
         loadedEditingInterestRef.current = editingInterestId;
       })
       .catch((error) => setFeedback({ type: "error", title: "Procura indisponivel", message: error instanceof Error ? error.message : "Nao foi possivel carregar esta procura para edicao." }))
       .finally(() => setIsLoadingInterest(false));
-  }, [dashboard?.myInterests, editingInterestId, setFeedback]);
+  }, [dashboard?.myInterests, editingInterestId, router, setFeedback]);
 
   async function handlePostalCodeLookup(postalCode = form.postalCode) {
     const normalizedPostalCode = String(postalCode).replace(/\D/g, "");
@@ -144,6 +154,11 @@ export function InterestFormPage() {
     event.preventDefault();
     if (!currentUser?.id) {
       openAuthModal("login");
+      return;
+    }
+    if (form.category === STICKERS_CATEGORY && !editingInterestId) {
+      setIsRedirectingToStickers(true);
+      router.push("/figurinhas/publicar");
       return;
     }
     if (hasLink(form.description)) {
@@ -201,6 +216,14 @@ export function InterestFormPage() {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function handleCategoryChange(value: string) {
+    update("category", value);
+    if (value === STICKERS_CATEGORY && !editingInterestId) {
+      setIsRedirectingToStickers(true);
+      router.push("/figurinhas/publicar");
+    }
+  }
+
   async function handleReferenceImageChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
@@ -221,6 +244,7 @@ export function InterestFormPage() {
         <p>{editingInterestId ? "Ajuste os dados da procura e envie novamente para validação." : "Descreva detalhadamente o que você precisa para receber as melhores propostas."}</p>
       </div>
       {isLoadingInterest ? <div className="section-loading" role="status">Carregando procura para edição...</div> : null}
+      {isRedirectingToStickers ? <div className="section-loading" role="status">Abrindo o formulário de figurinhas...</div> : null}
       <form className="feature-form" onSubmit={submit}>
         <section className="form-section">
           <h2>Informações principais</h2>
@@ -232,7 +256,7 @@ export function InterestFormPage() {
           </label>
           <label>
             Categoria
-            <select value={form.category} onChange={(event) => update("category", event.target.value)} required>
+            <select value={form.category} onChange={(event) => handleCategoryChange(event.target.value)} required disabled={isRedirectingToStickers}>
               <option value="">Selecione uma categoria...</option>
               {categories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
             </select>
@@ -284,7 +308,7 @@ export function InterestFormPage() {
         </section>
         <div className="form-actions">
           <Link className="button button--outline" href="/meus-interesses">Cancelar</Link>
-          <Button type="submit" disabled={isSaving || isLoadingInterest}>{isSaving ? (editingInterestId ? "Salvando..." : "Publicando...") : (editingInterestId ? "Salvar alteracoes" : "Publicar Procura")}</Button>
+          <Button type="submit" disabled={isSaving || isLoadingInterest || isRedirectingToStickers}>{isRedirectingToStickers ? "Abrindo figurinhas..." : isSaving ? (editingInterestId ? "Salvando..." : "Publicando...") : (editingInterestId ? "Salvar alteracoes" : "Publicar Procura")}</Button>
         </div>
       </form>
     </section>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, MapPin, Tag, Zap } from "lucide-react";
 import { usePlatform } from "@/features/platform/platform-context";
+import { STICKERS_CATEGORY, stickerSelectionLabel } from "@/features/stickers/stickers-data";
 import type { Category, Interest } from "@/shared/api/types";
 import { budgetLabel, categoryLabel, isBoostActive, locationLabel } from "@/shared/lib/format";
 import { referenceImageSrc } from "@/shared/lib/images";
@@ -14,6 +15,7 @@ export function InterestCard({ interest, categories }: { interest: Interest; cat
     currentUser?.id && (interest.ownerId === currentUser.id || dashboard?.myInterests?.some((item) => item.id === interest.id))
   );
   const isOwnBoostActive = isOwnInterest && isBoostActive(interest);
+  const stickerSelection = interest.category === STICKERS_CATEGORY ? stickerSelectionLabel(interest.stickerDetails?.selection) : "";
   return (
     <article className={`interest-card${imageSrc ? " interest-card--with-image" : ""}`}>
       {isOwnInterest ? (
@@ -29,7 +31,10 @@ export function InterestCard({ interest, categories }: { interest: Interest; cat
       ) : null}
       <div className="interest-card__body">
         <div className="interest-card__title">
-          <h3>{interest.title}</h3>
+          <h3>
+            {interest.title}
+            {stickerSelection ? <span className="interest-card__sticker-selection">{stickerSelection}</span> : null}
+          </h3>
           <div className="interest-meta">
             <span><Tag size={15} /> {categoryLabel(categories, interest.category)}</span>
             <span><MapPin size={15} /> {locationLabel(interest)}</span>

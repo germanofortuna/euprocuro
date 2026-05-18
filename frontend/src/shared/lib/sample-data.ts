@@ -9,9 +9,9 @@ export const sampleInterests: Interest[] = [
     budgetMax: 450,
     location: { city: "São Paulo", state: "SP", country: "Brasil" },
     tags: ["Urgente", "Residencial"],
-    boostedUntil: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3).toISOString(),
+    boostedUntil: "2099-01-04T12:00:00.000Z",
     status: "OPEN",
-    createdAt: new Date().toISOString()
+    createdAt: "2026-01-01T12:00:00.000Z"
   },
   {
     id: "sample-2",
@@ -22,7 +22,7 @@ export const sampleInterests: Interest[] = [
     location: { city: "Curitiba", state: "PR", country: "Brasil" },
     tags: ["Estudo", "Usado"],
     status: "OPEN",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString()
+    createdAt: "2026-01-01T08:00:00.000Z"
   },
   {
     id: "sample-3",
@@ -33,7 +33,7 @@ export const sampleInterests: Interest[] = [
     location: { remote: true, country: "Brasil" },
     tags: ["Música", "Online"],
     status: "OPEN",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString()
+    createdAt: "2026-01-01T04:00:00.000Z"
   },
   {
     id: "sample-4",
@@ -43,8 +43,8 @@ export const sampleInterests: Interest[] = [
     budgetMax: 2500,
     location: { city: "Campinas", state: "SP", country: "Brasil" },
     tags: ["Aluguel", "2 Quartos"],
-    boostedUntil: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+    boostedUntil: "2099-01-02T12:00:00.000Z",
     status: "OPEN",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString()
+    createdAt: "2026-01-01T00:00:00.000Z"
   }
 ];
