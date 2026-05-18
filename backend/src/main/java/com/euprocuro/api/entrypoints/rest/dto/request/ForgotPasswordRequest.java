@@ -10,4 +10,6 @@ public class ForgotPasswordRequest {
     @Email
     @NotBlank
     private String email;
+
+    private String turnstileToken;
 }

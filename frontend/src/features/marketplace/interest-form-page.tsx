@@ -92,12 +92,23 @@ export function InterestFormPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingInterest, setIsLoadingInterest] = useState(false);
   const [isRedirectingToStickers, setIsRedirectingToStickers] = useState(false);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const loadedEditingInterestRef = useRef<string | null>(null);
   const [lookupState, setLookupState] = useState<{ loading: boolean; message: string; tone: "muted" | "success" | "error" }>({
     loading: false,
     message: "",
     tone: "muted"
   });
+
+  useEffect(() => {
+    if (editingInterestId || typeof window === "undefined" || window.innerWidth > 760) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [editingInterestId]);
 
   useEffect(() => {
     const normalizedPostalCode = form.postalCode.replace(/\D/g, "");
@@ -264,7 +275,7 @@ export function InterestFormPage() {
       </div>
       {isLoadingInterest ? <div className="section-loading" role="status">Carregando procura para edição...</div> : null}
       {isRedirectingToStickers ? <div className="section-loading" role="status">Abrindo o formulário de figurinhas...</div> : null}
-      <form className="feature-form" onSubmit={submit}>
+      <form ref={formRef} className="feature-form" onSubmit={submit}>
         <section className="form-section">
           <h2>Informações principais</h2>
           <p>O título e a descrição são os itens mais importantes da sua procura.</p>

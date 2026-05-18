@@ -26,6 +26,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.euprocuro.api.application.command.CatalogCategoryCommand;
 import com.euprocuro.api.application.command.CatalogProductCommand;
+import com.euprocuro.api.application.command.FeatureFlagsCommand;
 import com.euprocuro.api.application.command.ModerationSettingsCommand;
 import com.euprocuro.api.application.command.MonetizationSettingsCommand;
 import com.euprocuro.api.application.command.OperationalFlagsCommand;
@@ -78,10 +79,43 @@ class OperationalCatalogServiceIntegrationStyleTest {
         assertThat(service.getMonetizationSettings().isBoostPurchasesEnabled()).isFalse();
         assertThat(service.getModerationSettings().isUserBlockListEnabled()).isTrue();
         assertThat(service.getFeatureFlags().isStickersPageEnabled()).isTrue();
+        assertThat(service.getFeatureFlags().isSellerProPlanEnabled()).isFalse();
+        assertThat(service.getFeatureFlags().isCaptchaEnabled()).isTrue();
         assertThat(service.getOperationalFields().getInitialFreeCredits()).isEqualTo(15);
         assertThat(service.getOperationalFields().getListingRenewalCredits()).isEqualTo(1);
         assertThat(contentEntryGateway.findAll()).hasSize(6);
         assertThat(contentRevisionGateway.revisions).hasSize(6);
+    }
+
+    @Test
+    void listActiveProductsShouldOnlyExposeSellerProWhenFeatureFlagIsEnabled() {
+        when(adminAccessService.requireAdmin("admin-1"))
+                .thenReturn(UserProfile.builder().id("admin-1").email("admin@test.com").build());
+
+        service.saveOperationalFlags("admin-1", OperationalFlagsCommand.builder()
+                .monetizationSettings(MonetizationSettingsCommand.builder()
+                        .creditPurchasesEnabled(true)
+                        .boostPurchasesEnabled(true)
+                        .build())
+                .build());
+
+        assertThat(service.listActiveProducts()).extracting("code")
+                .doesNotContain("SELLER_PRO");
+
+        service.saveOperationalFlags("admin-1", OperationalFlagsCommand.builder()
+                .monetizationSettings(MonetizationSettingsCommand.builder()
+                        .creditPurchasesEnabled(true)
+                        .boostPurchasesEnabled(true)
+                        .build())
+                .featureFlags(FeatureFlagsCommand.builder()
+                        .stickersPageEnabled(true)
+                        .sellerProPlanEnabled(true)
+                        .captchaEnabled(true)
+                        .build())
+                .build());
+
+        assertThat(service.listActiveProducts()).extracting("code")
+                .contains("SELLER_PRO");
     }
 
     @Test

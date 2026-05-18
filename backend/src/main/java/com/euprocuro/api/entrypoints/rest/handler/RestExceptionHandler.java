@@ -29,7 +29,8 @@ public class RestExceptionHandler {
             "message", "Mensagem",
             "offerImageUrl", "Imagem",
             "imageUrl", "Imagem",
-            "offeredPrice", "Valor da proposta"
+            "offeredPrice", "Valor da proposta",
+            "turnstileToken", "Verificacao de seguranca"
     );
 
     @ExceptionHandler(ResourceNotFoundException.class)

@@ -13,7 +13,7 @@ type AuthIntentLinkProps = {
 };
 
 export function AuthIntentLink({ href, children, className, mode = "login", onClick }: AuthIntentLinkProps) {
-  const { currentUser, openAuthModal } = usePlatform();
+  const { currentUser, isSessionReady, openAuthModal } = usePlatform();
 
   if (currentUser?.id) {
     return <Link className={className} href={href} onClick={onClick}>{children}</Link>;
@@ -23,7 +23,11 @@ export function AuthIntentLink({ href, children, className, mode = "login", onCl
     <button
       type="button"
       className={className}
+      disabled={!isSessionReady}
       onClick={() => {
+        if (!isSessionReady) {
+          return;
+        }
         onClick?.();
         openAuthModal(mode, href);
       }}

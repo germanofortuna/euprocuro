@@ -2,7 +2,7 @@
 
 import Script from "next/script";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { hasCookieConsent } from "@/features/privacy/cookie-consent";
 
 const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
@@ -32,19 +32,24 @@ export function trackEvent(name: string, params: Record<string, unknown> = {}) {
   window.gtag("event", name, params);
 }
 
-function AnalyticsRouteTracker() {
+function AnalyticsRouteTracker({ isReady }: { isReady: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    if (!isReady) {
+      return;
+    }
     const query = searchParams.toString();
     trackPageView(`${pathname}${query ? `?${query}` : ""}`);
-  }, [pathname, searchParams]);
+  }, [isReady, pathname, searchParams]);
 
   return null;
 }
 
 export function Analytics() {
+  const [isReady, setIsReady] = useState(false);
+
   if (!measurementId || !hasCookieConsent("analytics")) {
     return null;
   }
@@ -61,7 +66,10 @@ export function Analytics() {
           gtag('config', '${measurementId}', { send_page_view: false });
         `}
       </Script>
-      <AnalyticsRouteTracker />
+      <Script id="ga4-ready" strategy="afterInteractive" onReady={() => setIsReady(true)}>
+        {`window.__euProcuroGaReady = true;`}
+      </Script>
+      <AnalyticsRouteTracker isReady={isReady} />
     </>
   );
 }

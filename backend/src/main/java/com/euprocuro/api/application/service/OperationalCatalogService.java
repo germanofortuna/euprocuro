@@ -466,11 +466,20 @@ public class OperationalCatalogService {
     }
 
     private FeatureFlagsView validateFeatureFlags(FeatureFlagsCommand command) {
-        if (command == null || command.getStickersPageEnabled() == null) {
+        if (command == null) {
             return defaultFeatureFlags();
         }
+        FeatureFlagsView defaults = defaultFeatureFlags();
         return FeatureFlagsView.builder()
-                .stickersPageEnabled(command.getStickersPageEnabled())
+                .stickersPageEnabled(command.getStickersPageEnabled() == null
+                        ? defaults.isStickersPageEnabled()
+                        : command.getStickersPageEnabled())
+                .sellerProPlanEnabled(command.getSellerProPlanEnabled() == null
+                        ? defaults.isSellerProPlanEnabled()
+                        : command.getSellerProPlanEnabled())
+                .captchaEnabled(command.getCaptchaEnabled() == null
+                        ? defaults.isCaptchaEnabled()
+                        : command.getCaptchaEnabled())
                 .build();
     }
 
@@ -499,11 +508,15 @@ public class OperationalCatalogService {
     ) {
         boolean creditPurchasesEnabled = settings != null && settings.isCreditPurchasesEnabled();
         boolean boostPurchasesEnabled = settings != null && settings.isBoostPurchasesEnabled();
+        boolean sellerProPlanEnabled = getFeatureFlags().isSellerProPlanEnabled();
         return products.stream()
                 .filter(MonetizationProductView::isEnabled)
                 .filter(product -> {
                     if (product.getType() == MonetizationProductType.BOOST) {
                         return boostPurchasesEnabled;
+                    }
+                    if ("SELLER_PRO".equalsIgnoreCase(product.getCode())) {
+                        return creditPurchasesEnabled && sellerProPlanEnabled;
                     }
                     if (product.getType() == MonetizationProductType.CREDIT_PACK
                             || product.getType() == MonetizationProductType.SUBSCRIPTION) {
@@ -530,6 +543,8 @@ public class OperationalCatalogService {
     private FeatureFlagsView defaultFeatureFlags() {
         return FeatureFlagsView.builder()
                 .stickersPageEnabled(true)
+                .sellerProPlanEnabled(false)
+                .captchaEnabled(true)
                 .build();
     }
 
@@ -688,10 +703,14 @@ public class OperationalCatalogService {
     @Data
     private static class FeatureFlagsRecord {
         private boolean stickersPageEnabled = true;
+        private boolean sellerProPlanEnabled = false;
+        private boolean captchaEnabled = true;
 
         private FeatureFlagsView toView() {
             return FeatureFlagsView.builder()
                     .stickersPageEnabled(stickersPageEnabled)
+                    .sellerProPlanEnabled(sellerProPlanEnabled)
+                    .captchaEnabled(captchaEnabled)
                     .build();
         }
     }
