@@ -53,7 +53,7 @@ export function GoogleSignInButton({
     const render = () => {
       if (!buttonRef.current || !window.google?.accounts?.id) return;
       const container = buttonRef.current;
-      const containerWidth = Math.max(container.clientWidth || 0, 240);
+      const containerWidth = Math.min(Math.max(container.parentElement?.clientWidth || 400, 240), 400);
 
       container.innerHTML = "";
       window.google.accounts.id.initialize({
@@ -77,23 +77,6 @@ export function GoogleSignInButton({
         width: containerWidth
       });
 
-      // Try to make the injected button adopt our local button styles
-      // The Google button markup may vary, but often contains a button element.
-      // Apply our classes/styles after a microtask so the DOM is in place.
-      setTimeout(() => {
-        try {
-          const btn = container.querySelector("button");
-          if (btn) {
-            btn.classList.add("button", "button--md");
-            // ensure it fills the container
-            (btn as HTMLElement).style.width = "100%";
-            (btn as HTMLElement).style.minHeight = "42px";
-            (btn as HTMLElement).style.borderRadius = "var(--radius)";
-          }
-        } catch (e) {
-          // ignore
-        }
-      }, 0);
     };
 
     render();
@@ -124,7 +107,7 @@ export function GoogleSignInButton({
         onLoad={() => setScriptReady(true)}
         onReady={() => setScriptReady(true)}
       />
-      <div ref={buttonRef} />
+      <div className="google-signin__button" ref={buttonRef} />
     </div>
   );
 }

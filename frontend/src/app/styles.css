@@ -744,39 +744,30 @@ button:disabled {
 .google-signin {
   width: 100%;
   min-height: 42px;
-  display: grid;
-  justify-items: center;
+  display: flex;
+  justify-content: center;
+  background: transparent;
+}
+
+.google-signin__button {
+  width: min(100%, 400px);
+  min-height: 42px;
+  line-height: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.google-signin__button > div {
+  line-height: 0;
+}
+
+.google-signin__button iframe {
+  display: block;
 }
 
 .google-signin.is-disabled {
   opacity: 0.6;
   pointer-events: none;
-}
-
-/* Make Google's injected button visually match our buttons and follow dark theme */
-.google-signin > div,
-.google-signin > div > div {
-  width: 100%;
-}
-
-.google-signin > div > div > button,
-.google-signin button {
-  width: 100% !important;
-  min-height: 42px !important;
-  padding: 0 18px !important;
-  border-radius: var(--radius) !important;
-  font-weight: 800 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-:root[data-theme="dark"] .google-signin > div > div > button,
-:root[data-theme="dark"] .google-signin button {
-  /* prefer the filled_black theme from Google, but ensure fallback styling */
-  background: var(--surface-raised) !important;
-  color: var(--text) !important;
-  border-color: var(--border) !important;
 }
 
 input,
