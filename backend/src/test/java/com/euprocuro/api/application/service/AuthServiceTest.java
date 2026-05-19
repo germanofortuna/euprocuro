@@ -25,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
+import com.euprocuro.api.application.command.GoogleLoginCommand;
 import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
@@ -32,6 +33,7 @@ import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.exception.UnauthorizedException;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
+import com.euprocuro.api.application.view.GoogleIdentityView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.RegistrationView;
 import com.euprocuro.api.domain.gateway.AuthSessionGateway;
@@ -44,6 +46,7 @@ import com.euprocuro.api.domain.model.AuthSession;
 import com.euprocuro.api.domain.model.EmailVerificationToken;
 import com.euprocuro.api.domain.model.PasswordResetToken;
 import com.euprocuro.api.domain.model.UserProfile;
+import com.euprocuro.api.infrastructure.security.GoogleIdentityService;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -66,6 +69,8 @@ class AuthServiceTest {
     private AuditLogService auditLogService;
     @Mock
     private OperationalCatalogService operationalCatalogService;
+    @Mock
+    private GoogleIdentityService googleIdentityService;
 
     @InjectMocks
     private AuthService authService;
@@ -553,6 +558,62 @@ class AuthServiceTest {
     }
 
     @Test
+    void googleLoginShouldCreateVerifiedUserWithInitialCredits() {
+        when(googleIdentityService.verify("google-token")).thenReturn(GoogleIdentityView.builder()
+                .subject("google-sub")
+                .email("NOVA@TESTE.COM")
+                .name("Nova Pessoa")
+                .emailVerified(true)
+                .build());
+        when(userGateway.findByEmail("nova@teste.com")).thenReturn(Optional.empty());
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
+            UserProfile user = invocation.getArgument(0);
+            user.setId("google-user");
+            return user;
+        });
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthenticatedSessionView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
+                .idToken("google-token")
+                .ipAddress("10.0.0.1")
+                .build());
+
+        assertThat(result.getUser().getId()).isEqualTo("google-user");
+        assertThat(result.getUser().getEmail()).isEqualTo("nova@teste.com");
+        assertThat(result.getUser().isEmailVerified()).isTrue();
+        assertThat(result.getUser().getSellerCredits()).isEqualTo(15);
+        assertThat(result.getUser().getPasswordHash()).isNull();
+        assertThat(result.getUser().isTermsAccepted()).isTrue();
+        verify(eventPublisherGateway).publish(eq("auth.google-login"), any(Map.class));
+    }
+
+    @Test
+    void googleLoginShouldUseExistingAccountAndMarkEmailVerified() {
+        UserProfile existing = baseUser().toBuilder()
+                .email("ana@teste.com")
+                .emailVerified(false)
+                .build();
+        when(googleIdentityService.verify("google-token")).thenReturn(GoogleIdentityView.builder()
+                .subject("google-sub")
+                .email("ana@teste.com")
+                .name("Ana Silva")
+                .emailVerified(true)
+                .build());
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(existing));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthenticatedSessionView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
+                .idToken("google-token")
+                .build());
+
+        assertThat(result.getUser().getId()).isEqualTo("user-1");
+        assertThat(result.getUser().isEmailVerified()).isTrue();
+        verify(userGateway).save(any(UserProfile.class));
+        verify(eventPublisherGateway).publish(eq("auth.google-login"), any(Map.class));
+    }
+
+    @Test
     void meByUserIdShouldReturnCurrentUserData() {
         UserProfile user = baseUser();
 
@@ -889,7 +950,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.requireAuthenticatedUser("token-123"))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessageContaining("Sessao invalida");
+                .hasMessageContaining("Sessão inválida");
     }
 
     private UserProfile baseUser() {

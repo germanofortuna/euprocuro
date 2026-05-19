@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
+import com.euprocuro.api.application.command.GoogleLoginCommand;
 import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
@@ -28,6 +29,7 @@ import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.exception.UnauthorizedException;
 import com.euprocuro.api.application.usecase.AuthUseCase;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
+import com.euprocuro.api.application.view.GoogleIdentityView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.RegistrationView;
 import com.euprocuro.api.domain.gateway.AuthSessionGateway;
@@ -47,6 +49,7 @@ import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.PasswordResetToken;
 import com.euprocuro.api.domain.model.UserProfile;
+import com.euprocuro.api.infrastructure.security.GoogleIdentityService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -80,6 +83,7 @@ public class AuthService implements AuthUseCase {
     private final EventPublisherGateway eventPublisherGateway;
     private final AuditLogService auditLogService;
     private final OperationalCatalogService operationalCatalogService;
+    private final GoogleIdentityService googleIdentityService;
 
     @Value("${application.auth.session-hours:168}")
     private long sessionHours;
@@ -247,6 +251,61 @@ public class AuthService implements AuthUseCase {
                 .expiresAt(session.getExpiresAt())
                 .user(user)
                 .build();
+    }
+
+    @Override
+    public AuthenticatedSessionView loginWithGoogle(GoogleLoginCommand command) {
+        GoogleIdentityView identity = googleIdentityService.verify(command.getIdToken());
+        String normalizedEmail = normalizeEmail(identity.getEmail());
+        validateHmlAccess(normalizedEmail);
+
+        UserProfile user = userGateway.findByEmail(normalizedEmail)
+                .map(existing -> existing.isEmailVerified()
+                        ? existing
+                        : userGateway.save(existing.toBuilder()
+                                .emailVerified(true)
+                                .build()))
+                .orElseGet(() -> userGateway.save(UserProfile.builder()
+                        .name(googleDisplayName(identity))
+                        .email(normalizedEmail)
+                        .emailVerified(true)
+                        .buyerRating(4.8)
+                        .sellerRating(4.8)
+                        .sellerCredits(operationalCatalogService.initialFreeCredits())
+                        .purchasedCreditsTotal(0)
+                        .ipAddress(command.getIpAddress())
+                        .termsAccepted(true)
+                        .termsAcceptedAt(Instant.now())
+                        .termsVersion(CURRENT_TERMS_VERSION)
+                        .country("Brasil")
+                        .build()));
+
+        AuthSession session = createSession(user);
+        auditLogService.record("AUTH_GOOGLE_LOGIN", user.getId(), user.getEmail(), "AUTH_SESSION", session.getToken(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("expiresAt", session.getExpiresAt()));
+        eventPublisherGateway.publish("auth.google-login", Map.of(
+                "userId", user.getId(),
+                "email", user.getEmail(),
+                "createdByGoogle", !StringUtils.hasText(user.getPasswordHash()),
+                "expiresAt", session.getExpiresAt()
+        ));
+
+        return AuthenticatedSessionView.builder()
+                .token(session.getToken())
+                .expiresAt(session.getExpiresAt())
+                .user(user)
+                .build();
+    }
+
+    private String googleDisplayName(GoogleIdentityView identity) {
+        String name = normalizeName(identity.getName());
+        if (StringUtils.hasText(name)) {
+            return name;
+        }
+        String email = normalizeEmail(identity.getEmail());
+        int atIndex = email.indexOf("@");
+        String localPart = atIndex > 0 ? email.substring(0, atIndex) : "Usuario";
+        return localPart.replace(".", " ").replace("_", " ").trim();
     }
 
     @Override
@@ -470,7 +529,7 @@ public class AuthService implements AuthUseCase {
         AuthSession session = getValidSession(token);
         AuthSession validSession = renewSessionIfNeeded(session);
         UserProfile user = userGateway.findById(validSession.getUserId())
-                .orElseThrow(() -> new UnauthorizedException("Sessao invalida."));
+                .orElseThrow(() -> new UnauthorizedException("Sessão inválida."));
 
         return AuthenticatedSessionView.builder()
                 .token(validSession.getToken())

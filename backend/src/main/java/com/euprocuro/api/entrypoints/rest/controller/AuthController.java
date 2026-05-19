@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.euprocuro.api.application.usecase.AuthUseCase;
 import com.euprocuro.api.entrypoints.rest.dto.request.ForgotPasswordRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.GoogleLoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.LoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.RegisterRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ResetPasswordRequest;
@@ -62,6 +63,18 @@ public class AuthController {
     ) {
         turnstileVerificationService.verify(request.getTurnstileToken(), clientIpResolver.resolve(httpRequest));
         return toCookieAuthResponse(authUseCase.login(RestMapper.toCommand(request)), response);
+    }
+
+    @PostMapping("/google")
+    public AuthResponse googleLogin(
+            @Valid @RequestBody GoogleLoginRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response
+    ) {
+        return toCookieAuthResponse(
+                authUseCase.loginWithGoogle(RestMapper.toGoogleLoginCommand(request, clientIpResolver.resolve(httpRequest))),
+                response
+        );
     }
 
     @GetMapping("/me")

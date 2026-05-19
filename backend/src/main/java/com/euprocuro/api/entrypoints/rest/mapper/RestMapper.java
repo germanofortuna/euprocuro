@@ -13,6 +13,7 @@ import com.euprocuro.api.application.command.CatalogCategoryCommand;
 import com.euprocuro.api.application.command.CatalogProductCommand;
 import com.euprocuro.api.application.command.FeatureFlagsCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
+import com.euprocuro.api.application.command.GoogleLoginCommand;
 import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.ModerationDecisionCommand;
 import com.euprocuro.api.application.command.ModerationSettingsCommand;
@@ -70,6 +71,7 @@ import com.euprocuro.api.entrypoints.rest.dto.request.CreateOfferRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.CreateSellerItemRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.BoostInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ForgotPasswordRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.GoogleLoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.LoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ModerationDecisionRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.PurchaseProductRequest;
@@ -112,6 +114,13 @@ public final class RestMapper {
         return LoginCommand.builder()
                 .email(request.getEmail())
                 .password(request.getPassword())
+                .build();
+    }
+
+    public static GoogleLoginCommand toGoogleLoginCommand(GoogleLoginRequest request, String clientIp) {
+        return GoogleLoginCommand.builder()
+                .idToken(request.getIdToken())
+                .ipAddress(clientIp)
                 .build();
     }
 
