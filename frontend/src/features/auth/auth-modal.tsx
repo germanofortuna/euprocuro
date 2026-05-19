@@ -107,8 +107,10 @@ export function AuthModal() {
   const handleGoogleCredential = useCallback(async (idToken: string) => {
     setIsSubmitting(true);
     try {
-      await signInWithGoogle(idToken);
+      await signInWithGoogle(idToken, turnstileToken || undefined);
     } catch (error) {
+      setTurnstileToken("");
+      setTurnstileResetKey((current) => current + 1);
       setFeedback({
         type: "error",
         title: "Não foi possível entrar com Google",
@@ -117,7 +119,7 @@ export function AuthModal() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [setFeedback, signInWithGoogle]);
+  }, [setFeedback, signInWithGoogle, turnstileToken]);
 
   if (!authModal.visible) {
     return null;
@@ -310,10 +312,13 @@ export function AuthModal() {
           {isGoogleSignInEnabled && (authModal.mode === "login" || authModal.mode === "register") ? (
             <div className="auth-social-block">
               <GoogleSignInButton
-                disabled={isSubmitting}
+                disabled={isSubmitting || (shouldUseTurnstile && !turnstileToken)}
                 label={authModal.mode === "register" ? "signup_with" : "continue_with"}
                 onCredential={handleGoogleCredential}
               />
+              {shouldUseTurnstile && !turnstileToken ? (
+                <small className="auth-social-hint">Confirme a verificação de segurança abaixo para usar o Google.</small>
+              ) : null}
               <span>ou continue com e-mail</span>
             </div>
           ) : null}

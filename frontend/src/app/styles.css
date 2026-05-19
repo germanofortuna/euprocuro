@@ -742,53 +742,59 @@ button:disabled {
 }
 
 .google-signin {
+  position: relative;
   width: 100%;
-  min-height: 42px;
+  max-width: 400px;
+  min-height: 48px;
   display: flex;
+  align-items: center;
   justify-content: center;
-  background: transparent;
-}
-
-.google-signin__button {
-  width: min(100%, 400px);
-  min-height: 40px;
-  line-height: 0;
-  background: transparent;
-  border-radius: var(--radius);
-}
-
-/* Tema claro: deixa o Google renderizar naturalmente */
-.google-signin__button > div {
-  width: 100% !important;
-  line-height: 0;
-}
-
-.google-signin__button iframe {
-  display: block;
-  max-width: 100%;
-  border: 0;
-}
-
-/* Tema escuro: aplica o corte apenas para esconder a sobra branca */
-:root[data-theme="dark"] .google-signin__button {
-  height: 40px;
-  min-height: 40px;
-  overflow: hidden;
-  background: #202124;
-}
-
-:root[data-theme="dark"] .google-signin__button > div {
-  height: 40px;
+  gap: 12px;
+  padding: 0 20px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 12px;
+  color: var(--text, #1a1a1a);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
   overflow: hidden;
 }
 
-:root[data-theme="dark"] .google-signin__button iframe {
-  height: 40px !important;
+.google-signin:hover {
+  background: color-mix(in srgb, var(--surface, #ffffff) 92%, #000 8%);
 }
 
-.google-signin.is-disabled {
+.google-signin:disabled {
   opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.google-signin__overlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.google-signin:disabled .google-signin__overlay {
   pointer-events: none;
+}
+
+.auth-social-hint {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted, #6b7280);
+  text-align: center;
+}
+
+:root[data-theme="dark"] .google-signin {
+  background: var(--surface, #1e1f24);
+  border-color: var(--border, rgba(255, 255, 255, 0.14));
+  color: var(--text, #f5f5f5);
+}
+
+:root[data-theme="dark"] .google-signin:hover {
+  background: color-mix(in srgb, var(--surface, #1e1f24) 88%, #fff 12%);
 }
 
 input,
