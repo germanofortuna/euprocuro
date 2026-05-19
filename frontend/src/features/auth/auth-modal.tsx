@@ -316,9 +316,6 @@ export function AuthModal() {
                 label={authModal.mode === "register" ? "signup_with" : "continue_with"}
                 onCredential={handleGoogleCredential}
               />
-              {shouldUseTurnstile && !turnstileToken ? (
-                <small className="auth-social-hint">Confirme a verificação de segurança abaixo para usar o Google.</small>
-              ) : null}
               <span>ou continue com e-mail</span>
             </div>
           ) : null}

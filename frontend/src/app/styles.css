@@ -765,7 +765,7 @@ button:disabled {
   background: color-mix(in srgb, var(--surface, #ffffff) 92%, #000 8%);
 }
 
-.google-signin:disabled {
+.google-signin.is-disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -776,16 +776,10 @@ button:disabled {
   opacity: 0;
 }
 
-.google-signin:disabled .google-signin__overlay {
+.google-signin.is-disabled .google-signin__overlay {
   pointer-events: none;
 }
 
-.auth-social-hint {
-  display: block;
-  font-size: 0.78rem;
-  color: var(--text-muted, #6b7280);
-  text-align: center;
-}
 
 :root[data-theme="dark"] .google-signin {
   background: var(--surface, #1e1f24);

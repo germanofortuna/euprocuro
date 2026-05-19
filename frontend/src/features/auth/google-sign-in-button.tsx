@@ -74,12 +74,17 @@ export function GoogleSignInButton({
   }
 
   return (
-    <button type="button" className="google-signin" disabled={disabled} aria-label={LABEL_TEXT[label]}>
+    <div
+      className={disabled ? "google-signin is-disabled" : "google-signin"}
+      role="button"
+      aria-label={LABEL_TEXT[label]}
+      aria-disabled={disabled || undefined}
+    >
       <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" onReady={() => setScriptReady(true)} />
       <GoogleGlyph />
       <span className="google-signin__text">{LABEL_TEXT[label]}</span>
-      <span className="google-signin__overlay" ref={overlayRef} aria-hidden="true" />
-    </button>
+      <div className="google-signin__overlay" ref={overlayRef} aria-hidden="true" />
+    </div>
   );
 }
 
