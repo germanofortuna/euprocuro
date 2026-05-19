@@ -17,6 +17,7 @@ public class UserResponse {
     String neighborhood;
     String country;
     boolean emailVerified;
+    boolean googleLinked;
     double buyerRating;
     double sellerRating;
     Integer sellerCredits;

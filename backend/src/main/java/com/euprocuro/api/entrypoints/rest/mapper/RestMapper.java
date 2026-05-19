@@ -493,6 +493,7 @@ public final class RestMapper {
                 .neighborhood(domain.getNeighborhood())
                 .country(domain.getCountry())
                 .emailVerified(domain.isEmailVerified())
+                .googleLinked(org.springframework.util.StringUtils.hasText(domain.getGoogleSubject()))
                 .buyerRating(domain.getBuyerRating())
                 .sellerRating(domain.getSellerRating())
                 .sellerCredits(domain.getSellerCredits())

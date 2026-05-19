@@ -259,16 +259,25 @@ public class AuthService implements AuthUseCase {
         String normalizedEmail = normalizeEmail(identity.getEmail());
         validateHmlAccess(normalizedEmail);
 
+        String googleSubject = identity.getSubject();
         UserProfile user = userGateway.findByEmail(normalizedEmail)
-                .map(existing -> existing.isEmailVerified()
-                        ? existing
-                        : userGateway.save(existing.toBuilder()
-                                .emailVerified(true)
-                                .build()))
+                .map(existing -> {
+                    boolean needsVerification = !existing.isEmailVerified();
+                    boolean needsLink = !Objects.equals(existing.getGoogleSubject(), googleSubject)
+                            && StringUtils.hasText(googleSubject);
+                    if (!needsVerification && !needsLink) {
+                        return existing;
+                    }
+                    return userGateway.save(existing.toBuilder()
+                            .emailVerified(true)
+                            .googleSubject(StringUtils.hasText(googleSubject) ? googleSubject : existing.getGoogleSubject())
+                            .build());
+                })
                 .orElseGet(() -> userGateway.save(UserProfile.builder()
                         .name(googleDisplayName(identity))
                         .email(normalizedEmail)
                         .emailVerified(true)
+                        .googleSubject(googleSubject)
                         .buyerRating(4.8)
                         .sellerRating(4.8)
                         .sellerCredits(operationalCatalogService.initialFreeCredits())

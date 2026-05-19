@@ -614,6 +614,55 @@ class AuthServiceTest {
     }
 
     @Test
+    void googleLoginShouldLinkGoogleSubjectOnExistingVerifiedUser() {
+        UserProfile existing = baseUser().toBuilder()
+                .email("ana@teste.com")
+                .emailVerified(true)
+                .googleSubject(null)
+                .build();
+        when(googleIdentityService.verify("google-token")).thenReturn(GoogleIdentityView.builder()
+                .subject("google-sub")
+                .email("ana@teste.com")
+                .name("Ana Silva")
+                .emailVerified(true)
+                .build());
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(existing));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthenticatedSessionView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
+                .accessToken("google-token")
+                .build());
+
+        assertThat(result.getUser().getGoogleSubject()).isEqualTo("google-sub");
+        verify(userGateway).save(any(UserProfile.class));
+    }
+
+    @Test
+    void googleLoginShouldSkipSaveWhenUserAlreadyLinkedAndVerified() {
+        UserProfile existing = baseUser().toBuilder()
+                .email("ana@teste.com")
+                .emailVerified(true)
+                .googleSubject("google-sub")
+                .build();
+        when(googleIdentityService.verify("google-token")).thenReturn(GoogleIdentityView.builder()
+                .subject("google-sub")
+                .email("ana@teste.com")
+                .name("Ana Silva")
+                .emailVerified(true)
+                .build());
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(existing));
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthenticatedSessionView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
+                .accessToken("google-token")
+                .build());
+
+        assertThat(result.getUser().getGoogleSubject()).isEqualTo("google-sub");
+        verify(userGateway, org.mockito.Mockito.never()).save(any(UserProfile.class));
+    }
+
+    @Test
     void meByUserIdShouldReturnCurrentUserData() {
         UserProfile user = baseUser();
 
