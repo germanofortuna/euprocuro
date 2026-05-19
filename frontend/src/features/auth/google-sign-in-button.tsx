@@ -49,24 +49,67 @@ export function GoogleSignInButton({
     if (!clientId || !scriptReady || !buttonRef.current || !window.google?.accounts?.id) {
       return;
     }
+    // render button using container width and current theme (light/dark)
+    const render = () => {
+      if (!buttonRef.current || !window.google?.accounts?.id) return;
+      const container = buttonRef.current;
+      const containerWidth = Math.max(container.clientWidth || 0, 240);
 
-    buttonRef.current.innerHTML = "";
-    window.google.accounts.id.initialize({
-      client_id: clientId,
-      callback: (response) => {
-        if (!disabled && response.credential) {
-          onCredential(response.credential);
+      container.innerHTML = "";
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: (response) => {
+          if (!disabled && response.credential) {
+            onCredential(response.credential);
+          }
         }
+      });
+
+      const isDark = typeof document !== "undefined" && document.documentElement?.dataset?.theme === "dark";
+
+      window.google.accounts.id.renderButton(container, {
+        theme: isDark ? "filled_black" : "outline",
+        size: "large",
+        shape: "rectangular",
+        text: label,
+        locale: "pt-BR",
+        // renderButton expects a number (px)
+        width: containerWidth
+      });
+
+      // Try to make the injected button adopt our local button styles
+      // The Google button markup may vary, but often contains a button element.
+      // Apply our classes/styles after a microtask so the DOM is in place.
+      setTimeout(() => {
+        try {
+          const btn = container.querySelector("button");
+          if (btn) {
+            btn.classList.add("button", "button--md");
+            // ensure it fills the container
+            (btn as HTMLElement).style.width = "100%";
+            (btn as HTMLElement).style.minHeight = "42px";
+            (btn as HTMLElement).style.borderRadius = "var(--radius)";
+          }
+        } catch (e) {
+          // ignore
+        }
+      }, 0);
+    };
+
+    render();
+
+    // Re-render when container resizes so the google button width follows
+    let ro: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== "undefined" && buttonRef.current) {
+      ro = new ResizeObserver(() => render());
+      ro.observe(buttonRef.current);
+    }
+
+    return () => {
+      if (ro && buttonRef.current) {
+        ro.unobserve(buttonRef.current);
       }
-    });
-    window.google.accounts.id.renderButton(buttonRef.current, {
-      theme: "outline",
-      size: "large",
-      shape: "rectangular",
-      text: label,
-      locale: "pt-BR",
-      width: 400
-    });
+    };
   }, [disabled, label, onCredential, scriptReady]);
 
   if (!clientId) {
