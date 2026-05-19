@@ -529,7 +529,7 @@ public class AuthService implements AuthUseCase {
         AuthSession session = getValidSession(token);
         AuthSession validSession = renewSessionIfNeeded(session);
         UserProfile user = userGateway.findById(validSession.getUserId())
-                .orElseThrow(() -> new UnauthorizedException("Sessao invalida."));
+                .orElseThrow(() -> new UnauthorizedException("Sessão inválida."));
 
         return AuthenticatedSessionView.builder()
                 .token(validSession.getToken())

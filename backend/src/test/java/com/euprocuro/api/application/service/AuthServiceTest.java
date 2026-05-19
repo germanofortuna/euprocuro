@@ -950,7 +950,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.requireAuthenticatedUser("token-123"))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessageContaining("Sessao invalida");
+                .hasMessageContaining("Sessão inválida");
     }
 
     private UserProfile baseUser() {

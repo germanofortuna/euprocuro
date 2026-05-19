@@ -111,7 +111,7 @@ export function AuthModal() {
     } catch (error) {
       setFeedback({
         type: "error",
-        title: "Nao foi possivel entrar com Google",
+        title: "Não foi possível entrar com Google",
         message: error instanceof Error ? error.message : "Tente novamente em instantes."
       });
     } finally {

@@ -65,7 +65,7 @@ export function GoogleSignInButton({
       shape: "rectangular",
       text: label,
       locale: "pt-BR",
-      width: Math.min(buttonRef.current.offsetWidth || 360, 400)
+      width: 400
     });
   }, [disabled, label, onCredential, scriptReady]);
 
