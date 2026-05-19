@@ -271,9 +271,9 @@ export function AuthModal() {
         neighborhood: String(address.neighborhood ?? current.neighborhood ?? ""),
         country: String(address.country ?? current.country ?? "Brasil")
       }));
-      setLookupState({ loading: false, message: "Endereco preenchido pelo CEP.", tone: "success" });
+      setLookupState({ loading: false, message: "Endereço preenchido pelo CEP.", tone: "success" });
     } catch (error) {
-      setLookupState({ loading: false, message: error instanceof Error ? error.message : "Nao encontramos esse CEP. Preencha cidade e UF manualmente.", tone: "error" });
+      setLookupState({ loading: false, message: error instanceof Error ? error.message : "Não encontramos esse CEP. Preencha cidade e UF manualmente.", tone: "error" });
     }
   }
 
