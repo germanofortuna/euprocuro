@@ -57,4 +57,32 @@ class AuthTokenInterceptorTest {
         );
         verifyNoInteractions(authUseCase);
     }
+
+    @Test
+    void preHandleShouldSkipAuthenticationForPublicOperationalSettings() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/operational/public");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        boolean result = interceptor.preHandle(request, response, new Object());
+
+        assertThat(result).isTrue();
+        assertThat(response.getStatus()).isEqualTo(200);
+        verifyNoInteractions(authUseCase);
+        verifyNoInteractions(authTokenResolver);
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void preHandleShouldSkipAuthenticationForPublicCategoriesList() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/categories");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        boolean result = interceptor.preHandle(request, response, new Object());
+
+        assertThat(result).isTrue();
+        assertThat(response.getStatus()).isEqualTo(200);
+        verifyNoInteractions(authUseCase);
+        verifyNoInteractions(authTokenResolver);
+        verifyNoInteractions(auditLogService);
+    }
 }

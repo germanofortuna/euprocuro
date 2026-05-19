@@ -98,7 +98,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        return "/api/categories".equals(uri);
+        return "/api/categories".equals(uri) || "/api/operational/public".equals(uri);
     }
 
     private boolean isPublicInterestRead(HttpServletRequest request) {
