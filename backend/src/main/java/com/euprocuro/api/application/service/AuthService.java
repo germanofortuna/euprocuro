@@ -255,7 +255,7 @@ public class AuthService implements AuthUseCase {
 
     @Override
     public AuthenticatedSessionView loginWithGoogle(GoogleLoginCommand command) {
-        GoogleIdentityView identity = googleIdentityService.verify(command.getIdToken());
+        GoogleIdentityView identity = googleIdentityService.verify(command.getAccessToken());
         String normalizedEmail = normalizeEmail(identity.getEmail());
         validateHmlAccess(normalizedEmail);
 

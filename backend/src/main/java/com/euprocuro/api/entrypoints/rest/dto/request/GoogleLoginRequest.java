@@ -7,6 +7,6 @@ import lombok.Data;
 @Data
 public class GoogleLoginRequest {
     @NotBlank
-    private String idToken;
+    private String accessToken;
     private String turnstileToken;
 }

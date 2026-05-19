@@ -6,6 +6,6 @@ import lombok.Data;
 @Data
 @Builder
 public class GoogleLoginCommand {
-    private String idToken;
+    private String accessToken;
     private String ipAddress;
 }

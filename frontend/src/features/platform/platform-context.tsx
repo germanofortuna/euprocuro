@@ -80,7 +80,7 @@ type PlatformContextValue = {
   closeAuthModal: () => void;
   setAuthMode: (mode: AuthMode) => void;
   signIn: (payload: { email: string; password: string; turnstileToken?: string }) => Promise<void>;
-  signInWithGoogle: (idToken: string, turnstileToken?: string) => Promise<void>;
+  signInWithGoogle: (accessToken: string, turnstileToken?: string) => Promise<void>;
   signUp: (payload: Record<string, unknown>) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -448,8 +448,8 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authModal.redirectTo, closeAuthModal, operationalSettings, router]);
 
-  const signInWithGoogle = useCallback(async (idToken: string, turnstileToken?: string) => {
-    const auth = await googleLogin({ idToken, turnstileToken });
+  const signInWithGoogle = useCallback(async (accessToken: string, turnstileToken?: string) => {
+    const auth = await googleLogin({ accessToken, turnstileToken });
     const nextSession = auth?.user?.id ? auth : normalizeMe(await fetchMe(), auth);
     storeSession(nextSession);
     setSession(nextSession);

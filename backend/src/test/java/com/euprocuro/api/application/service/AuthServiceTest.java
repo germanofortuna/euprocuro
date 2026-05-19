@@ -574,7 +574,7 @@ class AuthServiceTest {
         when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         AuthenticatedSessionView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
-                .idToken("google-token")
+                .accessToken("google-token")
                 .ipAddress("10.0.0.1")
                 .build());
 
@@ -604,7 +604,7 @@ class AuthServiceTest {
         when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         AuthenticatedSessionView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
-                .idToken("google-token")
+                .accessToken("google-token")
                 .build());
 
         assertThat(result.getUser().getId()).isEqualTo("user-1");

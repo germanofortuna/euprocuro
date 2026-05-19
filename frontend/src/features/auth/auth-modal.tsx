@@ -104,10 +104,10 @@ export function AuthModal() {
     setTurnstileToken(token);
   }, []);
 
-  const handleGoogleCredential = useCallback(async (idToken: string) => {
+  const handleGoogleCredential = useCallback(async (accessToken: string) => {
     setIsSubmitting(true);
     try {
-      await signInWithGoogle(idToken, turnstileToken || undefined);
+      await signInWithGoogle(accessToken, turnstileToken || undefined);
     } catch (error) {
       setTurnstileToken("");
       setTurnstileResetKey((current) => current + 1);

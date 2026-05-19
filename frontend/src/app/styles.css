@@ -742,7 +742,6 @@ button:disabled {
 }
 
 .google-signin {
-  position: relative;
   width: 100%;
   max-width: 400px;
   min-height: 48px;
@@ -758,35 +757,16 @@ button:disabled {
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
-  overflow: hidden;
+  font-family: inherit;
 }
 
-.google-signin:hover {
+.google-signin:hover:not(:disabled) {
   background: color-mix(in srgb, var(--surface, #ffffff) 92%, #000 8%);
 }
 
-.google-signin.is-disabled {
+.google-signin:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.google-signin__overlay {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  z-index: 1;
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.google-signin__overlay > * {
-  pointer-events: auto;
-}
-
-.google-signin.is-disabled .google-signin__overlay {
-  pointer-events: none;
 }
 
 
@@ -796,7 +776,7 @@ button:disabled {
   color: var(--text, #f5f5f5);
 }
 
-:root[data-theme="dark"] .google-signin:hover {
+:root[data-theme="dark"] .google-signin:hover:not(:disabled) {
   background: color-mix(in srgb, var(--surface, #1e1f24) 88%, #fff 12%);
 }
 

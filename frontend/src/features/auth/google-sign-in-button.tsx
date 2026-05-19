@@ -1,23 +1,27 @@
 "use client";
 
 import Script from "next/script";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() ?? "";
+
+type TokenResponse = { access_token?: string; error?: string; error_description?: string };
+
+type TokenClient = {
+  requestAccessToken: (options?: { prompt?: string }) => void;
+};
 
 declare global {
   interface Window {
     google?: {
       accounts?: {
-        id?: {
-          initialize: (options: {
+        oauth2?: {
+          initTokenClient: (config: {
             client_id: string;
-            callback: (response: { credential?: string }) => void;
-          }) => void;
-          renderButton: (
-            element: HTMLElement,
-            options: { type?: "standard" | "icon"; size?: "large" | "medium" | "small"; width?: number }
-          ) => void;
+            scope: string;
+            callback: (response: TokenResponse) => void;
+            error_callback?: (error: { type?: string; message?: string }) => void;
+          }) => TokenClient;
         };
       };
     };
@@ -35,8 +39,8 @@ const LABEL_TEXT: Record<Label, string> = {
   signin: "Entrar com Google"
 };
 
-function isGisReady() {
-  return typeof window !== "undefined" && Boolean(window.google?.accounts?.id);
+function isOauthReady() {
+  return typeof window !== "undefined" && Boolean(window.google?.accounts?.oauth2);
 }
 
 export function GoogleSignInButton({
@@ -46,85 +50,67 @@ export function GoogleSignInButton({
 }: {
   disabled?: boolean;
   label?: Label;
-  onCredential: (idToken: string) => void;
+  onCredential: (accessToken: string) => void;
 }) {
-  const overlayRef = useRef<HTMLDivElement | null>(null);
-  const [gisReady, setGisReady] = useState(() => isGisReady());
+  const [oauthReady, setOauthReady] = useState(() => isOauthReady());
+  const tokenClientRef = useRef<TokenClient | null>(null);
   const callbackRef = useRef(onCredential);
-  const disabledRef = useRef(disabled);
 
   useEffect(() => {
     callbackRef.current = onCredential;
-    disabledRef.current = disabled;
   });
 
   useEffect(() => {
-    if (gisReady) {
-      return;
-    }
-    if (isGisReady()) {
-      setGisReady(true);
+    if (oauthReady) return;
+    if (isOauthReady()) {
+      setOauthReady(true);
       return;
     }
     const interval = window.setInterval(() => {
-      if (isGisReady()) {
-        setGisReady(true);
+      if (isOauthReady()) {
+        setOauthReady(true);
         window.clearInterval(interval);
       }
     }, 100);
     return () => window.clearInterval(interval);
-  }, [gisReady]);
+  }, [oauthReady]);
 
   useEffect(() => {
-    if (!clientId || !gisReady || !overlayRef.current || !window.google?.accounts?.id) {
+    if (!clientId || !oauthReady || !window.google?.accounts?.oauth2) {
       return;
     }
-    const container = overlayRef.current;
-    const render = () => {
-      if (!window.google?.accounts?.id) return;
-      const width = Math.min(Math.max(container.clientWidth || 320, 200), 400);
-      container.innerHTML = "";
-      window.google!.accounts!.id!.initialize({
-        client_id: clientId,
-        callback: (response) => {
-          if (!disabledRef.current && response.credential) {
-            callbackRef.current(response.credential);
-          }
+    tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: "openid email profile",
+      callback: (response) => {
+        if (response.access_token) {
+          callbackRef.current(response.access_token);
         }
-      });
-      window.google!.accounts!.id!.renderButton(container, { type: "standard", size: "large", width });
-    };
-    render();
-    let observer: ResizeObserver | undefined;
-    if (typeof ResizeObserver !== "undefined") {
-      let lastWidth = container.clientWidth;
-      observer = new ResizeObserver(() => {
-        if (Math.abs(container.clientWidth - lastWidth) > 4) {
-          lastWidth = container.clientWidth;
-          render();
-        }
-      });
-      observer.observe(container);
-    }
-    return () => observer?.disconnect();
-  }, [gisReady]);
+      }
+    });
+  }, [oauthReady]);
+
+  const handleClick = useCallback(() => {
+    if (disabled || !tokenClientRef.current) return;
+    tokenClientRef.current.requestAccessToken();
+  }, [disabled]);
 
   if (!clientId) {
     return null;
   }
 
   return (
-    <div
-      className={disabled ? "google-signin is-disabled" : "google-signin"}
-      role="button"
+    <button
+      type="button"
+      className="google-signin"
+      onClick={handleClick}
+      disabled={disabled || !oauthReady}
       aria-label={LABEL_TEXT[label]}
-      aria-disabled={disabled || undefined}
     >
       <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
       <GoogleGlyph />
       <span className="google-signin__text">{LABEL_TEXT[label]}</span>
-      <div className="google-signin__overlay" ref={overlayRef} aria-hidden="true" />
-    </div>
+    </button>
   );
 }
 

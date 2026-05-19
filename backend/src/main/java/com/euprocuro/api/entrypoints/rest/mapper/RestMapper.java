@@ -119,7 +119,7 @@ public final class RestMapper {
 
     public static GoogleLoginCommand toGoogleLoginCommand(GoogleLoginRequest request, String clientIp) {
         return GoogleLoginCommand.builder()
-                .idToken(request.getIdToken())
+                .accessToken(request.getAccessToken())
                 .ipAddress(clientIp)
                 .build();
     }
