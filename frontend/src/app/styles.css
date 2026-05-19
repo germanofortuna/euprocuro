@@ -741,14 +741,26 @@ button:disabled {
   background: var(--border);
 }
 
+.google-signin {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  justify-content: center;
+  background: transparent;
+}
+
 .google-signin__button {
   width: min(100%, 400px);
   height: 40px;
   min-height: 40px;
   line-height: 0;
-  background: #202124;
+  background: transparent;
   border-radius: var(--radius);
   overflow: hidden;
+}
+
+:root[data-theme="dark"] .google-signin__button {
+  background: #202124;
 }
 
 .google-signin__button > div {
