@@ -3387,6 +3387,130 @@ small {
   place-items: center;
 }
 
+.auth-modal {
+  padding: 18px 20px;
+}
+
+.auth-modal .modal-header {
+  margin-bottom: 10px;
+}
+
+.auth-modal .modal-header h2 {
+  margin: 4px 0 0;
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.auth-modal .segmented-control {
+  margin-bottom: 4px;
+}
+
+.auth-modal .auth-social-block {
+  gap: 8px;
+  margin: 2px 0 8px;
+}
+
+.auth-modal .auth-social-block > span {
+  font-size: 0.74rem;
+}
+
+.auth-modal .google-signin {
+  min-height: 42px;
+}
+
+.auth-modal .stack-form {
+  gap: 8px;
+}
+
+.auth-modal .stack-form label {
+  gap: 3px;
+  margin-bottom: 0;
+  font-size: 0.82rem;
+}
+
+.auth-modal .stack-form input {
+  min-height: 38px;
+  padding: 8px 11px;
+}
+
+.auth-modal .stack-form small {
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.auth-modal .form-grid,
+.auth-modal .form-grid--3 {
+  gap: 8px;
+}
+
+.auth-modal .address-lookup-note {
+  min-height: 18px;
+  margin: -2px 0 4px;
+  font-size: 0.76rem;
+}
+
+.auth-modal .terms-box {
+  padding: 10px 12px;
+  margin-bottom: 0;
+}
+
+.auth-modal .terms-box .checkbox-row {
+  margin-bottom: 4px;
+}
+
+.auth-modal .terms-helper {
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.auth-modal .turnstile-box {
+  padding: 4px;
+  gap: 4px;
+}
+
+.auth-modal .turnstile-box > div {
+  min-height: 60px;
+}
+
+.auth-modal .text-button {
+  font-size: 0.82rem;
+  padding: 2px 0;
+}
+
+.auth-modal--register .modal-header h2 {
+  font-size: 1.18rem;
+}
+
+.auth-modal--register .stack-form {
+  gap: 7px;
+}
+
+.auth-modal--register .terms-box {
+  padding: 8px 10px;
+}
+
+.auth-modal--register .terms-box .checkbox-row {
+  margin-bottom: 2px;
+  font-size: 0.82rem;
+}
+
+.auth-modal--register .terms-helper {
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.auth-modal--register .stack-form > label > small {
+  margin-top: 1px;
+}
+
+.auth-modal--register .auth-social-block {
+  margin: 0 0 4px;
+}
+
+.auth-modal--register .segmented-control {
+  margin-bottom: 2px;
+}
+
 .modal-card {
   width: min(100%, 540px);
   max-height: min(86vh, 860px);
@@ -4214,6 +4338,48 @@ small {
   .notification-modal {
     width: 100%;
     max-height: 92vh;
+  }
+
+  .auth-modal {
+    padding: 14px 14px 16px;
+  }
+
+  .auth-modal .modal-header h2 {
+    font-size: 1.15rem;
+  }
+
+  .auth-modal .stack-form {
+    gap: 7px;
+  }
+
+  .auth-modal .stack-form input {
+    min-height: 36px;
+  }
+
+  .auth-modal .auth-social-block {
+    margin: 0 0 4px;
+  }
+
+  .auth-modal--register .stack-form {
+    gap: 6px;
+  }
+
+  .auth-modal--register .stack-form input {
+    min-height: 34px;
+    padding: 6px 10px;
+  }
+
+  .auth-modal--register .terms-box {
+    padding: 8px 10px;
+  }
+
+  .auth-modal--register .terms-box .checkbox-row span {
+    font-size: 0.82rem;
+    line-height: 1.3;
+  }
+
+  .auth-modal--register .turnstile-box {
+    padding: 2px;
   }
 
   .cookie-banner {

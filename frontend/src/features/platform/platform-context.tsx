@@ -50,7 +50,6 @@ import type {
   User
 } from "@/shared/api/types";
 import { activeCategories, FALLBACK_CATEGORIES, isAdminUser } from "@/shared/lib/format";
-import { sampleInterests } from "@/shared/lib/sample-data";
 import type { FeedbackState } from "@/shared/ui/feedback-modal";
 
 type AuthMode = "login" | "register" | "forgot" | "reset";
@@ -239,8 +238,8 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [session, setSession] = useState<StoredSession | null>(null);
   const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES);
-  const [interests, setInterests] = useState<Interest[]>(sampleInterests);
-  const [selectedInterest, setSelectedInterest] = useState<Interest | null>(sampleInterests[0]);
+  const [interests, setInterests] = useState<Interest[]>([]);
+  const [selectedInterest, setSelectedInterest] = useState<Interest | null>(null);
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [monetization, setMonetization] = useState<MonetizationAccount | null>(null);
   const [sellerItems, setSellerItems] = useState<SellerItemGroup[]>([]);
@@ -264,10 +263,10 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     try {
       const [categoryPayload, interestPayload] = await Promise.all([
         fetchCategories().catch(() => FALLBACK_CATEGORIES),
-        fetchInterests(filters).catch(() => sampleInterests)
+        fetchInterests(filters).catch(() => [] as Interest[])
       ]);
       const nextCategories = normalizeCategories(categoryPayload);
-      const nextInterests = interestPayload.length ? interestPayload : sampleInterests;
+      const nextInterests = interestPayload;
       setCategories(nextCategories);
       setInterests(nextInterests);
       setSelectedInterest((current) => nextInterests.find((item) => item.id === current?.id) ?? nextInterests[0] ?? null);

@@ -338,8 +338,10 @@ export function AuthModal() {
 
           {authModal.mode === "register" ? (
             <form className="stack-form" onSubmit={submitRegister}>
-              <label>Nome completo<input value={registerForm.name} onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))} required /></label>
-              <label>E-mail<input type="email" value={registerForm.email} onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))} required /></label>
+              <div className="form-grid">
+                <label>Nome completo<input value={registerForm.name} onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))} required /></label>
+                <label>E-mail<input type="email" value={registerForm.email} onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))} required /></label>
+              </div>
               <label>CPF ou CNPJ<input value={registerForm.documentNumber} onChange={(event) => setRegisterForm((current) => ({ ...current, documentNumber: formatCpfCnpj(event.target.value) }))} maxLength={18} required /></label>
               <label>Senha<input type="password" value={registerForm.password} onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))} required /><small>{passwordStatus(registerForm.password)}</small></label>
               <div className="form-grid form-grid--3">

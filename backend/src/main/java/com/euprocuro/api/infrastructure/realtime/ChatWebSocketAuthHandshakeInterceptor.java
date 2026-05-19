@@ -1,7 +1,5 @@
 package com.euprocuro.api.infrastructure.realtime;
 
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -72,7 +70,7 @@ public class ChatWebSocketAuthHandshakeInterceptor implements HandshakeIntercept
             return Optional.of(header.substring(BEARER_PREFIX.length()).trim());
         }
 
-        Optional<String> cookieToken = request.getHeaders().getOrEmpty(HttpHeaders.COOKIE)
+        return request.getHeaders().getOrEmpty(HttpHeaders.COOKIE)
                 .stream()
                 .flatMap(headerValue -> Arrays.stream(headerValue.split(";")))
                 .map(String::trim)
@@ -81,33 +79,5 @@ public class ChatWebSocketAuthHandshakeInterceptor implements HandshakeIntercept
                 .map(parts -> parts[1])
                 .filter(StringUtils::hasText)
                 .findFirst();
-        if (cookieToken.isPresent()) {
-            return cookieToken;
-        }
-
-        String queryToken = resolveQueryParam(request, "token");
-        if (StringUtils.hasText(queryToken)) {
-            return Optional.of(queryToken);
-        }
-
-        return Optional.empty();
-    }
-
-    private String resolveQueryParam(ServerHttpRequest request, String name) {
-        String query = request.getURI().getRawQuery();
-        if (!StringUtils.hasText(query)) {
-            return null;
-        }
-
-        return Arrays.stream(query.split("&"))
-                .map(value -> value.split("=", 2))
-                .filter(parts -> parts.length == 2 && name.equals(decode(parts[0])))
-                .map(parts -> decode(parts[1]))
-                .findFirst()
-                .orElse(null);
-    }
-
-    private String decode(String value) {
-        return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 }
