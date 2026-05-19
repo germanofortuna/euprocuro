@@ -125,7 +125,7 @@ application:
       enabled: ${APP_HML_ACCESS_ENABLED:false}
       allowed-emails: ${APP_HML_ALLOWED_EMAILS:}
   admin:
-    allowed-emails: ${APP_ADMIN_ALLOWED_EMAILS:gfortuna@outlook.com}
+    allowed-emails: ${APP_ADMIN_ALLOWED_EMAILS:}
   moderation:
     local:
       blocked-terms: ${APP_MODERATION_BLOCKED_TERMS:assassino de aluguel,documento falso,cartao clonado,cartao de credito,senha,credencial,pornografia,putaria,puta}

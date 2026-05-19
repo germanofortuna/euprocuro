@@ -24,7 +24,7 @@ services:
       - key: APP_AUTH_EXPOSE_RESET_PREVIEW
         value: "false"
       - key: APP_AUTH_EXPOSE_SESSION_TOKEN
-        value: "true"
+        value: "false"
       - key: APP_MONETIZATION_PROVIDER
         value: LOCAL_MOCK
       - key: APP_HML_ACCESS_ENABLED
