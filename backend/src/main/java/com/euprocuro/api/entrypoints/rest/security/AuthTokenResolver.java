@@ -2,7 +2,7 @@ package com.euprocuro.api.entrypoints.rest.security;
 
 import java.util.Optional;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
