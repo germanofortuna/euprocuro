@@ -79,16 +79,34 @@ export function GoogleSignInButton({
     if (!clientId || !gisReady || !overlayRef.current || !window.google?.accounts?.id) {
       return;
     }
-    overlayRef.current.innerHTML = "";
-    window.google.accounts.id.initialize({
-      client_id: clientId,
-      callback: (response) => {
-        if (!disabledRef.current && response.credential) {
-          callbackRef.current(response.credential);
+    const container = overlayRef.current;
+    const render = () => {
+      if (!window.google?.accounts?.id) return;
+      const width = Math.min(Math.max(container.clientWidth || 320, 200), 400);
+      container.innerHTML = "";
+      window.google!.accounts!.id!.initialize({
+        client_id: clientId,
+        callback: (response) => {
+          if (!disabledRef.current && response.credential) {
+            callbackRef.current(response.credential);
+          }
         }
-      }
-    });
-    window.google.accounts.id.renderButton(overlayRef.current, { type: "standard", size: "large", width: 400 });
+      });
+      window.google!.accounts!.id!.renderButton(container, { type: "standard", size: "large", width });
+    };
+    render();
+    let observer: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== "undefined") {
+      let lastWidth = container.clientWidth;
+      observer = new ResizeObserver(() => {
+        if (Math.abs(container.clientWidth - lastWidth) > 4) {
+          lastWidth = container.clientWidth;
+          render();
+        }
+      });
+      observer.observe(container);
+    }
+    return () => observer?.disconnect();
   }, [gisReady]);
 
   if (!clientId) {

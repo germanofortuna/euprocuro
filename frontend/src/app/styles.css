@@ -774,6 +774,15 @@ button:disabled {
   position: absolute;
   inset: 0;
   opacity: 0;
+  z-index: 1;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.google-signin__overlay > * {
+  pointer-events: auto;
 }
 
 .google-signin.is-disabled .google-signin__overlay {
