@@ -933,7 +933,7 @@ class AuthServiceTest {
     void requireAuthenticatedUserShouldRejectBlankToken() {
         assertThatThrownBy(() -> authService.requireAuthenticatedUser(" "))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessageContaining("Sessao nao informada");
+                .hasMessageContaining("Sessão não informada");
     }
 
     @Test
