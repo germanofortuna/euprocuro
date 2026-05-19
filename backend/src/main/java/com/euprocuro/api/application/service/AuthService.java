@@ -550,15 +550,15 @@ public class AuthService implements AuthUseCase {
 
     private AuthSession getValidSession(String token) {
         if (!StringUtils.hasText(token)) {
-            throw new UnauthorizedException("Sessao nao informada.");
+            throw new UnauthorizedException("Sessão não informada.");
         }
 
         AuthSession session = authSessionGateway.findByToken(token)
-                .orElseThrow(() -> new UnauthorizedException("Sessao invalida."));
+                .orElseThrow(() -> new UnauthorizedException("Sessão inválida."));
 
         if (session.getExpiresAt().isBefore(Instant.now())) {
             authSessionGateway.deleteByToken(token);
-            throw new UnauthorizedException("Sessao expirada.");
+            throw new UnauthorizedException("Sessão expirada.");
         }
 
         return session;
