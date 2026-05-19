@@ -1,0 +1,128 @@
+name: E2E PRD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-prd
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Smoke against PRD
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    defaults:
+      run:
+        working-directory: e2e
+
+    env:
+      E2E_ENV: prd
+      E2E_FRONTEND_URL: ${{ secrets.E2E_FRONTEND_URL_PRD }}
+      E2E_API_URL: ${{ secrets.E2E_API_URL_PRD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for PRD deploy to be healthy
+        run: |
+          set -e
+          echo "Sleeping 60s to let Render kick off the new deploy..."
+          sleep 60
+          echo "Polling ${E2E_API_URL}/actuator/health (max 10 minutes)..."
+          end=$((SECONDS+600))
+          until curl -fsS "${E2E_API_URL}/actuator/health" | grep -q '"status":"UP"'; do
+            if [ $SECONDS -ge $end ]; then
+              echo "::error::PRD healthcheck never returned UP within 10 minutes"
+              exit 1
+            fi
+            echo "  not up yet, retrying in 15s..."
+            sleep 15
+          done
+          echo "PRD is UP."
+
+      - name: Run Playwright smoke tests
+        id: tests
+        run: npm run test:smoke
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-prd-${{ github.run_number }}
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 30
+
+      - name: Notify failure via MailerSend
+        if: failure()
+        env:
+          MAILERSEND_API_KEY: ${{ secrets.MAILERSEND_API_KEY }}
+          ALERT_TO: ${{ secrets.E2E_ALERT_TO_EMAIL }}
+          ALERT_FROM: ${{ secrets.E2E_ALERT_FROM_EMAIL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT: ${{ github.sha }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          set -e
+          payload=$(node -e '
+            const failed = [];
+            try {
+              const r = require("./playwright-report/results.json");
+              const walk = (suites) => {
+                for (const s of suites ?? []) {
+                  for (const spec of s.specs ?? []) {
+                    for (const t of spec.tests ?? []) {
+                      const last = t.results?.[t.results.length - 1];
+                      if (last && last.status !== "passed" && last.status !== "skipped") {
+                        failed.push(`${s.title} › ${spec.title}`);
+                      }
+                    }
+                  }
+                  walk(s.suites);
+                }
+              };
+              walk(r.suites);
+            } catch (e) { /* json may not exist if install failed */ }
+            const list = failed.length ? failed.map(t => `<li>${t}</li>`).join("") : "<li>(falha antes de produzir relatório)</li>";
+            const msg = process.env.COMMIT_MSG || "";
+            const out = {
+              from: { email: process.env.ALERT_FROM, name: "Eu Procuro CI" },
+              to: [{ email: process.env.ALERT_TO }],
+              subject: `[E2E FAIL · PRD] ${failed.length} teste(s) quebraram — ${process.env.COMMIT.substring(0,7)}`,
+              html: `
+                <h2 style="color:#c0392b">E2E quebrou em PRODUÇÃO</h2>
+                <p><strong>Commit:</strong> <code>${process.env.COMMIT.substring(0,7)}</code><br>
+                <strong>Mensagem:</strong> ${msg.replace(/</g,"&lt;").split("\n")[0]}<br>
+                <strong>Run:</strong> <a href="${process.env.RUN_URL}">${process.env.RUN_URL}</a></p>
+                <h3>Testes que falharam</h3>
+                <ul>${list}</ul>
+                <p>Baixe o relatório completo (HTML + traces + vídeo) no <em>Artifacts</em> do run. Considere rollback se o impacto for crítico.</p>
+              `,
+              text: `E2E PRD quebrou no commit ${process.env.COMMIT.substring(0,7)}. Run: ${process.env.RUN_URL}`
+            };
+            process.stdout.write(JSON.stringify(out));
+          ')
+          curl -fsS -X POST https://api.mailersend.com/v1/email \
+            -H "Authorization: Bearer ${MAILERSEND_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$payload"
