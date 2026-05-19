@@ -71,8 +71,10 @@ public class AuthController {
             HttpServletRequest httpRequest,
             HttpServletResponse response
     ) {
+        String clientIp = clientIpResolver.resolve(httpRequest);
+        turnstileVerificationService.verify(request.getTurnstileToken(), clientIp);
         return toCookieAuthResponse(
-                authUseCase.loginWithGoogle(RestMapper.toGoogleLoginCommand(request, clientIpResolver.resolve(httpRequest))),
+                authUseCase.loginWithGoogle(RestMapper.toGoogleLoginCommand(request, clientIp)),
                 response
         );
     }

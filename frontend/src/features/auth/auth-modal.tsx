@@ -104,11 +104,13 @@ export function AuthModal() {
     setTurnstileToken(token);
   }, []);
 
-  const handleGoogleCredential = useCallback(async (idToken: string) => {
+  const handleGoogleCredential = useCallback(async (accessToken: string) => {
     setIsSubmitting(true);
     try {
-      await signInWithGoogle(idToken);
+      await signInWithGoogle(accessToken, turnstileToken || undefined);
     } catch (error) {
+      setTurnstileToken("");
+      setTurnstileResetKey((current) => current + 1);
       setFeedback({
         type: "error",
         title: "Não foi possível entrar com Google",
@@ -117,7 +119,7 @@ export function AuthModal() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [setFeedback, signInWithGoogle]);
+  }, [setFeedback, signInWithGoogle, turnstileToken]);
 
   if (!authModal.visible) {
     return null;
@@ -269,9 +271,9 @@ export function AuthModal() {
         neighborhood: String(address.neighborhood ?? current.neighborhood ?? ""),
         country: String(address.country ?? current.country ?? "Brasil")
       }));
-      setLookupState({ loading: false, message: "Endereco preenchido pelo CEP.", tone: "success" });
+      setLookupState({ loading: false, message: "Endereço preenchido pelo CEP.", tone: "success" });
     } catch (error) {
-      setLookupState({ loading: false, message: error instanceof Error ? error.message : "Nao encontramos esse CEP. Preencha cidade e UF manualmente.", tone: "error" });
+      setLookupState({ loading: false, message: error instanceof Error ? error.message : "Não encontramos esse CEP. Preencha cidade e UF manualmente.", tone: "error" });
     }
   }
 
@@ -310,7 +312,7 @@ export function AuthModal() {
           {isGoogleSignInEnabled && (authModal.mode === "login" || authModal.mode === "register") ? (
             <div className="auth-social-block">
               <GoogleSignInButton
-                disabled={isSubmitting}
+                disabled={isSubmitting || (shouldUseTurnstile && !turnstileToken)}
                 label={authModal.mode === "register" ? "signup_with" : "continue_with"}
                 onCredential={handleGoogleCredential}
               />
