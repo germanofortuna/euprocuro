@@ -35,6 +35,10 @@ const LABEL_TEXT: Record<Label, string> = {
   signin: "Entrar com Google"
 };
 
+function isGisReady() {
+  return typeof window !== "undefined" && Boolean(window.google?.accounts?.id);
+}
+
 export function GoogleSignInButton({
   disabled,
   label = "continue_with",
@@ -45,7 +49,7 @@ export function GoogleSignInButton({
   onCredential: (idToken: string) => void;
 }) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
-  const [scriptReady, setScriptReady] = useState(false);
+  const [gisReady, setGisReady] = useState(() => isGisReady());
   const callbackRef = useRef(onCredential);
   const disabledRef = useRef(disabled);
 
@@ -55,9 +59,27 @@ export function GoogleSignInButton({
   });
 
   useEffect(() => {
-    if (!clientId || !scriptReady || !overlayRef.current || !window.google?.accounts?.id) {
+    if (gisReady) {
       return;
     }
+    if (isGisReady()) {
+      setGisReady(true);
+      return;
+    }
+    const interval = window.setInterval(() => {
+      if (isGisReady()) {
+        setGisReady(true);
+        window.clearInterval(interval);
+      }
+    }, 100);
+    return () => window.clearInterval(interval);
+  }, [gisReady]);
+
+  useEffect(() => {
+    if (!clientId || !gisReady || !overlayRef.current || !window.google?.accounts?.id) {
+      return;
+    }
+    overlayRef.current.innerHTML = "";
     window.google.accounts.id.initialize({
       client_id: clientId,
       callback: (response) => {
@@ -67,7 +89,7 @@ export function GoogleSignInButton({
       }
     });
     window.google.accounts.id.renderButton(overlayRef.current, { type: "standard", size: "large", width: 400 });
-  }, [scriptReady]);
+  }, [gisReady]);
 
   if (!clientId) {
     return null;
@@ -80,7 +102,7 @@ export function GoogleSignInButton({
       aria-label={LABEL_TEXT[label]}
       aria-disabled={disabled || undefined}
     >
-      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" onReady={() => setScriptReady(true)} />
+      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
       <GoogleGlyph />
       <span className="google-signin__text">{LABEL_TEXT[label]}</span>
       <div className="google-signin__overlay" ref={overlayRef} aria-hidden="true" />
