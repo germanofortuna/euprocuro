@@ -73,7 +73,6 @@ export function GoogleSignInButton({
         shape: "rectangular",
         text: label,
         locale: "pt-BR",
-        // renderButton expects a number (px)
         width: containerWidth
       });
 

@@ -741,28 +741,26 @@ button:disabled {
   background: var(--border);
 }
 
-.google-signin {
-  width: 100%;
-  min-height: 42px;
-  display: flex;
-  justify-content: center;
-  background: transparent;
-}
-
 .google-signin__button {
   width: min(100%, 400px);
-  min-height: 42px;
+  height: 40px;
+  min-height: 40px;
   line-height: 0;
-  background: transparent;
+  background: #202124;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 
 .google-signin__button > div {
+  height: 40px;
   line-height: 0;
+  overflow: hidden;
 }
 
 .google-signin__button iframe {
   display: block;
+  height: 40px !important;
+  border: 0;
 }
 
 .google-signin.is-disabled {
