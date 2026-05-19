@@ -751,28 +751,39 @@ button:disabled {
 
 .google-signin__button {
   width: min(100%, 400px);
-  height: 40px;
   min-height: 40px;
   line-height: 0;
   background: transparent;
   border-radius: var(--radius);
-  overflow: hidden;
 }
 
-:root[data-theme="dark"] .google-signin__button {
-  background: #202124;
-}
-
+/* Tema claro: deixa o Google renderizar naturalmente */
 .google-signin__button > div {
-  height: 40px;
+  width: 100% !important;
   line-height: 0;
-  overflow: hidden;
 }
 
 .google-signin__button iframe {
   display: block;
-  height: 40px !important;
+  max-width: 100%;
   border: 0;
+}
+
+/* Tema escuro: aplica o corte apenas para esconder a sobra branca */
+:root[data-theme="dark"] .google-signin__button {
+  height: 40px;
+  min-height: 40px;
+  overflow: hidden;
+  background: #202124;
+}
+
+:root[data-theme="dark"] .google-signin__button > div {
+  height: 40px;
+  overflow: hidden;
+}
+
+:root[data-theme="dark"] .google-signin__button iframe {
+  height: 40px !important;
 }
 
 .google-signin.is-disabled {

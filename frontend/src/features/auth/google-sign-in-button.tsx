@@ -53,7 +53,7 @@ export function GoogleSignInButton({
     const render = () => {
       if (!buttonRef.current || !window.google?.accounts?.id) return;
       const container = buttonRef.current;
-      const containerWidth = Math.min(Math.max(container.parentElement?.clientWidth || 400, 240), 400);
+      const containerWidth = Math.min(Math.max(container.clientWidth || 400, 240), 400);
 
       container.innerHTML = "";
       window.google.accounts.id.initialize({
