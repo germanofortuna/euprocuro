@@ -1,5 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <circle cx="27" cy="27" r="18" stroke="#0b4fbb" stroke-width="8"/>
-  <path d="M40 40L56 56" stroke="#1e6ff2" stroke-width="8" stroke-linecap="round"/>
-  <circle cx="27" cy="27" r="8" fill="#d8e8ff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Eu Procuro">
+  <defs>
+    <linearGradient id="epFavLens" x1="6" y1="6" x2="58" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1E40D8"/>
+      <stop offset="0.55" stop-color="#3157F6"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+  </defs>
+  <path d="M10 54 L22 42" stroke="url(#epFavLens)" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="32" cy="30" r="18" stroke="url(#epFavLens)" stroke-width="6"/>
+  <circle cx="32" cy="30" r="8" stroke="#3157F6" stroke-width="2" opacity="0.6"/>
+  <path d="M32 23 L35.5 30 L32 37 L28.5 30 Z" fill="#1E40D8"/>
+  <path d="M25 30 L32 27 L39 30 L32 33 Z" fill="#22D3EE"/>
+  <circle cx="50" cy="14" r="4" fill="#F472B6"/>
 </svg>

@@ -98,7 +98,7 @@ export function AppHeader() {
     <header className="site-header">
       <div className="header-inner">
         <Link href="/" className="brand-link" aria-label="Eu Procuro">
-          <Image src={theme === "dark" ? logoDark : logoLight} alt="Eu Procuro" width={130} height={32} priority />
+          <Image src={theme === "dark" ? logoDark : logoLight} alt="Eu Procuro" width={178} height={44} priority />
         </Link>
 
         <form className="header-search" action="/categorias" role="search">

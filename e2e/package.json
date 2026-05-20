@@ -1,0 +1,15 @@
+{
+  "name": "eu-procuro-e2e",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Smoke and flow E2E tests against deployed environments (HML/PRD).",
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test smoke",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^20.11.0"
+  }
+}

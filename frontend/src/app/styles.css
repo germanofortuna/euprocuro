@@ -53,6 +53,7 @@ body {
   font-family: Sora, Arial, sans-serif;
   letter-spacing: 0;
   transition: background-color 220ms ease, color 220ms ease;
+  overflow-x: clip;
 }
 
 :root[data-route-loading="true"] body {
@@ -4083,7 +4084,17 @@ small {
   }
 
   .marketplace-layout > .detail-preview {
-    grid-column: auto;
+    display: none;
+  }
+
+  .marketplace-layout .interest-card--selectable {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .marketplace-layout .interest-card--selectable a,
+  .marketplace-layout .interest-card--selectable button {
+    pointer-events: auto;
   }
 
   .private-workspace {
