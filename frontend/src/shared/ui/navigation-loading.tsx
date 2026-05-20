@@ -82,7 +82,17 @@ export function NavigationLoading() {
     };
     window.history.replaceState = function replaceStateWithLoading(...args) {
       const result = originalReplaceState.apply(this, args);
-      scheduleLoading();
+      const newUrl = args[2];
+      if (newUrl) {
+        try {
+          const next = new URL(String(newUrl), window.location.href);
+          if (next.pathname !== window.location.pathname) {
+            scheduleLoading();
+          }
+        } catch {
+          // ignore invalid URLs
+        }
+      }
       return result;
     };
 

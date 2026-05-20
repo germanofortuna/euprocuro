@@ -297,19 +297,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     }
     setIsLoadingPrivate(true);
     try {
-      const shouldProbeAdmin = Boolean(currentUser?.id) && !isAdminUser(currentUser) && !hasAdminAccess;
-      const shouldFetchAdminModeration = shouldLoadAdminModeration || shouldProbeAdmin;
-      const adminRequest = shouldFetchAdminModeration ? fetchAdminModeration() : Promise.resolve(null);
-      if (shouldFetchAdminModeration) {
-        adminRequest
-          .then((value) => {
-            if (value) {
-              setAdminModeration(value);
-              setHasAdminAccess(true);
-            }
-          })
-          .catch(() => {});
-      }
+      const adminRequest = shouldLoadAdminModeration ? fetchAdminModeration() : Promise.resolve(null);
       const [dashboardResult, monetizationResult, sellerItemsResult, adminResult] = await Promise.allSettled([
         fetchDashboard(),
         fetchMonetizationAccount(),
