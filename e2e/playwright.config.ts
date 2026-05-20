@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const FRONTEND_URL = process.env.E2E_FRONTEND_URL ?? "http://localhost:5173";
 const API_URL = process.env.E2E_API_URL ?? "http://localhost:8080";
+const VERCEL_BYPASS = process.env.VERCEL_BYPASS ?? "";
 
 export default defineConfig({
   testDir: "./",
@@ -22,7 +23,8 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
     extraHTTPHeaders: {
-      "x-e2e-source": "playwright"
+      "x-e2e-source": "playwright",
+      ...(VERCEL_BYPASS ? { "x-vercel-protection-bypass": VERCEL_BYPASS, "x-vercel-set-bypass-cookie": "samesitenone" } : {})
     }
   },
   projects: [

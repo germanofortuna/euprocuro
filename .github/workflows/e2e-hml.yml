@@ -24,6 +24,7 @@ jobs:
       E2E_ENV: hml
       E2E_FRONTEND_URL: ${{ secrets.E2E_FRONTEND_URL_HML }}
       E2E_API_URL: ${{ secrets.E2E_API_URL_HML }}
+      VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET_HML }}
 
     steps:
       - name: Checkout
@@ -63,7 +64,11 @@ jobs:
           echo "Polling ${E2E_FRONTEND_URL}/ (max 10 minutes) to confirm Vercel deploy is ready..."
           end=$((SECONDS+600))
           while true; do
-            code=$(curl -sS -o /dev/null -L --max-time 15 -w '%{http_code}' "${E2E_FRONTEND_URL}/" || echo "000")
+            bypass_header=""
+            if [ -n "${VERCEL_BYPASS}" ]; then
+              bypass_header="-H x-vercel-protection-bypass:${VERCEL_BYPASS}"
+            fi
+            code=$(curl -sS -o /dev/null -L --max-time 15 -w '%{http_code}' ${bypass_header} "${E2E_FRONTEND_URL}/" || echo "000")
             if [ "$code" = "200" ]; then
               echo "HML frontend is ready (HTTP $code)."
               break
