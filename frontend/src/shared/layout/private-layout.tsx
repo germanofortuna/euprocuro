@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { AlertTriangle, CreditCard, LayoutDashboard, MessageSquare, Package, Search, Settings, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, CreditCard, LayoutDashboard, MessageSquare, Package, Search, Settings, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppHeader } from "./app-header";
 import { AppFooter } from "./app-footer";
@@ -82,6 +82,7 @@ export function PrivateLayout({ children }: { children: React.ReactNode }) {
             {currentUser.email ? (
               <small className="sidebar-user-email">
                 {currentUser.email}
+                {isAdminUser(currentUser, hasAdminAccess) ? <AdminBadge /> : null}
                 {currentUser.googleLinked ? <GoogleLinkedBadge /> : null}
               </small>
             ) : null}
@@ -140,6 +141,14 @@ export function PrivateLayout({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function AdminBadge() {
+  return (
+    <span className="admin-badge" title="Conta administradora" aria-label="Conta administradora">
+      <ShieldCheck size={14} aria-hidden="true" />
+    </span>
   );
 }
 
