@@ -24,4 +24,5 @@ public class UserResponse {
     Integer purchasedCreditsTotal;
     String subscriptionPlan;
     Instant subscriptionActiveUntil;
+    boolean admin;
 }

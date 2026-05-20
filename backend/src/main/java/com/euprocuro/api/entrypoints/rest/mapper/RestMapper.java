@@ -483,6 +483,10 @@ public final class RestMapper {
     }
 
     public static UserResponse toResponse(UserProfile domain) {
+        return toResponse(domain, false);
+    }
+
+    public static UserResponse toResponse(UserProfile domain, boolean isAdmin) {
         return UserResponse.builder()
                 .id(domain.getId())
                 .name(domain.getName())
@@ -500,6 +504,7 @@ public final class RestMapper {
                 .purchasedCreditsTotal(domain.getPurchasedCreditsTotal())
                 .subscriptionPlan(domain.getSubscriptionPlan())
                 .subscriptionActiveUntil(domain.getSubscriptionActiveUntil())
+                .admin(isAdmin)
                 .build();
     }
 
