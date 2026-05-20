@@ -59,17 +59,21 @@ jobs:
           done
           echo "PRD API is UP."
 
-          echo "Polling ${E2E_FRONTEND_URL}/robots.txt (max 5 minutes) to confirm Vercel deploy is ready..."
-          end=$((SECONDS+300))
-          until [ "$(curl -fsS -o /dev/null -w '%{http_code}' "${E2E_FRONTEND_URL}/robots.txt")" = "200" ]; do
+          echo "Polling ${E2E_FRONTEND_URL}/ (max 10 minutes) to confirm Vercel deploy is ready..."
+          end=$((SECONDS+600))
+          while true; do
+            code=$(curl -sS -o /dev/null -L --max-time 15 -w '%{http_code}' "${E2E_FRONTEND_URL}/" || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "PRD frontend is ready (HTTP $code)."
+              break
+            fi
             if [ $SECONDS -ge $end ]; then
-              echo "::error::PRD frontend never returned 200 on /robots.txt within 5 minutes"
+              echo "::error::PRD frontend never returned 200 on / within 10 minutes (last HTTP $code)"
               exit 1
             fi
-            echo "  frontend not ready yet, retrying in 10s..."
+            echo "  frontend HTTP $code, retrying in 10s..."
             sleep 10
           done
-          echo "PRD frontend is ready."
 
       - name: Run Playwright smoke tests
         id: tests

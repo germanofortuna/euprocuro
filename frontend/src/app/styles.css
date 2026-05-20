@@ -4084,7 +4084,17 @@ small {
   }
 
   .marketplace-layout > .detail-preview {
-    grid-column: auto;
+    display: none;
+  }
+
+  .marketplace-layout .interest-card--selectable {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .marketplace-layout .interest-card--selectable a,
+  .marketplace-layout .interest-card--selectable button {
+    pointer-events: auto;
   }
 
   .private-workspace {
