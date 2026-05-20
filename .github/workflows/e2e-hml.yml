@@ -46,19 +46,31 @@ jobs:
         run: |
           set -e
           # Render free tier deploy can take a few minutes; give it a head start.
-          echo "Sleeping 60s to let Render kick off the new deploy..."
+          echo "Sleeping 60s to let Render and Vercel kick off the new deploy..."
           sleep 60
           echo "Polling ${E2E_API_URL}/actuator/health (max 10 minutes)..."
           end=$((SECONDS+600))
           until curl -fsS "${E2E_API_URL}/actuator/health" | grep -q '"status":"UP"'; do
             if [ $SECONDS -ge $end ]; then
-              echo "::error::HML healthcheck never returned UP within 10 minutes"
+              echo "::error::HML API healthcheck never returned UP within 10 minutes"
               exit 1
             fi
-            echo "  not up yet, retrying in 15s..."
+            echo "  API not up yet, retrying in 15s..."
             sleep 15
           done
-          echo "HML is UP."
+          echo "HML API is UP."
+
+          echo "Polling ${E2E_FRONTEND_URL}/robots.txt (max 5 minutes) to confirm Vercel deploy is ready..."
+          end=$((SECONDS+300))
+          until [ "$(curl -fsS -o /dev/null -w '%{http_code}' "${E2E_FRONTEND_URL}/robots.txt")" = "200" ]; do
+            if [ $SECONDS -ge $end ]; then
+              echo "::error::HML frontend never returned 200 on /robots.txt within 5 minutes"
+              exit 1
+            fi
+            echo "  frontend not ready yet, retrying in 10s..."
+            sleep 10
+          done
+          echo "HML frontend is ready."
 
       - name: Run Playwright smoke tests
         id: tests
