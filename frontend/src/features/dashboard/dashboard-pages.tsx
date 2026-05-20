@@ -329,9 +329,15 @@ export function SellerItemsPage() {
 }
 
 export function CreditsPage() {
-  const { monetization, buyProduct, cancelPlan, setFeedback, isLoadingPrivate } = usePlatform();
+  const { monetization, buyProduct, cancelPlan, setFeedback, isLoadingPrivate, operationalSettings } = usePlatform();
   const searchParams = useSearchParams();
-  const products = (monetization?.products ?? []).filter((product) => String(product.type).toUpperCase() !== "BOOST");
+  const sellerProPlanEnabled = Boolean(operationalSettings.featureFlags?.sellerProPlanEnabled);
+  const products = (monetization?.products ?? []).filter((product) => {
+    const type = String(product.type).toUpperCase();
+    if (type === "BOOST") return false;
+    if (type === "PLAN" && !sellerProPlanEnabled) return false;
+    return true;
+  });
   const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
   const [buyingProductCode, setBuyingProductCode] = useState<string | null>(null);
   const paymentStatus = searchParams.get("payment");
@@ -381,7 +387,7 @@ export function CreditsPage() {
       <div className="dashboard-heading"><div><h1>Créditos e Plano</h1><p>Gerencie saldo, Plano Pro e histórico de pagamentos.</p></div></div>
       <div className="stat-grid">
         <StatCard title="Saldo atual" value={monetization?.sellerCredits ?? 0} detail="Créditos disponíveis para propostas" icon={CreditCard} />
-        <StatCard title="Plano Pro" value={monetization?.proSubscriptionActive ? "Ativo" : "Inativo"} detail="Envios liberados enquanto ativo" icon={Sparkles} />
+        {sellerProPlanEnabled ? <StatCard title="Plano Pro" value={monetization?.proSubscriptionActive ? "Ativo" : "Inativo"} detail="Envios liberados enquanto ativo" icon={Sparkles} /> : null}
       </div>
       <section className="dashboard-section">
         <h2>Produtos disponíveis</h2>
@@ -399,7 +405,7 @@ export function CreditsPage() {
             </article>
           )) : <EmptyState title="Compras indisponíveis" description="O CRM operacional ainda não liberou produtos para compra." />}
         </div>
-        {monetization?.proSubscriptionActive ? <Button variant="outline" onClick={() => window.confirm("Deseja cancelar seu Plano Pro? O benefício será encerrado imediatamente.") && cancelPlan()}>Cancelar Plano Pro</Button> : null}
+        {sellerProPlanEnabled && monetization?.proSubscriptionActive ? <Button variant="outline" onClick={() => window.confirm("Deseja cancelar seu Plano Pro? O benefício será encerrado imediatamente.") && cancelPlan()}>Cancelar Plano Pro</Button> : null}
       </section>
     </div>
   );
