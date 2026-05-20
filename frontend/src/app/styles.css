@@ -53,6 +53,7 @@ body {
   font-family: Sora, Arial, sans-serif;
   letter-spacing: 0;
   transition: background-color 220ms ease, color 220ms ease;
+  overflow-x: clip;
 }
 
 :root[data-route-loading="true"] body {

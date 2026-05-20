@@ -1,20 +1,39 @@
-<svg width="520" height="128" viewBox="0 0 520 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
-  <title id="title">Eu Procuro</title>
-  <desc id="desc">Logo Eu Procuro com lupa e texto Marketplace Reverso para tema escuro.</desc>
+<svg width="520" height="128" viewBox="0 0 520 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="epLogoDarkTitle epLogoDarkDesc">
+  <title id="epLogoDarkTitle">Eu Procuro</title>
+  <desc id="epLogoDarkDesc">Eu Procuro - Marketplace Reverso. Versao para tema escuro.</desc>
   <defs>
-    <linearGradient id="darkLens" x1="20" y1="18" x2="132" y2="112" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#D7E0EC"/>
-      <stop offset="1" stop-color="#7D8B9C"/>
+    <linearGradient id="epLensGradDark" x1="32" y1="20" x2="128" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7C8EFF"/>
+      <stop offset="0.55" stop-color="#6B7DFF"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <radialGradient id="epLensFillDark" cx="78" cy="50" r="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1E2444" stop-opacity="0.9"/>
+      <stop offset="0.7" stop-color="#121947" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#121947" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="epEuGradDark" x1="0" y1="0" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9FB1FF"/>
+      <stop offset="1" stop-color="#22D3EE"/>
     </linearGradient>
   </defs>
-  <g stroke="url(#darkLens)" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 111L54 78" stroke-width="12"/>
-    <circle cx="84" cy="54" r="42" stroke-width="7"/>
-    <circle cx="84" cy="54" r="30" stroke-width="4"/>
-    <path d="M54 54a30 30 0 0 1 60 0" stroke-width="4"/>
-    <path d="M54 54a30 30 0 0 0 60 0" stroke-width="4"/>
+
+  <g>
+    <path d="M28 110 L52 86" stroke="url(#epLensGradDark)" stroke-width="11" stroke-linecap="round"/>
+    <circle cx="78" cy="60" r="36" fill="url(#epLensFillDark)" stroke="url(#epLensGradDark)" stroke-width="6"/>
+    <circle cx="78" cy="60" r="18" stroke="#9FB1FF" stroke-width="2.2" fill="none" opacity="0.45"/>
+    <path d="M78 50 L82.5 60 L78 70 L73.5 60 Z" fill="#9FB1FF"/>
+    <path d="M68 60 L78 56 L88 60 L78 64 Z" fill="#22D3EE"/>
+    <circle cx="78" cy="60" r="2.4" fill="#FFFFFF"/>
+    <circle cx="44" cy="30" r="5" fill="#22D3EE"/>
+    <circle cx="118" cy="42" r="6" fill="#A78BFA"/>
+    <circle cx="108" cy="100" r="5" fill="#F472B6"/>
+    <path d="M50 34 L60 42" stroke="#22D3EE" stroke-width="1.6" stroke-linecap="round" opacity="0.65"/>
+    <path d="M112 46 L100 52" stroke="#A78BFA" stroke-width="1.6" stroke-linecap="round" opacity="0.65"/>
+    <path d="M104 95 L94 86" stroke="#F472B6" stroke-width="1.6" stroke-linecap="round" opacity="0.65"/>
   </g>
-  <text x="50" y="70" font-family="Sora, Arial, sans-serif" font-size="39" font-weight="900" fill="#DDE6F2" letter-spacing="-1.5">EU</text>
-  <text x="135" y="70" font-family="Sora, Arial, sans-serif" font-size="43" font-weight="500" fill="#D7DEE8" letter-spacing="-1">PROCURO</text>
-  <text x="138" y="103" font-family="Sora, Arial, sans-serif" font-size="18" font-weight="900" fill="#1B4F8F" letter-spacing="1.8">MARKETPLACE REVERSO</text>
+
+  <text x="140" y="68" font-family="Sora, Inter, system-ui, sans-serif" font-size="44" font-weight="800" fill="url(#epEuGradDark)" letter-spacing="-1.5">eu</text>
+  <text x="196" y="68" font-family="Sora, Inter, system-ui, sans-serif" font-size="44" font-weight="500" fill="#F5F8FF" letter-spacing="-0.8">procuro</text>
+  <text x="140" y="100" font-family="Sora, Inter, system-ui, sans-serif" font-size="13" font-weight="800" fill="#9FB1FF" letter-spacing="3.2">MARKETPLACE REVERSO</text>
 </svg>
