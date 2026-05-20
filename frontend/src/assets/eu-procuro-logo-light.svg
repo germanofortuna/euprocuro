@@ -16,6 +16,21 @@
       <stop offset="0" stop-color="#1E40D8"/>
       <stop offset="1" stop-color="#3157F6"/>
     </linearGradient>
+    <style>
+      .ep-orbit-1 { transform-origin: 78px 60px; animation: ep-spin-cw 16s linear infinite; }
+      .ep-orbit-2 { transform-origin: 78px 60px; animation: ep-spin-ccw 22s linear infinite; }
+      .ep-orbit-3 { transform-origin: 78px 60px; animation: ep-spin-cw 28s linear infinite; }
+      .ep-jewel { transform-origin: 78px 60px; animation: ep-pulse 3.4s ease-in-out infinite; }
+      @keyframes ep-spin-cw { to { transform: rotate(360deg); } }
+      @keyframes ep-spin-ccw { to { transform: rotate(-360deg); } }
+      @keyframes ep-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.08); opacity: 0.9; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .ep-orbit-1, .ep-orbit-2, .ep-orbit-3, .ep-jewel { animation: none; }
+      }
+    </style>
   </defs>
 
   <!-- Magnifying lens -->
@@ -27,17 +42,24 @@
     <!-- Inner concentric ring (target) -->
     <circle cx="78" cy="60" r="18" stroke="#3157F6" stroke-width="2.2" fill="none" opacity="0.55"/>
     <!-- Central jewel: sparkle made of two crossing diamonds -->
-    <path d="M78 50 L82.5 60 L78 70 L73.5 60 Z" fill="#1E40D8"/>
-    <path d="M68 60 L78 56 L88 60 L78 64 Z" fill="#22D3EE"/>
-    <circle cx="78" cy="60" r="2.4" fill="#FFFFFF"/>
+    <g class="ep-jewel">
+      <path d="M78 50 L82.5 60 L78 70 L73.5 60 Z" fill="#1E40D8"/>
+      <path d="M68 60 L78 56 L88 60 L78 64 Z" fill="#22D3EE"/>
+      <circle cx="78" cy="60" r="2.4" fill="#FFFFFF"/>
+    </g>
     <!-- Convergent orbital dots (sellers reaching buyer) -->
-    <circle cx="44" cy="30" r="5" fill="#22D3EE"/>
-    <circle cx="118" cy="42" r="6" fill="#7C3AED"/>
-    <circle cx="108" cy="100" r="5" fill="#F472B6"/>
-    <!-- Subtle inward motion lines -->
-    <path d="M50 34 L60 42" stroke="#22D3EE" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>
-    <path d="M112 46 L100 52" stroke="#7C3AED" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>
-    <path d="M104 95 L94 86" stroke="#F472B6" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>
+    <g class="ep-orbit-1">
+      <circle cx="44" cy="30" r="5" fill="#22D3EE"/>
+      <path d="M50 34 L60 42" stroke="#22D3EE" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>
+    </g>
+    <g class="ep-orbit-2">
+      <circle cx="118" cy="42" r="6" fill="#7C3AED"/>
+      <path d="M112 46 L100 52" stroke="#7C3AED" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>
+    </g>
+    <g class="ep-orbit-3">
+      <circle cx="108" cy="100" r="5" fill="#F472B6"/>
+      <path d="M104 95 L94 86" stroke="#F472B6" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>
+    </g>
   </g>
 
   <!-- Wordmark -->
