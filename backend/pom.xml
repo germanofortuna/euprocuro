@@ -19,8 +19,8 @@
     <properties>
         <java.version>11</java.version>
         <maven.compiler.release>11</maven.compiler.release>
-        <jacoco.version>0.8.12</jacoco.version>
-        <lombok.version>1.18.38</lombok.version>
+        <jacoco.version>0.8.14</jacoco.version>
+        <lombok.version>1.18.46</lombok.version>
         <tomcat.version>9.0.118</tomcat.version>
         <snakeyaml.version>2.2</snakeyaml.version>
         <spring-security.version>5.7.14</spring-security.version>
