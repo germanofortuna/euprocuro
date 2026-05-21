@@ -256,7 +256,17 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
 
   const currentUser = session?.user ?? null;
   const shouldLoadSellerItems = pathname === "/meus-itens";
-  const shouldLoadAdminModeration = pathname === "/admin" || isAdminUser(currentUser) || hasAdminAccess;
+  // Carrega moderação admin se:
+  // 1. Usuário já confirmado como admin pelo backend (currentUser.admin === true)
+  // 2. Está na página /admin
+  // 3. hasAdminAccess foi confirmado por probe anterior
+  // 4. O campo admin ainda não chegou do backend (null/undefined) → faz probe uma vez;
+  //    quando o backend retornar admin: false, a probe para automaticamente.
+  const shouldLoadAdminModeration =
+    pathname === "/admin" ||
+    isAdminUser(currentUser) ||
+    hasAdminAccess ||
+    (currentUser?.id != null && currentUser.admin == null);
 
   const refreshPublicData = useCallback(async (filters: Record<string, string | number | undefined | null> = {}) => {
     setIsLoadingPublic(true);
@@ -297,19 +307,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     }
     setIsLoadingPrivate(true);
     try {
-      const shouldProbeAdmin = Boolean(currentUser?.id) && !isAdminUser(currentUser) && !hasAdminAccess;
-      const shouldFetchAdminModeration = shouldLoadAdminModeration || shouldProbeAdmin;
-      const adminRequest = shouldFetchAdminModeration ? fetchAdminModeration() : Promise.resolve(null);
-      if (shouldFetchAdminModeration) {
-        adminRequest
-          .then((value) => {
-            if (value) {
-              setAdminModeration(value);
-              setHasAdminAccess(true);
-            }
-          })
-          .catch(() => {});
-      }
+      const adminRequest = shouldLoadAdminModeration ? fetchAdminModeration() : Promise.resolve(null);
       const [dashboardResult, monetizationResult, sellerItemsResult, adminResult] = await Promise.allSettled([
         fetchDashboard(),
         fetchMonetizationAccount(),

@@ -18,4 +18,5 @@ public class MeResponse {
     private String country;
     private Integer credits;
     private Instant expiresAt;
+    private boolean admin;
 }

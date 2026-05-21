@@ -34,14 +34,19 @@ export function NavigationLoading() {
 
   useEffect(() => {
     let scheduledLoading: number | null = null;
+    let safetyTimeout: number | null = null;
 
     function startLoading() {
       if (scheduledLoading) {
         window.clearTimeout(scheduledLoading);
         scheduledLoading = null;
       }
+      if (safetyTimeout) {
+        window.clearTimeout(safetyTimeout);
+      }
       setIsLoading(true);
       document.documentElement.setAttribute("data-route-loading", "true");
+      safetyTimeout = window.setTimeout(stopLoading, 8000);
     }
 
     function scheduleLoading() {
@@ -59,8 +64,22 @@ export function NavigationLoading() {
         window.clearTimeout(scheduledLoading);
         scheduledLoading = null;
       }
+      if (safetyTimeout) {
+        window.clearTimeout(safetyTimeout);
+        safetyTimeout = null;
+      }
       setIsLoading(false);
       document.documentElement.removeAttribute("data-route-loading");
+    }
+
+    function urlChangesRoute(newUrl: string | URL | null | undefined): boolean {
+      if (!newUrl) return false;
+      try {
+        const next = new URL(String(newUrl), window.location.href);
+        return next.pathname !== window.location.pathname || next.search !== window.location.search;
+      } catch {
+        return false;
+      }
     }
 
     function handleClick(event: MouseEvent) {
@@ -77,12 +96,16 @@ export function NavigationLoading() {
     const originalReplaceState = window.history.replaceState;
     window.history.pushState = function pushStateWithLoading(...args) {
       const result = originalPushState.apply(this, args);
-      scheduleLoading();
+      if (urlChangesRoute(args[2])) {
+        scheduleLoading();
+      }
       return result;
     };
     window.history.replaceState = function replaceStateWithLoading(...args) {
       const result = originalReplaceState.apply(this, args);
-      scheduleLoading();
+      if (urlChangesRoute(args[2])) {
+        scheduleLoading();
+      }
       return result;
     };
 
@@ -98,6 +121,9 @@ export function NavigationLoading() {
       window.history.replaceState = originalReplaceState;
       if (scheduledLoading) {
         window.clearTimeout(scheduledLoading);
+      }
+      if (safetyTimeout) {
+        window.clearTimeout(safetyTimeout);
       }
       document.documentElement.removeAttribute("data-route-loading");
     };

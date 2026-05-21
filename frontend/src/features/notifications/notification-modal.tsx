@@ -16,25 +16,16 @@ export type AppNotification = {
   source: "received" | "sent";
 };
 
-export function buildOfferNotifications(receivedOffers: Offer[] = [], sentOffers: Offer[] = []): AppNotification[] {
-  const received = receivedOffers.map((offer) => ({
-    id: `received:${offer.id}`,
-    title: offer.interestTitle ? `Nova proposta em ${offer.interestTitle}` : "Nova proposta recebida",
-    message: offer.sellerName ? `${offer.sellerName} enviou uma proposta.` : offer.message || "Uma proposta chegou para uma procura sua.",
-    createdAt: offer.latestMessageAt ?? offer.createdAt,
-    href: "/ofertas-recebidas",
-    source: "received" as const
-  }));
-  const sent = sentOffers.map((offer) => ({
-    id: `sent:${offer.id}`,
-    title: offer.interestTitle ? `Atualizacao em ${offer.interestTitle}` : "Atualizacao de proposta",
-    message: offer.status ? `Status atual: ${offer.status}.` : offer.message || "Acompanhe sua conversa com o comprador.",
-    createdAt: offer.latestMessageAt ?? offer.createdAt,
-    href: "/ofertas-enviadas",
-    source: "sent" as const
-  }));
-
-  return [...received, ...sent]
+export function buildOfferNotifications(receivedOffers: Offer[] = []): AppNotification[] {
+  return receivedOffers
+    .map((offer) => ({
+      id: `received:${offer.id}`,
+      title: offer.interestTitle ? `Nova proposta em "${offer.interestTitle}"` : "Nova proposta recebida",
+      message: offer.sellerName ? `${offer.sellerName} enviou uma proposta.` : offer.message || "Uma proposta chegou para uma procura sua.",
+      createdAt: offer.latestMessageAt ?? offer.createdAt,
+      href: "/ofertas-recebidas",
+      source: "received" as const
+    }))
     .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
     .slice(0, 8);
 }

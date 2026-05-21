@@ -612,7 +612,7 @@ button:disabled {
 
 .marketplace-layout {
   display: grid;
-  grid-template-columns: 258px minmax(0, 1fr) 340px;
+  grid-template-columns: 258px minmax(0, 1fr);
   gap: 28px;
   align-items: start;
 }
@@ -878,8 +878,15 @@ select:focus {
 }
 
 .interest-card__media {
-  min-height: 100%;
   border-right: 1px solid var(--border);
+}
+
+.interest-card--with-image .interest-card__media {
+  grid-row: 1 / -1;
+}
+
+.interest-card--with-image .interest-card__footer {
+  grid-column: 2;
 }
 
 .interest-card__media img,
@@ -2490,6 +2497,21 @@ small {
   word-break: break-all;
 }
 
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  vertical-align: -3px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 15%, var(--surface-raised));
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
 .google-linked-badge {
   display: inline-flex;
   align-items: center;
@@ -3377,6 +3399,8 @@ small {
 .modal-overlay--topbar {
   display: block;
   padding: 0;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .modal-overlay--plain {

@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Search, Sparkles, TrendingUp } from "lucide-react";
+import { Sparkles, TrendingUp } from "lucide-react";
 import { useEffect } from "react";
 import { usePlatform } from "@/features/platform/platform-context";
 import { InterestCard } from "./interest-card";
 import { MarketplaceFilters } from "./marketplace-filters";
-import { budgetLabel, categoryLabel, categorySearchPlaceholder, locationLabel, slugifyCategory } from "@/shared/lib/format";
+import { categorySearchPlaceholder, slugifyCategory } from "@/shared/lib/format";
 import { rememberInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { AuthIntentLink } from "@/shared/ui/auth-intent-link";
 import { STICKERS_CATEGORY } from "@/features/stickers/stickers-data";
@@ -41,7 +41,7 @@ function interestMatchesQuery(interest: Interest, query: string) {
 }
 
 export function PublicHome() {
-  const { categories, interests, selectedInterest, selectInterest, refreshPublicData, isLoadingPublic, hasLoadedPublicData } = usePlatform();
+  const { categories, interests, refreshPublicData, isLoadingPublic, hasLoadedPublicData } = usePlatform();
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = (searchParams.get("query") ?? "").trim().toLowerCase();
@@ -80,26 +80,9 @@ export function PublicHome() {
               <Link href="/categorias">Ver todas</Link>
             </div>
             <div className="interest-list">
-              {isResolvingResults ? <div className="section-loading" role="status">Carregando procuras...</div> : visibleInterests.map((interest) => <InterestCard key={interest.id} interest={interest} categories={categories} onSelect={(item) => selectInterest(item.id)} />)}
+              {isResolvingResults ? <div className="section-loading" role="status">Carregando procuras...</div> : visibleInterests.map((interest) => <InterestCard key={interest.id} interest={interest} categories={categories} />)}
             </div>
           </div>
-          <aside className="detail-preview">
-            {selectedInterest ? (
-              <>
-                <span className="pill">Procura selecionada</span>
-                <h2>{selectedInterest.title}</h2>
-                <p>{selectedInterest.description}</p>
-                <dl>
-                  <div><dt>Categoria</dt><dd>{categoryLabel(categories, selectedInterest.category)}</dd></div>
-                  <div><dt>Localidade</dt><dd>{locationLabel(selectedInterest)}</dd></div>
-                  <div><dt>Orçamento</dt><dd>{budgetLabel(selectedInterest)}</dd></div>
-                </dl>
-                <Link className="button button--primary" href={`/interesses/${selectedInterest.id}`}>Ver detalhes e enviar proposta <ArrowRight size={16} /></Link>
-              </>
-            ) : (
-              <div className="empty-state"><Search size={28} /><strong>Selecione uma procura</strong><p>Escolha uma procura publicada para ver detalhes.</p></div>
-            )}
-          </aside>
         </div>
       </section>
     </>
@@ -107,7 +90,7 @@ export function PublicHome() {
 }
 
 export function CategoryLanding({ categorySlug }: { categorySlug?: string }) {
-  const { categories, interests, refreshPublicData, selectInterest, isLoadingPublic, hasLoadedPublicData } = usePlatform();
+  const { categories, interests, refreshPublicData, isLoadingPublic, hasLoadedPublicData } = usePlatform();
   const searchParams = useSearchParams();
   useEffect(() => {
     rememberInterestListHref(`${window.location.pathname}${window.location.search}`);
@@ -176,7 +159,7 @@ export function CategoryLanding({ categorySlug }: { categorySlug?: string }) {
               <h2>{isResolvingResults ? "Carregando procuras..." : query ? `${categoryInterests.length} resultados para "${query}"` : `${categoryInterests.length} procuras ativas`}</h2>
             </div>
             <div className="interest-list">
-              {isResolvingResults ? <div className="section-loading" role="status">Carregando resultados...</div> : categoryInterests.map((interest) => <InterestCard key={interest.id} interest={interest} categories={categories} onSelect={(item) => selectInterest(item.id)} />)}
+              {isResolvingResults ? <div className="section-loading" role="status">Carregando resultados...</div> : categoryInterests.map((interest) => <InterestCard key={interest.id} interest={interest} categories={categories} />)}
             </div>
           </div>
         </div>

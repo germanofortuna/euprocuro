@@ -630,6 +630,29 @@ APP_RESET_BASE_URL=https://app.seudominio.com
 
 `APP_AUTH_SESSION_HOURS` define o tempo maximo de inatividade. `APP_AUTH_SESSION_RENEWAL_THRESHOLD_HOURS` define quando renovar: com os defaults, uma sessao dura 7 dias e, se o usuario continuar ativo quando faltar menos de 24h, o backend renova por mais 7 dias.
 
+## Rate limit
+
+O rate limit e aplicado automaticamente nas rotas sensiveis:
+
+- `POST /api/auth/login`
+- `POST /api/auth/register`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+- `POST /api/offers/:offerId/messages`
+
+O padrao e **25 requisicoes por janela de 5 minutos por IP**. A contagem usa o IP real do cliente, lido do header `CF-Connecting-IP` quando a requisicao passa pelo Cloudflare.
+
+Para ajustar os limites, use variaveis de ambiente (no Render ou no `.env.local`):
+
+```bash
+APP_RATE_LIMIT_ENABLED=true
+APP_RATE_LIMIT_MAX_REQUESTS=25        # numero maximo de requisicoes por janela
+APP_RATE_LIMIT_WINDOW_SECONDS=300     # tamanho da janela em segundos (300 = 5 minutos)
+APP_RATE_LIMIT_MAX_TRACKED_KEYS=10000 # maximo de IPs monitorados simultaneamente
+```
+
+Os defaults ficam em `backend/src/main/resources/application.yml` na chave `application.security.rate-limit`. A implementacao esta em `backend/src/main/java/com/euprocuro/api/entrypoints/rest/security/RateLimitInterceptor.java`.
+
 ## Configuracao de RabbitMQ
 
 O backend ja sobe com publisher pronto para RabbitMQ. Os principais eventos publicados hoje sao:

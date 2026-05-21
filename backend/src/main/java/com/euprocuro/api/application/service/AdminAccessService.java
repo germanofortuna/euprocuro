@@ -24,10 +24,14 @@ public class AdminAccessService {
     @Value("${application.admin.allowed-emails:}")
     private String allowedAdminEmails;
 
+    public boolean isAdmin(String email) {
+        return adminEmails().contains(safeEmail(email));
+    }
+
     public UserProfile requireAdmin(String userId) {
         UserProfile user = userGateway.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado."));
-        if (!adminEmails().contains(safeEmail(user.getEmail()))) {
+        if (!isAdmin(user.getEmail())) {
             throw new ForbiddenException("Acesso administrativo nao autorizado.");
         }
         return user;

@@ -17,6 +17,14 @@ import { Button } from "@/shared/ui/button";
 import { BackButton } from "@/shared/ui/back-button";
 import { FieldCounter } from "@/shared/ui/field-counter";
 import { trackEvent } from "@/features/analytics/analytics";
+
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits.length ? `(${digits}` : "";
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
 import { STICKERS_CATEGORY, stickerFlagImageForSelection, stickerSelectionLabel } from "@/features/stickers/stickers-data";
 
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
@@ -431,7 +439,7 @@ export function InterestDetailPage({ interestId, initialInterest }: { interestId
             ) : (
             <form className="stack-form" onSubmit={submitOfferForm}>
               <label>Valor da proposta<input type="number" min="0" required value={offerForm.offeredPrice} onChange={(event) => setOfferForm((current) => ({ ...current, offeredPrice: event.target.value }))} /></label>
-              <label>Telefone ou WhatsApp<input required value={offerForm.sellerPhone} onChange={(event) => setOfferForm((current) => ({ ...current, sellerPhone: event.target.value }))} /></label>
+              <label>Telefone ou WhatsApp<input required value={offerForm.sellerPhone} maxLength={15} placeholder="(00) 00000-0000" onChange={(event) => setOfferForm((current) => ({ ...current, sellerPhone: formatPhone(event.target.value) }))} /></label>
               <label>Mensagem<textarea rows={4} required value={offerForm.message} onChange={(event) => setOfferForm((current) => ({ ...current, message: event.target.value }))} placeholder="Conte como voce pode atender esta procura" /></label>
               {offerForm.offerImageUrl ? (
                 <div className="conversation-image-preview offer-image-preview">

@@ -14,7 +14,7 @@ jobs:
   smoke:
     name: Smoke against HML
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 50
 
     defaults:
       run:
@@ -49,11 +49,11 @@ jobs:
           # Render free tier deploy can take a few minutes; give it a head start.
           echo "Sleeping 60s to let Render and Vercel kick off the new deploy..."
           sleep 60
-          echo "Polling ${E2E_API_URL}/actuator/health (max 10 minutes)..."
-          end=$((SECONDS+600))
+          echo "Polling ${E2E_API_URL}/actuator/health (max 25 minutes)..."
+          end=$((SECONDS+1500))
           until curl -fsS "${E2E_API_URL}/actuator/health" | grep -q '"status":"UP"'; do
             if [ $SECONDS -ge $end ]; then
-              echo "::error::HML API healthcheck never returned UP within 10 minutes"
+              echo "::error::HML API healthcheck never returned UP within 25 minutes"
               exit 1
             fi
             echo "  API not up yet, retrying in 15s..."

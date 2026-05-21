@@ -52,10 +52,7 @@ function initialInterestForm(currentUser?: { city?: string; state?: string; neig
     neighborhood: currentUser?.neighborhood ?? "",
     country: currentUser?.country ?? "Brasil",
     preferredCondition: "",
-    preferredContactMode: "",
     desiredRadiusKm: "25",
-    allowsWhatsappContact: false,
-    whatsappContact: "",
     referenceImageUrl: ""
   };
 }
@@ -75,10 +72,7 @@ function interestToForm(interest: Interest, currentForm: ReturnType<typeof initi
     neighborhood: String(interest.location?.neighborhood ?? ""),
     country: String(interest.location?.country ?? "Brasil"),
     preferredCondition: String(interest.preferredCondition ?? ""),
-    preferredContactMode: String(interest.preferredContactMode ?? ""),
     desiredRadiusKm: String(interest.desiredRadiusKm ?? currentForm.desiredRadiusKm),
-    allowsWhatsappContact: Boolean(interest.allowsWhatsappContact),
-    whatsappContact: String(interest.whatsappContact ?? ""),
     referenceImageUrl: String(interest.referenceImageUrl ?? "")
   };
 }
@@ -209,10 +203,7 @@ export function InterestFormPage() {
         budgetMax: form.budgetMax ? Number(form.budgetMax) : null,
         tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
         desiredRadiusKm: Number(form.desiredRadiusKm || 0),
-        allowsWhatsappContact: form.allowsWhatsappContact,
-        whatsappContact: form.whatsappContact,
         preferredCondition: form.preferredCondition,
-        preferredContactMode: form.preferredContactMode,
         referenceImageUrl: form.referenceImageUrl || null,
         postalCode: form.postalCode,
         city: form.city,
@@ -325,15 +316,7 @@ export function InterestFormPage() {
             <label>Bairro<input value={form.neighborhood} onChange={(event) => update("neighborhood", event.target.value)} /></label>
             <label>País<input value={form.country} onChange={(event) => update("country", event.target.value)} /></label>
           </div>
-          <div className="form-grid">
-            <label>Condição preferida<input value={form.preferredCondition} onChange={(event) => update("preferredCondition", event.target.value)} placeholder="Novo, usado, indiferente" /></label>
-            <label>Modo de contato<select value={form.preferredContactMode} onChange={(event) => update("preferredContactMode", event.target.value)}><option value="">Selecione...</option><option value="CHAT">Chat da plataforma</option><option value="WHATSAPP">WhatsApp</option><option value="EMAIL">E-mail</option></select></label>
-          </div>
-          <label className="checkbox-row">
-            <input type="checkbox" checked={form.allowsWhatsappContact} onChange={(event) => update("allowsWhatsappContact", event.target.checked)} />
-            <span>Permitir contato via WhatsApp</span>
-          </label>
-          {form.allowsWhatsappContact ? <label>WhatsApp<input value={form.whatsappContact} onChange={(event) => update("whatsappContact", event.target.value)} /></label> : null}
+          <label>Condição preferida<input value={form.preferredCondition} onChange={(event) => update("preferredCondition", event.target.value)} placeholder="Novo, usado, indiferente" /></label>
           <div className="notice-box">Esta procura ficará ativa por até 30 dias e depois poderá ser renovada com crédito.</div>
         </section>
         <div className="form-actions">

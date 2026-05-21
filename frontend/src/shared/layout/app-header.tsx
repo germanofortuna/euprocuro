@@ -50,7 +50,7 @@ export function AppHeader() {
   const notificationButtonRef = useRef<HTMLButtonElement | null>(null);
   const credits = monetization?.sellerCredits ?? currentUser?.sellerCredits ?? currentUser?.credits ?? 0;
   const creditPurchasesEnabled = Boolean(monetization?.settings?.creditPurchasesEnabled);
-  const notifications = buildOfferNotifications(dashboard?.receivedOffers, dashboard?.sentOffers);
+  const notifications = buildOfferNotifications(dashboard?.receivedOffers);
   const navItems = baseNavItems.filter((item) => item.feature !== "stickers" || operationalSettings.featureFlags?.stickersPageEnabled !== false);
   const messageSeenKey = currentUser?.id ? `eu-procuro-message-seen:${currentUser.id}` : null;
   const unreadCount = notifications.filter((notification) => !seenNotifications.includes(notification.id)).length;

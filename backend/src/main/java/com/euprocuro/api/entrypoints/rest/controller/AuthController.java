@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import com.euprocuro.api.application.service.AdminAccessService;
 import com.euprocuro.api.application.usecase.AuthUseCase;
 import com.euprocuro.api.entrypoints.rest.dto.request.ForgotPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.GoogleLoginRequest;
@@ -38,6 +39,7 @@ public class AuthController {
     private final AuthTokenResolver authTokenResolver;
     private final ClientIpResolver clientIpResolver;
     private final TurnstileVerificationService turnstileVerificationService;
+    private final AdminAccessService adminAccessService;
 
     @Value("${application.auth.expose-session-token:false}")
     private boolean exposeSessionToken;
@@ -82,7 +84,9 @@ public class AuthController {
     @GetMapping("/me")
     public MeResponse me(HttpServletRequest request) {
         String userId = CurrentUserContext.userId(request);
-        MeResponse response = RestMapper.toMeResponse(authUseCase.meByUserId(userId));
+        com.euprocuro.api.domain.model.UserProfile user = authUseCase.meByUserId(userId);
+        MeResponse response = RestMapper.toMeResponse(user);
+        response.setAdmin(adminAccessService.isAdmin(user.getEmail()));
         CurrentUserContext.optionalSessionExpiresAt(request).ifPresent(response::setExpiresAt);
         return response;
     }
@@ -134,7 +138,7 @@ public class AuthController {
         return AuthResponse.builder()
                 .token(exposeSessionToken ? session.getToken() : null)
                 .expiresAt(session.getExpiresAt())
-                .user(RestMapper.toResponse(session.getUser()))
+                .user(RestMapper.toResponse(session.getUser(), adminAccessService.isAdmin(session.getUser().getEmail())))
                 .build();
     }
 }
