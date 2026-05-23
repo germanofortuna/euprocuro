@@ -46,13 +46,13 @@ jobs:
       - name: Wait for PRD deploy to be healthy
         run: |
           set -e
-          echo "Sleeping 60s to let Render and Vercel kick off the new deploy..."
-          sleep 60
-          echo "Polling ${E2E_API_URL}/actuator/health (max 10 minutes)..."
-          end=$((SECONDS+600))
+          echo "Sleeping 120s to let Render and Vercel kick off the new deploy..."
+          sleep 120
+          echo "Polling ${E2E_API_URL}/actuator/health (max 20 minutes)..."
+          end=$((SECONDS+1200))
           until curl -fsS "${E2E_API_URL}/actuator/health" | grep -q '"status":"UP"'; do
             if [ $SECONDS -ge $end ]; then
-              echo "::error::PRD API healthcheck never returned UP within 10 minutes"
+              echo "::error::PRD API healthcheck never returned UP within 20 minutes"
               exit 1
             fi
             echo "  API not up yet, retrying in 15s..."
