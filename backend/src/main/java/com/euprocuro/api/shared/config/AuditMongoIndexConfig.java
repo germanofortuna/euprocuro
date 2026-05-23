@@ -1,8 +1,8 @@
 package com.euprocuro.api.shared.config;
 
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort.Direction;
@@ -50,7 +50,7 @@ public class AuditMongoIndexConfig {
 
         indexOperations.ensureIndex(new Index()
                 .on(field, Direction.ASC)
-                .expire(Math.max(60, ttlSeconds), TimeUnit.SECONDS)
+                .expire(Duration.ofSeconds(Math.max(60, ttlSeconds)))
                 .named(name));
     }
 

@@ -13,7 +13,7 @@ import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -417,7 +417,7 @@ public class EmailGatewayAdapter implements EmailGateway {
             headers.setBearerAuth(mailerSendApiKey);
             headers.setContentType(MediaType.APPLICATION_JSON);
 
-            HttpStatus status = restTemplate.exchange(
+            HttpStatusCode status = restTemplate.exchange(
                     mailerSendApiUrl,
                     HttpMethod.POST,
                     new HttpEntity<>(body, headers),

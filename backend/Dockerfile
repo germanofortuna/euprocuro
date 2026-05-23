@@ -1,4 +1,4 @@
-FROM maven:3.9.9-eclipse-temurin-11 AS build
+FROM maven:3.9.9-eclipse-temurin-21 AS build
 WORKDIR /app
 
 # Copia só o pom.xml primeiro para cachear o download das dependencias
@@ -9,7 +9,7 @@ RUN mvn -B dependency:go-offline -q
 COPY src ./src
 RUN mvn -B clean package -DskipTests
 
-FROM eclipse-temurin:11-jre
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 
 COPY --from=build /app/target/*.jar app.jar

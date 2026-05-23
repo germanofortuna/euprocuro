@@ -1,8 +1,8 @@
 package com.euprocuro.api.entrypoints.rest.controller;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.euprocuro.api.entrypoints.rest.dto.response.MeResponse;
