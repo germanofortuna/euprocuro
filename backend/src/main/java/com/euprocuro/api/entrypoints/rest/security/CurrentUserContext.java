@@ -3,7 +3,7 @@ package com.euprocuro.api.entrypoints.rest.security;
 import java.time.Instant;
 import java.util.Optional;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import com.euprocuro.api.application.exception.UnauthorizedException;
 

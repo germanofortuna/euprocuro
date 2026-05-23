@@ -700,7 +700,7 @@ Com o backend rodando em `http://localhost:8080`, acesse:
 
 ### Configuracao
 
-A dependencia `springdoc-openapi-ui` ja esta adicionada no `pom.xml`. A configuracao padrao esta em `application.yml`:
+A dependencia `springdoc-openapi-starter-webmvc-ui` ja esta adicionada no `pom.xml`. A configuracao padrao esta em `application.yml`:
 
 ```yaml
 springdoc:

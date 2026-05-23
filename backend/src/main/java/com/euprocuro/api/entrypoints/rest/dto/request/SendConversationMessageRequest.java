@@ -1,6 +1,6 @@
 package com.euprocuro.api.entrypoints.rest.dto.request;
 
-import javax.validation.constraints.Size;
+import jakarta.validation.constraints.Size;
 
 import lombok.Data;
 
