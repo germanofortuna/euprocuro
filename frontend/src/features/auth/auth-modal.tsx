@@ -10,6 +10,7 @@ import { Button } from "@/shared/ui/button";
 import { LegalModal } from "@/features/legal/legal-modal";
 import { forgotPassword, lookupAddressByPostalCode } from "@/shared/api/client";
 import { GoogleSignInButton, isGoogleSignInEnabled } from "@/features/auth/google-sign-in-button";
+import { FacebookSignInButton, isFacebookSignInEnabled } from "@/features/auth/facebook-sign-in-button";
 import { isTurnstileEnabled, TurnstileWidget } from "@/features/auth/turnstile-widget";
 
 type LoginForm = {
@@ -64,7 +65,7 @@ function passwordStatus(password: string) {
 }
 
 export function AuthModal() {
-  const { authModal, closeAuthModal, setAuthMode, signIn, signInWithGoogle, signUp, setFeedback, operationalSettings } = usePlatform();
+  const { authModal, closeAuthModal, setAuthMode, signIn, signInWithGoogle, signInWithFacebook, signUp, setFeedback, operationalSettings } = usePlatform();
   const { termsVersion } = useLegalContent();
   const [loginForm, setLoginForm] = useState(initialLogin);
   const [registerForm, setRegisterForm] = useState(initialRegister);
@@ -120,6 +121,23 @@ export function AuthModal() {
       setIsSubmitting(false);
     }
   }, [setFeedback, signInWithGoogle, turnstileToken]);
+
+  const handleFacebookCredential = useCallback(async (accessToken: string) => {
+    setIsSubmitting(true);
+    try {
+      await signInWithFacebook(accessToken, turnstileToken || undefined);
+    } catch (error) {
+      setTurnstileToken("");
+      setTurnstileResetKey((current) => current + 1);
+      setFeedback({
+        type: "error",
+        title: "Não foi possível entrar com Facebook",
+        message: error instanceof Error ? error.message : "Tente novamente em instantes."
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [setFeedback, signInWithFacebook, turnstileToken]);
 
   if (!authModal.visible) {
     return null;
@@ -309,13 +327,20 @@ export function AuthModal() {
             </div>
           ) : null}
 
-          {isGoogleSignInEnabled && (authModal.mode === "login" || authModal.mode === "register") ? (
+          {(isGoogleSignInEnabled || isFacebookSignInEnabled) && (authModal.mode === "login" || authModal.mode === "register") ? (
             <div className="auth-social-block">
-              <GoogleSignInButton
-                disabled={isSubmitting || (shouldUseTurnstile && !turnstileToken)}
-                label={authModal.mode === "register" ? "signup_with" : "continue_with"}
-                onCredential={handleGoogleCredential}
-              />
+              <div className="auth-social-buttons">
+                <GoogleSignInButton
+                  disabled={isSubmitting || (shouldUseTurnstile && !turnstileToken)}
+                  label={authModal.mode === "register" ? "signup_with" : "continue_with"}
+                  onCredential={handleGoogleCredential}
+                />
+                <FacebookSignInButton
+                  disabled={isSubmitting || (shouldUseTurnstile && !turnstileToken)}
+                  label={authModal.mode === "register" ? "signup_with" : "continue_with"}
+                  onCredential={handleFacebookCredential}
+                />
+              </div>
               <span>ou continue com e-mail</span>
             </div>
           ) : null}

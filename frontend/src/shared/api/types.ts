@@ -15,6 +15,7 @@ export type User = {
   roles?: string[];
   authorities?: string[];
   googleLinked?: boolean;
+  facebookLinked?: boolean;
 };
 
 export type StoredSession = {

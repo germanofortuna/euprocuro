@@ -18,6 +18,7 @@ public class UserResponse {
     String country;
     boolean emailVerified;
     boolean googleLinked;
+    boolean facebookLinked;
     double buyerRating;
     double sellerRating;
     Integer sellerCredits;

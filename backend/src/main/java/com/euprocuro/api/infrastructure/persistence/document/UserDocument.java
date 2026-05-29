@@ -27,6 +27,7 @@ public class UserDocument {
     private String documentType;
     private String passwordHash;
     private String googleSubject;
+    private String facebookSubject;
     private String postalCode;
     private String city;
     private String state;

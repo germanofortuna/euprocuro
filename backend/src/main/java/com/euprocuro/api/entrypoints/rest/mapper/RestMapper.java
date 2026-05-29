@@ -11,6 +11,7 @@ import com.euprocuro.api.application.command.CreateSellerItemCommand;
 import com.euprocuro.api.application.command.BoostInterestCommand;
 import com.euprocuro.api.application.command.CatalogCategoryCommand;
 import com.euprocuro.api.application.command.CatalogProductCommand;
+import com.euprocuro.api.application.command.FacebookLoginCommand;
 import com.euprocuro.api.application.command.FeatureFlagsCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.GoogleLoginCommand;
@@ -71,6 +72,7 @@ import com.euprocuro.api.entrypoints.rest.dto.request.CreateOfferRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.CreateSellerItemRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.BoostInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ForgotPasswordRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.FacebookLoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.GoogleLoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.LoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ModerationDecisionRequest;
@@ -119,6 +121,13 @@ public final class RestMapper {
 
     public static GoogleLoginCommand toGoogleLoginCommand(GoogleLoginRequest request, String clientIp) {
         return GoogleLoginCommand.builder()
+                .accessToken(request.getAccessToken())
+                .ipAddress(clientIp)
+                .build();
+    }
+
+    public static FacebookLoginCommand toFacebookLoginCommand(FacebookLoginRequest request, String clientIp) {
+        return FacebookLoginCommand.builder()
                 .accessToken(request.getAccessToken())
                 .ipAddress(clientIp)
                 .build();
@@ -498,6 +507,7 @@ public final class RestMapper {
                 .country(domain.getCountry())
                 .emailVerified(domain.isEmailVerified())
                 .googleLinked(org.springframework.util.StringUtils.hasText(domain.getGoogleSubject()))
+                .facebookLinked(org.springframework.util.StringUtils.hasText(domain.getFacebookSubject()))
                 .buyerRating(domain.getBuyerRating())
                 .sellerRating(domain.getSellerRating())
                 .sellerCredits(domain.getSellerCredits())

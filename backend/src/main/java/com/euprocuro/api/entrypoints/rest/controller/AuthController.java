@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.euprocuro.api.application.service.AdminAccessService;
 import com.euprocuro.api.application.usecase.AuthUseCase;
+import com.euprocuro.api.entrypoints.rest.dto.request.FacebookLoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ForgotPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.GoogleLoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.LoginRequest;
@@ -77,6 +78,20 @@ public class AuthController {
         turnstileVerificationService.verify(request.getTurnstileToken(), clientIp);
         return toCookieAuthResponse(
                 authUseCase.loginWithGoogle(RestMapper.toGoogleLoginCommand(request, clientIp)),
+                response
+        );
+    }
+
+    @PostMapping("/facebook")
+    public AuthResponse facebookLogin(
+            @Valid @RequestBody FacebookLoginRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response
+    ) {
+        String clientIp = clientIpResolver.resolve(httpRequest);
+        turnstileVerificationService.verify(request.getTurnstileToken(), clientIp);
+        return toCookieAuthResponse(
+                authUseCase.loginWithFacebook(RestMapper.toFacebookLoginCommand(request, clientIp)),
                 response
         );
     }

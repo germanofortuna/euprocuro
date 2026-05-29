@@ -19,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import com.euprocuro.api.application.command.FacebookLoginCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.GoogleLoginCommand;
 import com.euprocuro.api.application.command.LoginCommand;
@@ -29,6 +30,7 @@ import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.exception.UnauthorizedException;
 import com.euprocuro.api.application.usecase.AuthUseCase;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
+import com.euprocuro.api.application.view.FacebookIdentityView;
 import com.euprocuro.api.application.view.GoogleIdentityView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.RegistrationView;
@@ -49,6 +51,7 @@ import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.PasswordResetToken;
 import com.euprocuro.api.domain.model.UserProfile;
+import com.euprocuro.api.infrastructure.security.FacebookIdentityService;
 import com.euprocuro.api.infrastructure.security.GoogleIdentityService;
 
 import lombok.RequiredArgsConstructor;
@@ -84,6 +87,7 @@ public class AuthService implements AuthUseCase {
     private final AuditLogService auditLogService;
     private final OperationalCatalogService operationalCatalogService;
     private final GoogleIdentityService googleIdentityService;
+    private final FacebookIdentityService facebookIdentityService;
 
     @Value("${application.auth.session-hours:168}")
     private long sessionHours;
@@ -307,11 +311,74 @@ public class AuthService implements AuthUseCase {
     }
 
     private String googleDisplayName(GoogleIdentityView identity) {
-        String name = normalizeName(identity.getName());
+        return socialDisplayName(identity.getName(), identity.getEmail());
+    }
+
+    @Override
+    public AuthenticatedSessionView loginWithFacebook(FacebookLoginCommand command) {
+        FacebookIdentityView identity = facebookIdentityService.verify(command.getAccessToken());
+        String normalizedEmail = normalizeEmail(identity.getEmail());
+        validateHmlAccess(normalizedEmail);
+
+        String facebookSubject = identity.getSubject();
+        UserProfile user = userGateway.findByEmail(normalizedEmail)
+                .map(existing -> {
+                    boolean needsVerification = !existing.isEmailVerified();
+                    boolean needsLink = !Objects.equals(existing.getFacebookSubject(), facebookSubject)
+                            && StringUtils.hasText(facebookSubject);
+                    if (!needsVerification && !needsLink) {
+                        return existing;
+                    }
+                    return userGateway.save(existing.toBuilder()
+                            .emailVerified(true)
+                            .facebookSubject(StringUtils.hasText(facebookSubject)
+                                    ? facebookSubject
+                                    : existing.getFacebookSubject())
+                            .build());
+                })
+                .orElseGet(() -> userGateway.save(UserProfile.builder()
+                        .name(facebookDisplayName(identity))
+                        .email(normalizedEmail)
+                        .emailVerified(true)
+                        .facebookSubject(facebookSubject)
+                        .buyerRating(4.8)
+                        .sellerRating(4.8)
+                        .sellerCredits(operationalCatalogService.initialFreeCredits())
+                        .purchasedCreditsTotal(0)
+                        .ipAddress(command.getIpAddress())
+                        .termsAccepted(true)
+                        .termsAcceptedAt(Instant.now())
+                        .termsVersion(CURRENT_TERMS_VERSION)
+                        .country("Brasil")
+                        .build()));
+
+        AuthSession session = createSession(user);
+        auditLogService.record("AUTH_FACEBOOK_LOGIN", user.getId(), user.getEmail(), "AUTH_SESSION", session.getToken(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("expiresAt", session.getExpiresAt()));
+        eventPublisherGateway.publish("auth.facebook-login", Map.of(
+                "userId", user.getId(),
+                "email", user.getEmail(),
+                "createdByFacebook", !StringUtils.hasText(user.getPasswordHash()),
+                "expiresAt", session.getExpiresAt()
+        ));
+
+        return AuthenticatedSessionView.builder()
+                .token(session.getToken())
+                .expiresAt(session.getExpiresAt())
+                .user(user)
+                .build();
+    }
+
+    private String facebookDisplayName(FacebookIdentityView identity) {
+        return socialDisplayName(identity.getName(), identity.getEmail());
+    }
+
+    private String socialDisplayName(String rawName, String rawEmail) {
+        String name = normalizeName(rawName);
         if (StringUtils.hasText(name)) {
             return name;
         }
-        String email = normalizeEmail(identity.getEmail());
+        String email = normalizeEmail(rawEmail);
         int atIndex = email.indexOf("@");
         String localPart = atIndex > 0 ? email.substring(0, atIndex) : "Usuario";
         return localPart.replace(".", " ").replace("_", " ").trim();

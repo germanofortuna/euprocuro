@@ -27,6 +27,7 @@ import {
   fetchSellerItems,
   getStoredSession,
   googleLogin,
+  facebookLogin,
   isAuthError,
   login,
   logout,
@@ -80,6 +81,7 @@ type PlatformContextValue = {
   setAuthMode: (mode: AuthMode) => void;
   signIn: (payload: { email: string; password: string; turnstileToken?: string }) => Promise<void>;
   signInWithGoogle: (accessToken: string, turnstileToken?: string) => Promise<void>;
+  signInWithFacebook: (accessToken: string, turnstileToken?: string) => Promise<void>;
   signUp: (payload: Record<string, unknown>) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -445,8 +447,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authModal.redirectTo, closeAuthModal, operationalSettings, router]);
 
-  const signInWithGoogle = useCallback(async (accessToken: string, turnstileToken?: string) => {
-    const auth = await googleLogin({ accessToken, turnstileToken });
+  const completeSocialSignIn = useCallback(async (auth: StoredSession) => {
     const nextSession = auth?.user?.id ? auth : normalizeMe(await fetchMe(), auth);
     storeSession(nextSession);
     setSession(nextSession);
@@ -471,6 +472,16 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       router.push(redirectTo);
     }
   }, [authModal.redirectTo, closeAuthModal, operationalSettings, router]);
+
+  const signInWithGoogle = useCallback(async (accessToken: string, turnstileToken?: string) => {
+    const auth = await googleLogin({ accessToken, turnstileToken });
+    await completeSocialSignIn(auth);
+  }, [completeSocialSignIn]);
+
+  const signInWithFacebook = useCallback(async (accessToken: string, turnstileToken?: string) => {
+    const auth = await facebookLogin({ accessToken, turnstileToken });
+    await completeSocialSignIn(auth);
+  }, [completeSocialSignIn]);
 
   const signUp = useCallback(async (payload: Record<string, unknown>) => {
     await register(payload);
@@ -629,6 +640,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     setAuthMode,
     signIn,
     signInWithGoogle,
+    signInWithFacebook,
     signUp,
     signOut,
     deleteAccount,
@@ -686,6 +698,7 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     setAuthMode,
     signIn,
     signInWithGoogle,
+    signInWithFacebook,
     signOut,
     signUp,
     submitOffer,
