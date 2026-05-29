@@ -272,6 +272,7 @@ export function connectChatSocket({ onMessage, onOpen, onClose, onError }: {
 
 export const login = (payload: unknown) => request<StoredSession>("/auth/login", { method: "POST", body: JSON.stringify(payload) });
 export const googleLogin = (payload: unknown) => request<StoredSession>("/auth/google", { method: "POST", body: JSON.stringify(payload) });
+export const facebookLogin = (payload: unknown) => request<StoredSession>("/auth/facebook", { method: "POST", body: JSON.stringify(payload) });
 export const register = (payload: unknown) => request<{ message?: string }>("/auth/register", { method: "POST", body: JSON.stringify(payload) });
 export const fetchMe = () => request<Record<string, unknown>>("/auth/me");
 export const logout = () => request<null>("/auth/logout", { method: "POST" });

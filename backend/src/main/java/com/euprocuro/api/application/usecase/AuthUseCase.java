@@ -1,5 +1,6 @@
 package com.euprocuro.api.application.usecase;
 
+import com.euprocuro.api.application.command.FacebookLoginCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.GoogleLoginCommand;
 import com.euprocuro.api.application.command.LoginCommand;
@@ -16,6 +17,8 @@ public interface AuthUseCase {
     AuthenticatedSessionView login(LoginCommand command);
 
     AuthenticatedSessionView loginWithGoogle(GoogleLoginCommand command);
+
+    AuthenticatedSessionView loginWithFacebook(FacebookLoginCommand command);
 
     UserProfile meByUserId(String userId);
 

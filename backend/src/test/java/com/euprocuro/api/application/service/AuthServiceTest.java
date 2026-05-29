@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.euprocuro.api.application.command.FacebookLoginCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.GoogleLoginCommand;
 import com.euprocuro.api.application.command.LoginCommand;
@@ -33,6 +34,7 @@ import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.exception.UnauthorizedException;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
+import com.euprocuro.api.application.view.FacebookIdentityView;
 import com.euprocuro.api.application.view.GoogleIdentityView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.RegistrationView;
@@ -46,6 +48,7 @@ import com.euprocuro.api.domain.model.AuthSession;
 import com.euprocuro.api.domain.model.EmailVerificationToken;
 import com.euprocuro.api.domain.model.PasswordResetToken;
 import com.euprocuro.api.domain.model.UserProfile;
+import com.euprocuro.api.infrastructure.security.FacebookIdentityService;
 import com.euprocuro.api.infrastructure.security.GoogleIdentityService;
 
 @ExtendWith(MockitoExtension.class)
@@ -71,6 +74,8 @@ class AuthServiceTest {
     private OperationalCatalogService operationalCatalogService;
     @Mock
     private GoogleIdentityService googleIdentityService;
+    @Mock
+    private FacebookIdentityService facebookIdentityService;
 
     @InjectMocks
     private AuthService authService;
@@ -659,6 +664,112 @@ class AuthServiceTest {
                 .build());
 
         assertThat(result.getUser().getGoogleSubject()).isEqualTo("google-sub");
+        verify(userGateway, org.mockito.Mockito.never()).save(any(UserProfile.class));
+    }
+
+    @Test
+    void facebookLoginShouldCreateVerifiedUserWithInitialCredits() {
+        when(facebookIdentityService.verify("fb-token")).thenReturn(FacebookIdentityView.builder()
+                .subject("fb-sub")
+                .email("NOVA@TESTE.COM")
+                .name("Nova Pessoa")
+                .emailVerified(true)
+                .build());
+        when(userGateway.findByEmail("nova@teste.com")).thenReturn(Optional.empty());
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
+            UserProfile user = invocation.getArgument(0);
+            user.setId("fb-user");
+            return user;
+        });
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthenticatedSessionView result = authService.loginWithFacebook(FacebookLoginCommand.builder()
+                .accessToken("fb-token")
+                .ipAddress("10.0.0.1")
+                .build());
+
+        assertThat(result.getUser().getId()).isEqualTo("fb-user");
+        assertThat(result.getUser().getEmail()).isEqualTo("nova@teste.com");
+        assertThat(result.getUser().isEmailVerified()).isTrue();
+        assertThat(result.getUser().getSellerCredits()).isEqualTo(15);
+        assertThat(result.getUser().getFacebookSubject()).isEqualTo("fb-sub");
+        assertThat(result.getUser().getPasswordHash()).isNull();
+        assertThat(result.getUser().isTermsAccepted()).isTrue();
+        verify(eventPublisherGateway).publish(eq("auth.facebook-login"), any(Map.class));
+    }
+
+    @Test
+    void facebookLoginShouldUseExistingAccountAndMarkEmailVerified() {
+        UserProfile existing = baseUser().toBuilder()
+                .email("ana@teste.com")
+                .emailVerified(false)
+                .build();
+        when(facebookIdentityService.verify("fb-token")).thenReturn(FacebookIdentityView.builder()
+                .subject("fb-sub")
+                .email("ana@teste.com")
+                .name("Ana Silva")
+                .emailVerified(true)
+                .build());
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(existing));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthenticatedSessionView result = authService.loginWithFacebook(FacebookLoginCommand.builder()
+                .accessToken("fb-token")
+                .build());
+
+        assertThat(result.getUser().getId()).isEqualTo("user-1");
+        assertThat(result.getUser().isEmailVerified()).isTrue();
+        verify(userGateway).save(any(UserProfile.class));
+        verify(eventPublisherGateway).publish(eq("auth.facebook-login"), any(Map.class));
+    }
+
+    @Test
+    void facebookLoginShouldLinkFacebookSubjectOnExistingVerifiedUser() {
+        UserProfile existing = baseUser().toBuilder()
+                .email("ana@teste.com")
+                .emailVerified(true)
+                .facebookSubject(null)
+                .build();
+        when(facebookIdentityService.verify("fb-token")).thenReturn(FacebookIdentityView.builder()
+                .subject("fb-sub")
+                .email("ana@teste.com")
+                .name("Ana Silva")
+                .emailVerified(true)
+                .build());
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(existing));
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthenticatedSessionView result = authService.loginWithFacebook(FacebookLoginCommand.builder()
+                .accessToken("fb-token")
+                .build());
+
+        assertThat(result.getUser().getFacebookSubject()).isEqualTo("fb-sub");
+        verify(userGateway).save(any(UserProfile.class));
+    }
+
+    @Test
+    void facebookLoginShouldSkipSaveWhenUserAlreadyLinkedAndVerified() {
+        UserProfile existing = baseUser().toBuilder()
+                .email("ana@teste.com")
+                .emailVerified(true)
+                .facebookSubject("fb-sub")
+                .build();
+        when(facebookIdentityService.verify("fb-token")).thenReturn(FacebookIdentityView.builder()
+                .subject("fb-sub")
+                .email("ana@teste.com")
+                .name("Ana Silva")
+                .emailVerified(true)
+                .build());
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(existing));
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthenticatedSessionView result = authService.loginWithFacebook(FacebookLoginCommand.builder()
+                .accessToken("fb-token")
+                .build());
+
+        assertThat(result.getUser().getFacebookSubject()).isEqualTo("fb-sub");
         verify(userGateway, org.mockito.Mockito.never()).save(any(UserProfile.class));
     }
 

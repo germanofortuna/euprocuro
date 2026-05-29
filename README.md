@@ -183,6 +183,27 @@ Se a variavel ficar vazia, o Analytics nao e carregado. Isso permite deixar loca
 
 A implementacao registra pageviews nas rotas do SPA e eventos basicos de compartilhamento de interesse (`share_interest`). Nao envie dados pessoais ao Google Analytics; use apenas identificadores tecnicos e propriedades agregadas.
 
+### Login social (Google e Facebook)
+
+O modal de login mostra os botoes "Entrar com Google" e "Entrar com Facebook" apenas quando as variaveis de cada provedor estao configuradas. Se uma variavel ficar vazia, o respectivo botao some automaticamente.
+
+**Frontend (Vercel)** — variaveis publicas `NEXT_PUBLIC_*`:
+
+```bash
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=seu-client-id.apps.googleusercontent.com
+NEXT_PUBLIC_FACEBOOK_APP_ID=2132920833947286
+```
+
+**Backend (Render)** — validacao do token recebido do provedor:
+
+```bash
+GOOGLE_CLIENT_ID=seu-client-id.apps.googleusercontent.com
+FACEBOOK_APP_ID=2132920833947286
+FACEBOOK_APP_SECRET=cole-aqui-a-chave-secreta-do-app-facebook
+```
+
+> **Onde colocar a chave secreta do Facebook:** `FACEBOOK_APP_SECRET` ja esta declarada em `render.yaml` com `sync: false` (HML e PRD), entao ela NAO fica no repositorio. Abra o servico no painel do Render (`eu-procuro-api-hml` e/ou `eu-procuro-api-prd`) em *Environment* e cole o valor da "Chave secreta do aplicativo" obtida no painel de desenvolvedores do Facebook. Para rodar localmente, exporte `FACEBOOK_APP_SECRET` no seu `.env`/ambiente. O `FACEBOOK_APP_ID` ja tem `2132920833947286` como padrao em `application.yml`.
+
 ## Ambiente local esperado
 
 - Java 11
