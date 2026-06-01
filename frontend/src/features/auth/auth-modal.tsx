@@ -307,7 +307,10 @@ export function AuthModal() {
   const showSocial = (isGoogleSignInEnabled || isFacebookSignInEnabled)
     && (authModal.mode === "login" || (authModal.mode === "register" && registerStep === "form"));
 
-  const turnstile = shouldUseTurnstile && (authModal.mode === "login" || authModal.mode === "register" || authModal.mode === "forgot")
+  const turnstileNeeded = authModal.mode === "login"
+    || authModal.mode === "forgot"
+    || (authModal.mode === "register" && registerStep === "form");
+  const turnstile = shouldUseTurnstile && turnstileNeeded
     ? <TurnstileWidget onToken={handleTurnstileToken} resetKey={turnstileResetKey} />
     : null;
 
@@ -317,7 +320,6 @@ export function AuthModal() {
         <div className={`modal-card auth-modal auth-modal--${authModal.mode}`} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
           <div className="modal-header">
             <div>
-              <span className="pill">Acesso</span>
               <h2>{title}</h2>
             </div>
             <button type="button" className="icon-button" onClick={closeAuthModal} aria-label="Fechar modal">
@@ -350,9 +352,11 @@ export function AuthModal() {
             </div>
           ) : null}
 
+          {turnstile ? <div className="auth-turnstile">{turnstile}</div> : null}
+
           {authModal.mode === "login" ? (
             loginEmailOpen ? (
-              <form className="stack-form" onSubmit={submitLogin}>
+              <form className="stack-form auth-reveal" onSubmit={submitLogin}>
                 <label>
                   E-mail
                   <input type="email" value={loginForm.email} onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))} required />
@@ -361,18 +365,17 @@ export function AuthModal() {
                   Senha
                   <input type="password" value={loginForm.password} onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))} required />
                 </label>
-                {turnstile}
                 <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Entrando..." : "Entrar na plataforma"}</Button>
                 <button type="button" className="text-button" onClick={() => setAuthMode("forgot")}>Esqueci minha senha</button>
               </form>
             ) : (
-              <Button type="button" onClick={() => setLoginEmailOpen(true)}>Entrar com e-mail e senha</Button>
+              <Button type="button" variant="outline" className="auth-email-cta" onClick={() => setLoginEmailOpen(true)}>Entrar com e-mail e senha</Button>
             )
           ) : null}
 
           {authModal.mode === "register" && registerStep === "form" ? (
             registerEmailOpen ? (
-              <form className="stack-form" onSubmit={submitRegister}>
+              <form className="stack-form auth-reveal" onSubmit={submitRegister}>
                 <label>Nome completo<input value={registerForm.name} onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))} required /></label>
                 <label>E-mail<input type="email" value={registerForm.email} onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))} required /></label>
                 <label>Celular (com DDD)<input type="tel" inputMode="numeric" placeholder="(11) 91234-5678" value={registerForm.phone} onChange={(event) => setRegisterForm((current) => ({ ...current, phone: event.target.value }))} required /></label>
@@ -384,11 +387,10 @@ export function AuthModal() {
                   </label>
                   <small id="terms-acceptance-helper" className={termsReminder ? "terms-helper terms-helper--warning" : "terms-helper"}>{registerForm.termsOpened ? `Versão dos termos: ${termsVersion}` : termsReminder || "Abra os termos para habilitar o aceite."}</small>
                 </div>
-                {turnstile}
                 <Button type="submit" disabled={isSubmitting || !registerForm.termsAccepted}>{isSubmitting ? "Enviando código..." : "Continuar"}</Button>
               </form>
             ) : (
-              <Button type="button" onClick={() => setRegisterEmailOpen(true)}>Criar conta com e-mail</Button>
+              <Button type="button" variant="outline" className="auth-email-cta" onClick={() => setRegisterEmailOpen(true)}>Criar conta com e-mail</Button>
             )
           ) : null}
 
@@ -409,7 +411,6 @@ export function AuthModal() {
           {authModal.mode === "forgot" ? (
             <form className="stack-form" onSubmit={submitForgot}>
               <label>E-mail da conta<input type="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} required /></label>
-              {turnstile}
               <Button type="submit">Enviar instruções</Button>
               <button type="button" className="text-button" onClick={() => setAuthMode("login")}>Voltar ao login</button>
             </form>
