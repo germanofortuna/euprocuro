@@ -79,7 +79,7 @@ public class AuthController {
             @Valid @RequestBody StartPhoneVerificationRequest request,
             HttpServletRequest httpRequest
     ) {
-        turnstileVerificationService.verify(request.getTurnstileToken(), clientIpResolver.resolve(httpRequest));
+        // Endpoint autenticado (exige sessao): nao precisa de Turnstile, que so existe nos fluxos publicos.
         authUseCase.startPhoneVerification(CurrentUserContext.userId(httpRequest), RestMapper.toCommand(request));
         return ActionMessageResponse.builder()
                 .message("Enviamos um codigo por SMS para o numero informado.")

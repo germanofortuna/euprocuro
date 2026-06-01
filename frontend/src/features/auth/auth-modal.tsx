@@ -363,7 +363,6 @@ export function AuthModal() {
 
           {showSocial ? (
             <div className="auth-social-block">
-              {socialTermsGate ? termsBox : null}
               <div
                 className={socialTermsBlocked ? "auth-social-buttons auth-social-buttons--gated" : "auth-social-buttons"}
                 onClickCapture={socialTermsBlocked ? (event) => { event.preventDefault(); event.stopPropagation(); blockSocialTerms(); } : undefined}
@@ -379,6 +378,7 @@ export function AuthModal() {
                   onCredential={handleFacebookCredential}
                 />
               </div>
+              {socialTermsGate ? termsBox : null}
               <span>ou use seu e-mail</span>
             </div>
           ) : null}
