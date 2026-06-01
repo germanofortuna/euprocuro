@@ -3515,6 +3515,27 @@ small {
   min-height: 46px;
 }
 
+.auth-modal .auth-form-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.auth-modal .auth-form-foot:has(> :only-child) {
+  justify-content: flex-start;
+}
+
+.auth-social-buttons--gated {
+  cursor: not-allowed;
+}
+
+.auth-social-buttons--gated > * {
+  opacity: 0.55;
+  filter: saturate(0.6);
+  pointer-events: none;
+}
+
 .auth-reveal {
   animation: authReveal 220ms ease both;
   overflow: hidden;
