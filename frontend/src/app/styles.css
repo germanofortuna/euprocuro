@@ -755,7 +755,7 @@ button:disabled {
   justify-content: center;
   gap: 12px;
   padding: 0 20px;
-  border-radius: 12px;
+  border-radius: 5px;
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
@@ -3483,12 +3483,12 @@ small {
 }
 
 .auth-modal .segmented-control {
-  margin-bottom: 4px;
+  margin-bottom: 16px;
 }
 
 .auth-modal .auth-social-block {
   gap: 8px;
-  margin: 2px 0 8px;
+  margin: 10px 0;
 }
 
 .auth-modal .auth-social-block > span {
@@ -3501,7 +3501,7 @@ small {
 }
 
 .auth-modal .auth-social-buttons {
-  gap: 14px;
+  gap: 7px;
 }
 
 .auth-modal .auth-turnstile {
