@@ -725,7 +725,7 @@ button:disabled {
 
 .auth-social-buttons {
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 
 .auth-social-block > span {
@@ -755,7 +755,7 @@ button:disabled {
   justify-content: center;
   gap: 12px;
   padding: 0 20px;
-  border-radius: 12px;
+  border-radius: 5px;
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
@@ -763,24 +763,25 @@ button:disabled {
 }
 
 .google-signin {
-  background: var(--surface, #ffffff);
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  background: color-mix(in srgb, #4285f4 8%, var(--surface, #ffffff));
+  border: 1px solid color-mix(in srgb, #4285f4 24%, var(--border, rgba(0, 0, 0, 0.12)));
   color: var(--text, #1a1a1a);
 }
 
 .google-signin:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--surface, #ffffff) 92%, #000 8%);
+  background: color-mix(in srgb, #4285f4 16%, var(--surface, #ffffff));
+  border-color: color-mix(in srgb, #4285f4 36%, var(--border, rgba(0, 0, 0, 0.12)));
 }
 
 .facebook-signin {
-  background: #1877f2;
-  border: 1px solid #1877f2;
-  color: #ffffff;
+  background: color-mix(in srgb, #1877f2 10%, var(--surface, #ffffff));
+  border: 1px solid color-mix(in srgb, #1877f2 28%, var(--border, rgba(0, 0, 0, 0.12)));
+  color: var(--text, #1a1a1a);
 }
 
 .facebook-signin:hover:not(:disabled) {
-  background: #166fe0;
-  border-color: #166fe0;
+  background: color-mix(in srgb, #1877f2 18%, var(--surface, #ffffff));
+  border-color: color-mix(in srgb, #1877f2 40%, var(--border, rgba(0, 0, 0, 0.12)));
 }
 
 .google-signin:disabled,
@@ -789,15 +790,32 @@ button:disabled {
   cursor: not-allowed;
 }
 
-
 :root[data-theme="dark"] .google-signin {
-  background: var(--surface, #1e1f24);
-  border-color: var(--border, rgba(255, 255, 255, 0.14));
+  background: color-mix(in srgb, #4285f4 18%, var(--surface, #1e1f24));
+  border-color: color-mix(in srgb, #4285f4 32%, var(--border, rgba(255, 255, 255, 0.14)));
   color: var(--text, #f5f5f5);
 }
 
 :root[data-theme="dark"] .google-signin:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--surface, #1e1f24) 88%, #fff 12%);
+  background: color-mix(in srgb, #4285f4 26%, var(--surface, #1e1f24));
+}
+
+:root[data-theme="dark"] .facebook-signin {
+  background: color-mix(in srgb, #1877f2 22%, var(--surface, #1e1f24));
+  border-color: color-mix(in srgb, #1877f2 36%, var(--border, rgba(255, 255, 255, 0.14)));
+  color: var(--text, #f5f5f5);
+}
+
+:root[data-theme="dark"] .facebook-signin:hover:not(:disabled) {
+  background: color-mix(in srgb, #1877f2 30%, var(--surface, #1e1f24));
+}
+
+.facebook-signin .facebook-signin__icon path {
+  fill: #1877f2;
+}
+
+:root[data-theme="dark"] .facebook-signin .facebook-signin__icon path {
+  fill: #4c9bff;
 }
 
 input,
@@ -3465,12 +3483,12 @@ small {
 }
 
 .auth-modal .segmented-control {
-  margin-bottom: 4px;
+  margin-bottom: 16px;
 }
 
 .auth-modal .auth-social-block {
   gap: 8px;
-  margin: 2px 0 8px;
+  margin: 10px 0;
 }
 
 .auth-modal .auth-social-block > span {
@@ -3479,7 +3497,46 @@ small {
 
 .auth-modal .google-signin,
 .auth-modal .facebook-signin {
-  min-height: 42px;
+  min-height: 46px;
+}
+
+.auth-modal .auth-social-buttons {
+  gap: 7px;
+}
+
+.auth-modal .auth-turnstile {
+  margin: 2px 0 10px;
+  display: flex;
+  justify-content: center;
+}
+
+.auth-modal .auth-email-cta {
+  width: 100%;
+  min-height: 46px;
+}
+
+.auth-reveal {
+  animation: authReveal 220ms ease both;
+  overflow: hidden;
+}
+
+@keyframes authReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 640px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-reveal {
+    animation: none;
+  }
 }
 
 .auth-modal .stack-form {

@@ -22,7 +22,10 @@ import com.euprocuro.api.application.command.MonetizationSettingsCommand;
 import com.euprocuro.api.application.command.OperationalFlagsCommand;
 import com.euprocuro.api.application.command.OperationalFieldsCommand;
 import com.euprocuro.api.application.command.PurchaseProductCommand;
-import com.euprocuro.api.application.command.RegisterUserCommand;
+import com.euprocuro.api.application.command.ConfirmPhoneVerificationCommand;
+import com.euprocuro.api.application.command.ConfirmRegistrationCommand;
+import com.euprocuro.api.application.command.StartPhoneVerificationCommand;
+import com.euprocuro.api.application.command.StartRegistrationCommand;
 import com.euprocuro.api.application.command.ReportInterestCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
 import com.euprocuro.api.application.command.SaveContentEntryCommand;
@@ -77,7 +80,10 @@ import com.euprocuro.api.entrypoints.rest.dto.request.GoogleLoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.LoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ModerationDecisionRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.PurchaseProductRequest;
-import com.euprocuro.api.entrypoints.rest.dto.request.RegisterRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.ConfirmPhoneVerificationRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.ConfirmRegistrationRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.StartPhoneVerificationRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.StartRegistrationRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ReportInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ResetPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.SaveContentEntryRequest;
@@ -95,20 +101,36 @@ public final class RestMapper {
     private RestMapper() {
     }
 
-    public static RegisterUserCommand toCommand(RegisterRequest request, String clientIp) {
-        return RegisterUserCommand.builder()
+    public static StartRegistrationCommand toCommand(StartRegistrationRequest request, String clientIp) {
+        return StartRegistrationCommand.builder()
                 .name(request.getName())
                 .email(request.getEmail())
-                .documentNumber(request.getDocumentNumber())
                 .password(request.getPassword())
-                .postalCode(request.getPostalCode())
-                .city(request.getCity())
-                .state(request.getState())
-                .neighborhood(request.getNeighborhood())
-                .country(request.getCountry())
+                .phone(request.getPhone())
                 .ipAddress(clientIp)
                 .termsAccepted(request.isTermsAccepted())
                 .termsVersion(request.getTermsVersion())
+                .build();
+    }
+
+    public static ConfirmRegistrationCommand toCommand(ConfirmRegistrationRequest request, String clientIp) {
+        return ConfirmRegistrationCommand.builder()
+                .email(request.getEmail())
+                .code(request.getCode())
+                .ipAddress(clientIp)
+                .build();
+    }
+
+    public static StartPhoneVerificationCommand toCommand(StartPhoneVerificationRequest request) {
+        return StartPhoneVerificationCommand.builder()
+                .phone(request.getPhone())
+                .build();
+    }
+
+    public static ConfirmPhoneVerificationCommand toCommand(ConfirmPhoneVerificationRequest request) {
+        return ConfirmPhoneVerificationCommand.builder()
+                .phone(request.getPhone())
+                .code(request.getCode())
                 .build();
     }
 
@@ -404,6 +426,8 @@ public final class RestMapper {
                 .id(session.getUser().getId())
                 .name(session.getUser().getName())
                 .email(session.getUser().getEmail())
+                .phone(session.getUser().getPhone())
+                .phoneVerified(session.getUser().isPhoneVerified())
                 .postalCode(session.getUser().getPostalCode())
                 .city(session.getUser().getCity())
                 .state(session.getUser().getState())
@@ -419,6 +443,8 @@ public final class RestMapper {
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .phone(user.getPhone())
+                .phoneVerified(user.isPhoneVerified())
                 .postalCode(user.getPostalCode())
                 .city(user.getCity())
                 .state(user.getState())
@@ -500,6 +526,8 @@ public final class RestMapper {
                 .id(domain.getId())
                 .name(domain.getName())
                 .email(domain.getEmail())
+                .phone(domain.getPhone())
+                .phoneVerified(domain.isPhoneVerified())
                 .postalCode(domain.getPostalCode())
                 .city(domain.getCity())
                 .state(domain.getState())

@@ -9,6 +9,9 @@ application:
   auth:
     email-verification-required: ${APP_AUTH_EMAIL_VERIFICATION_REQUIRED:false}
     expose-reset-preview: ${APP_AUTH_EXPOSE_RESET_PREVIEW:true}
+    phone-verification:
+      provider: ${PHONE_VERIFICATION_PROVIDER:LOG}
+      dev-bypass-code: ${PHONE_VERIFICATION_DEV_BYPASS_CODE:00000}
   admin:
     allowed-emails: ${APP_ADMIN_ALLOWED_EMAILS:gfortuna@outlook.com}
   monetization:

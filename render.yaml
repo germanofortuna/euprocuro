@@ -35,6 +35,18 @@ services:
         value: "2132920833947286"
       - key: FACEBOOK_APP_SECRET
         sync: false
+      - key: PHONE_VERIFICATION_PROVIDER
+        value: LOG
+      - key: PHONE_VERIFICATION_CHANNEL
+        value: SMS
+      - key: PHONE_VERIFICATION_DEV_BYPASS_CODE
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_VERIFY_SERVICE_SID
+        sync: false
       - key: RABBITMQ_HOST
         sync: false
       - key: RABBITMQ_PORT
@@ -150,4 +162,14 @@ services:
       - key: FACEBOOK_APP_ID
         value: "2132920833947286"
       - key: FACEBOOK_APP_SECRET
+        sync: false
+      - key: PHONE_VERIFICATION_PROVIDER
+        value: TWILIO
+      - key: PHONE_VERIFICATION_CHANNEL
+        value: SMS
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_VERIFY_SERVICE_SID
         sync: false

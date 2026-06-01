@@ -5,10 +5,9 @@ import type { ComponentProps } from "react";
 import { X } from "lucide-react";
 import { useLegalContent } from "@/features/legal/use-legal-content";
 import { usePlatform } from "@/features/platform/platform-context";
-import { formatCep, formatCpfCnpj } from "@/shared/lib/format";
 import { Button } from "@/shared/ui/button";
 import { LegalModal } from "@/features/legal/legal-modal";
-import { forgotPassword, lookupAddressByPostalCode } from "@/shared/api/client";
+import { forgotPassword } from "@/shared/api/client";
 import { GoogleSignInButton, isGoogleSignInEnabled } from "@/features/auth/google-sign-in-button";
 import { FacebookSignInButton, isFacebookSignInEnabled } from "@/features/auth/facebook-sign-in-button";
 import { isTurnstileEnabled, TurnstileWidget } from "@/features/auth/turnstile-widget";
@@ -21,13 +20,8 @@ type LoginForm = {
 type RegisterForm = {
   name: string;
   email: string;
-  documentNumber: string;
   password: string;
-  postalCode: string;
-  city: string;
-  state: string;
-  neighborhood: string;
-  country: string;
+  phone: string;
   termsOpened: boolean;
   termsAccepted: boolean;
 };
@@ -36,16 +30,13 @@ const initialLogin: LoginForm = { email: "", password: "" };
 const initialRegister: RegisterForm = {
   name: "",
   email: "",
-  documentNumber: "",
   password: "",
-  postalCode: "",
-  city: "",
-  state: "",
-  neighborhood: "",
-  country: "Brasil",
+  phone: "",
   termsOpened: false,
   termsAccepted: false
 };
+
+const RESEND_COOLDOWN_SECONDS = 30;
 
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 type SubmitHandlerEvent = Parameters<FormSubmitHandler>[0];
@@ -65,7 +56,7 @@ function passwordStatus(password: string) {
 }
 
 export function AuthModal() {
-  const { authModal, closeAuthModal, setAuthMode, signIn, signInWithGoogle, signInWithFacebook, signUp, setFeedback, operationalSettings } = usePlatform();
+  const { authModal, closeAuthModal, setAuthMode, signIn, signInWithGoogle, signInWithFacebook, startSignUp, confirmSignUp, setFeedback, operationalSettings } = usePlatform();
   const { termsVersion } = useLegalContent();
   const [loginForm, setLoginForm] = useState(initialLogin);
   const [registerForm, setRegisterForm] = useState(initialRegister);
@@ -76,30 +67,29 @@ export function AuthModal() {
   const [termsReminder, setTermsReminder] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
-  const [lookupState, setLookupState] = useState<{ loading: boolean; message: string; tone: "muted" | "success" | "error" }>({
-    loading: false,
-    message: "",
-    tone: "muted"
-  });
-
-  useEffect(() => {
-    if (!authModal.visible || authModal.mode !== "register") {
-      return;
-    }
-    const normalizedPostalCode = registerForm.postalCode.replace(/\D/g, "");
-    if (normalizedPostalCode.length !== 8) {
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      handlePostalCodeLookup(normalizedPostalCode);
-    }, 380);
-    return () => window.clearTimeout(timer);
-  }, [authModal.mode, authModal.visible, registerForm.postalCode]);
+  const [loginEmailOpen, setLoginEmailOpen] = useState(false);
+  const [registerEmailOpen, setRegisterEmailOpen] = useState(false);
+  const [registerStep, setRegisterStep] = useState<"form" | "code">("form");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [resendIn, setResendIn] = useState(0);
 
   useEffect(() => {
     setTurnstileToken("");
     setTurnstileResetKey((current) => current + 1);
+    setLoginEmailOpen(false);
+    setRegisterEmailOpen(false);
+    setRegisterStep("form");
+    setVerificationCode("");
   }, [authModal.mode, authModal.visible]);
+
+  useEffect(() => {
+    if (resendIn <= 0) {
+      return;
+    }
+    const timer = window.setTimeout(() => setResendIn((current) => Math.max(0, current - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendIn]);
 
   const handleTurnstileToken = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -184,6 +174,18 @@ export function AuthModal() {
     }
   };
 
+  const sendRegistrationCode = async () => {
+    await startSignUp({
+      name: registerForm.name,
+      email: registerForm.email,
+      password: registerForm.password,
+      phone: registerForm.phone,
+      termsAccepted: true,
+      termsVersion,
+      turnstileToken
+    });
+  };
+
   const submitRegister: FormSubmitHandler = async (event) => {
     event.preventDefault();
     if (!registerForm.termsOpened || !registerForm.termsAccepted) {
@@ -195,24 +197,51 @@ export function AuthModal() {
     }
     setIsSubmitting(true);
     try {
-      await signUp({
-        name: registerForm.name,
-        email: registerForm.email,
-        documentNumber: registerForm.documentNumber,
-        password: registerForm.password,
-        postalCode: registerForm.postalCode,
-        city: registerForm.city,
-        state: registerForm.state,
-        neighborhood: registerForm.neighborhood,
-        country: registerForm.country,
-        termsAccepted: true,
-        termsVersion,
-        turnstileToken
+      await sendRegistrationCode();
+      setPendingEmail(registerForm.email);
+      setRegisterStep("code");
+      setVerificationCode("");
+      setResendIn(RESEND_COOLDOWN_SECONDS);
+      resetTurnstile();
+      setFeedback({
+        type: "info",
+        title: "Confirme seu telefone",
+        message: "Enviamos um código por SMS. Digite-o para concluir o cadastro."
       });
-      setLoginForm({ email: registerForm.email, password: "" });
     } catch (error) {
       resetTurnstile();
-      setFeedback({ type: "error", title: "Não foi possível criar a conta", message: error instanceof Error ? error.message : "Revise os dados e tente novamente." });
+      setFeedback({ type: "error", title: "Não foi possível iniciar o cadastro", message: error instanceof Error ? error.message : "Revise os dados e tente novamente." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitRegisterCode: FormSubmitHandler = async (event) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await confirmSignUp({ email: pendingEmail, code: verificationCode.trim() });
+      setRegisterForm(initialRegister);
+    } catch (error) {
+      setFeedback({ type: "error", title: "Código inválido", message: error instanceof Error ? error.message : "Confira o código e tente novamente." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resendCode = async () => {
+    if (resendIn > 0 || !requireTurnstile()) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await sendRegistrationCode();
+      setResendIn(RESEND_COOLDOWN_SECONDS);
+      resetTurnstile();
+      setFeedback({ type: "info", title: "Código reenviado", message: "Enviamos um novo código por SMS." });
+    } catch (error) {
+      resetTurnstile();
+      setFeedback({ type: "error", title: "Não foi possível reenviar", message: error instanceof Error ? error.message : "Tente novamente em instantes." });
     } finally {
       setIsSubmitting(false);
     }
@@ -268,33 +297,6 @@ export function AuthModal() {
     setFeedback({ type: "warning", title: "Abra os termos primeiro", message: TERMS_GATE_MESSAGE });
   }
 
-  async function handlePostalCodeLookup(postalCode = registerForm.postalCode) {
-    const normalizedPostalCode = String(postalCode).replace(/\D/g, "");
-    if (!normalizedPostalCode) {
-      setLookupState({ loading: false, message: "", tone: "muted" });
-      return;
-    }
-    if (normalizedPostalCode.length !== 8) {
-      setLookupState({ loading: false, message: "Digite um CEP com 8 numeros.", tone: "error" });
-      return;
-    }
-    setLookupState({ loading: true, message: "Buscando endereco pelo CEP...", tone: "muted" });
-    try {
-      const address = await lookupAddressByPostalCode(normalizedPostalCode);
-      setRegisterForm((current) => ({
-        ...current,
-        postalCode: formatCep(String(address.postalCode ?? current.postalCode)),
-        city: String(address.city ?? current.city ?? ""),
-        state: String(address.state ?? current.state ?? "").toUpperCase().slice(0, 2),
-        neighborhood: String(address.neighborhood ?? current.neighborhood ?? ""),
-        country: String(address.country ?? current.country ?? "Brasil")
-      }));
-      setLookupState({ loading: false, message: "Endereço preenchido pelo CEP.", tone: "success" });
-    } catch (error) {
-      setLookupState({ loading: false, message: error instanceof Error ? error.message : "Não encontramos esse CEP. Preencha cidade e UF manualmente.", tone: "error" });
-    }
-  }
-
   const title = {
     login: "Acesse sua conta",
     register: "Crie sua conta",
@@ -302,7 +304,13 @@ export function AuthModal() {
     reset: "Criar nova senha"
   }[authModal.mode];
 
-  const turnstile = shouldUseTurnstile && (authModal.mode === "login" || authModal.mode === "register" || authModal.mode === "forgot")
+  const showSocial = (isGoogleSignInEnabled || isFacebookSignInEnabled)
+    && (authModal.mode === "login" || (authModal.mode === "register" && registerStep === "form"));
+
+  const turnstileNeeded = authModal.mode === "login"
+    || authModal.mode === "forgot"
+    || (authModal.mode === "register" && registerStep === "form");
+  const turnstile = shouldUseTurnstile && turnstileNeeded
     ? <TurnstileWidget onToken={handleTurnstileToken} resetKey={turnstileResetKey} />
     : null;
 
@@ -312,7 +320,6 @@ export function AuthModal() {
         <div className={`modal-card auth-modal auth-modal--${authModal.mode}`} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
           <div className="modal-header">
             <div>
-              <span className="pill">Acesso</span>
               <h2>{title}</h2>
             </div>
             <button type="button" className="icon-button" onClick={closeAuthModal} aria-label="Fechar modal">
@@ -327,7 +334,7 @@ export function AuthModal() {
             </div>
           ) : null}
 
-          {(isGoogleSignInEnabled || isFacebookSignInEnabled) && (authModal.mode === "login" || authModal.mode === "register") ? (
+          {showSocial ? (
             <div className="auth-social-block">
               <div className="auth-social-buttons">
                 <GoogleSignInButton
@@ -341,60 +348,69 @@ export function AuthModal() {
                   onCredential={handleFacebookCredential}
                 />
               </div>
-              <span>ou continue com e-mail</span>
+              <span>ou use seu e-mail</span>
             </div>
           ) : null}
 
+          {turnstile ? <div className="auth-turnstile">{turnstile}</div> : null}
+
           {authModal.mode === "login" ? (
-            <form className="stack-form" onSubmit={submitLogin}>
-              <label>
-                E-mail
-                <input type="email" value={loginForm.email} onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))} required />
-              </label>
-              <label>
-                Senha
-                <input type="password" value={loginForm.password} onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))} required />
-              </label>
-              {turnstile}
-              <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Entrando..." : "Entrar na plataforma"}</Button>
-              <button type="button" className="text-button" onClick={() => setAuthMode("forgot")}>Esqueci minha senha</button>
-            </form>
+            loginEmailOpen ? (
+              <form className="stack-form auth-reveal" onSubmit={submitLogin}>
+                <label>
+                  E-mail
+                  <input type="email" value={loginForm.email} onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))} required />
+                </label>
+                <label>
+                  Senha
+                  <input type="password" value={loginForm.password} onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))} required />
+                </label>
+                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Entrando..." : "Entrar na plataforma"}</Button>
+                <button type="button" className="text-button" onClick={() => setAuthMode("forgot")}>Esqueci minha senha</button>
+              </form>
+            ) : (
+              <Button type="button" variant="outline" className="auth-email-cta" onClick={() => setLoginEmailOpen(true)}>Entrar com e-mail e senha</Button>
+            )
           ) : null}
 
-          {authModal.mode === "register" ? (
-            <form className="stack-form" onSubmit={submitRegister}>
-              <div className="form-grid">
+          {authModal.mode === "register" && registerStep === "form" ? (
+            registerEmailOpen ? (
+              <form className="stack-form auth-reveal" onSubmit={submitRegister}>
                 <label>Nome completo<input value={registerForm.name} onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))} required /></label>
                 <label>E-mail<input type="email" value={registerForm.email} onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))} required /></label>
-              </div>
-              <label>CPF ou CNPJ<input value={registerForm.documentNumber} onChange={(event) => setRegisterForm((current) => ({ ...current, documentNumber: formatCpfCnpj(event.target.value) }))} maxLength={18} required /></label>
-              <label>Senha<input type="password" value={registerForm.password} onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))} required /><small>{passwordStatus(registerForm.password)}</small></label>
-              <div className="form-grid form-grid--3">
-                <label>CEP<input inputMode="numeric" value={registerForm.postalCode} onChange={(event) => setRegisterForm((current) => ({ ...current, postalCode: formatCep(event.target.value) }))} onBlur={() => handlePostalCodeLookup()} /></label>
-                <label>Cidade<input value={registerForm.city} onChange={(event) => setRegisterForm((current) => ({ ...current, city: event.target.value }))} required /></label>
-                <label>UF<input value={registerForm.state} onChange={(event) => setRegisterForm((current) => ({ ...current, state: event.target.value.toUpperCase().slice(0, 2) }))} required /></label>
-              </div>
-              {lookupState.message ? <span className={`address-lookup-note address-lookup-note--${lookupState.tone}`} role="status" aria-live="polite" aria-busy={lookupState.loading}>{lookupState.message}</span> : null}
-              <div className="form-grid">
-                <label>Bairro<input value={registerForm.neighborhood} onChange={(event) => setRegisterForm((current) => ({ ...current, neighborhood: event.target.value }))} /></label>
-                <label>País<input value={registerForm.country} onChange={(event) => setRegisterForm((current) => ({ ...current, country: event.target.value }))} /></label>
-              </div>
-              <div className={termsReminder ? "terms-box terms-box--attention" : "terms-box"}>
-                <label className={!registerForm.termsOpened ? "is-disabled checkbox-row" : "checkbox-row"} title={!registerForm.termsOpened ? TERMS_GATE_MESSAGE : undefined} onClickCapture={!registerForm.termsOpened ? (event) => { if ((event.target as HTMLElement).closest(".text-button--inline")) { return; } event.preventDefault(); remindTermsGate(); } : undefined}>
-                  <input type="checkbox" checked={registerForm.termsAccepted} aria-disabled={!registerForm.termsOpened} aria-describedby="terms-acceptance-helper" onChange={(event) => { if (!registerForm.termsOpened) { event.preventDefault(); remindTermsGate(); return; } setRegisterForm((current) => ({ ...current, termsAccepted: event.target.checked })); }} />
-                  <span>Li e aceito os <button type="button" className="text-button text-button--inline" onClick={openTerms}>Termos de Uso da plataforma</button></span>
-                </label>
-                <small id="terms-acceptance-helper" className={termsReminder ? "terms-helper terms-helper--warning" : "terms-helper"}>{registerForm.termsOpened ? `Versão dos termos: ${termsVersion}` : termsReminder || "Abra os termos para habilitar o aceite."}</small>
-              </div>
-              {turnstile}
-              <Button type="submit" disabled={isSubmitting || !registerForm.termsAccepted}>{isSubmitting ? "Criando..." : "Criar conta"}</Button>
+                <label>Celular (com DDD)<input type="tel" inputMode="numeric" placeholder="(11) 91234-5678" value={registerForm.phone} onChange={(event) => setRegisterForm((current) => ({ ...current, phone: event.target.value }))} required /></label>
+                <label>Senha<input type="password" value={registerForm.password} onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))} required /><small>{passwordStatus(registerForm.password)}</small></label>
+                <div className={termsReminder ? "terms-box terms-box--attention" : "terms-box"}>
+                  <label className={!registerForm.termsOpened ? "is-disabled checkbox-row" : "checkbox-row"} title={!registerForm.termsOpened ? TERMS_GATE_MESSAGE : undefined} onClickCapture={!registerForm.termsOpened ? (event) => { if ((event.target as HTMLElement).closest(".text-button--inline")) { return; } event.preventDefault(); remindTermsGate(); } : undefined}>
+                    <input type="checkbox" checked={registerForm.termsAccepted} aria-disabled={!registerForm.termsOpened} aria-describedby="terms-acceptance-helper" onChange={(event) => { if (!registerForm.termsOpened) { event.preventDefault(); remindTermsGate(); return; } setRegisterForm((current) => ({ ...current, termsAccepted: event.target.checked })); }} />
+                    <span>Li e aceito os <button type="button" className="text-button text-button--inline" onClick={openTerms}>Termos de Uso da plataforma</button></span>
+                  </label>
+                  <small id="terms-acceptance-helper" className={termsReminder ? "terms-helper terms-helper--warning" : "terms-helper"}>{registerForm.termsOpened ? `Versão dos termos: ${termsVersion}` : termsReminder || "Abra os termos para habilitar o aceite."}</small>
+                </div>
+                <Button type="submit" disabled={isSubmitting || !registerForm.termsAccepted}>{isSubmitting ? "Enviando código..." : "Continuar"}</Button>
+              </form>
+            ) : (
+              <Button type="button" variant="outline" className="auth-email-cta" onClick={() => setRegisterEmailOpen(true)}>Criar conta com e-mail</Button>
+            )
+          ) : null}
+
+          {authModal.mode === "register" && registerStep === "code" ? (
+            <form className="stack-form" onSubmit={submitRegisterCode}>
+              <p className="auth-code-hint">Enviamos um código por SMS para o celular informado. Digite-o abaixo para concluir o cadastro de <strong>{pendingEmail}</strong>.</p>
+              <label>Código de verificação
+                <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, ""))} required />
+              </label>
+              <Button type="submit" disabled={isSubmitting || verificationCode.trim().length < 4}>{isSubmitting ? "Confirmando..." : "Confirmar e criar conta"}</Button>
+              <button type="button" className="text-button" onClick={resendCode} disabled={isSubmitting || resendIn > 0}>
+                {resendIn > 0 ? `Reenviar código em ${resendIn}s` : "Reenviar código"}
+              </button>
+              <button type="button" className="text-button" onClick={() => { setRegisterStep("form"); setVerificationCode(""); }}>Voltar e revisar dados</button>
             </form>
           ) : null}
 
           {authModal.mode === "forgot" ? (
             <form className="stack-form" onSubmit={submitForgot}>
               <label>E-mail da conta<input type="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} required /></label>
-              {turnstile}
               <Button type="submit">Enviar instruções</Button>
               <button type="button" className="text-button" onClick={() => setAuthMode("login")}>Voltar ao login</button>
             </form>

@@ -28,6 +28,9 @@ public class UserDocument {
     private String passwordHash;
     private String googleSubject;
     private String facebookSubject;
+    @Indexed(unique = true, sparse = true)
+    private String phone;
+    private Boolean phoneVerified;
     private String postalCode;
     private String city;
     private String state;
@@ -38,6 +41,7 @@ public class UserDocument {
     private double sellerRating;
     private Integer sellerCredits;
     private Integer purchasedCreditsTotal;
+    private Boolean freeCreditsGranted;
     private String subscriptionPlan;
     private Instant subscriptionActiveUntil;
     private String ipAddress;

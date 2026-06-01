@@ -5,16 +5,11 @@ import lombok.Value;
 
 @Value
 @Builder
-public class RegisterUserCommand {
+public class StartRegistrationCommand {
     String name;
     String email;
-    String documentNumber;
     String password;
-    String postalCode;
-    String city;
-    String state;
-    String neighborhood;
-    String country;
+    String phone;
     String ipAddress;
     boolean termsAccepted;
     String termsVersion;
