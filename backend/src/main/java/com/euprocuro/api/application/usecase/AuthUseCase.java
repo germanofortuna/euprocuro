@@ -7,11 +7,14 @@ import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.GoogleLoginCommand;
 import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
+import com.euprocuro.api.application.command.ConfirmSocialPhoneVerificationCommand;
 import com.euprocuro.api.application.command.StartPhoneVerificationCommand;
 import com.euprocuro.api.application.command.StartRegistrationCommand;
+import com.euprocuro.api.application.command.StartSocialPhoneVerificationCommand;
 import com.euprocuro.api.application.view.AuthenticatedSessionView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.RegistrationView;
+import com.euprocuro.api.application.view.SocialAuthView;
 import com.euprocuro.api.domain.model.UserProfile;
 
 public interface AuthUseCase {
@@ -25,9 +28,13 @@ public interface AuthUseCase {
 
     AuthenticatedSessionView login(LoginCommand command);
 
-    AuthenticatedSessionView loginWithGoogle(GoogleLoginCommand command);
+    SocialAuthView loginWithGoogle(GoogleLoginCommand command);
 
-    AuthenticatedSessionView loginWithFacebook(FacebookLoginCommand command);
+    SocialAuthView loginWithFacebook(FacebookLoginCommand command);
+
+    void startSocialPhoneVerification(StartSocialPhoneVerificationCommand command);
+
+    AuthenticatedSessionView confirmSocialPhoneVerification(ConfirmSocialPhoneVerificationCommand command);
 
     UserProfile meByUserId(String userId);
 

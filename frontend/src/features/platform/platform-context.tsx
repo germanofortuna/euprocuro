@@ -36,6 +36,8 @@ import {
   registerConfirm,
   startPhoneVerification,
   confirmPhoneVerification,
+  startSocialPhoneVerification,
+  confirmSocialPhoneVerification,
   renewInterest,
   reportInterest,
   storeSession,
@@ -83,10 +85,12 @@ type PlatformContextValue = {
   closeAuthModal: () => void;
   setAuthMode: (mode: AuthMode) => void;
   signIn: (payload: { email: string; password: string; turnstileToken?: string }) => Promise<void>;
-  signInWithGoogle: (accessToken: string, turnstileToken?: string) => Promise<void>;
-  signInWithFacebook: (accessToken: string, turnstileToken?: string) => Promise<void>;
+  signInWithGoogle: (accessToken: string, turnstileToken?: string) => Promise<{ phoneRequired: boolean; socialToken?: string | null }>;
+  signInWithFacebook: (accessToken: string, turnstileToken?: string) => Promise<{ phoneRequired: boolean; socialToken?: string | null }>;
   startSignUp: (payload: Record<string, unknown>) => Promise<{ message?: string }>;
   confirmSignUp: (payload: { email: string; code: string }) => Promise<void>;
+  socialPhoneStart: (socialToken: string, phone: string) => Promise<void>;
+  socialPhoneConfirm: (socialToken: string, phone: string, code: string) => Promise<void>;
   verifyPhoneStart: (phone: string, turnstileToken?: string) => Promise<void>;
   verifyPhoneConfirm: (phone: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -489,11 +493,28 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = useCallback(async (accessToken: string, turnstileToken?: string) => {
     const auth = await googleLogin({ accessToken, turnstileToken });
-    await completeSocialSignIn(auth);
+    if (auth?.phoneRequired) {
+      return { phoneRequired: true, socialToken: auth.socialToken ?? null };
+    }
+    await completeSocialSignIn(auth as StoredSession);
+    return { phoneRequired: false };
   }, [completeSocialSignIn]);
 
   const signInWithFacebook = useCallback(async (accessToken: string, turnstileToken?: string) => {
     const auth = await facebookLogin({ accessToken, turnstileToken });
+    if (auth?.phoneRequired) {
+      return { phoneRequired: true, socialToken: auth.socialToken ?? null };
+    }
+    await completeSocialSignIn(auth as StoredSession);
+    return { phoneRequired: false };
+  }, [completeSocialSignIn]);
+
+  const socialPhoneStart = useCallback(async (socialToken: string, phone: string) => {
+    await startSocialPhoneVerification({ socialToken, phone });
+  }, []);
+
+  const socialPhoneConfirm = useCallback(async (socialToken: string, phone: string, code: string) => {
+    const auth = await confirmSocialPhoneVerification({ socialToken, phone, code });
     await completeSocialSignIn(auth);
   }, [completeSocialSignIn]);
 
@@ -672,6 +693,8 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     signInWithFacebook,
     startSignUp,
     confirmSignUp,
+    socialPhoneStart,
+    socialPhoneConfirm,
     verifyPhoneStart,
     verifyPhoneConfirm,
     signOut,
@@ -734,6 +757,8 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     signOut,
     startSignUp,
     confirmSignUp,
+    socialPhoneStart,
+    socialPhoneConfirm,
     verifyPhoneStart,
     verifyPhoneConfirm,
     submitOffer,

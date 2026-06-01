@@ -15,8 +15,10 @@ import org.springframework.web.bind.annotation.*;
 import com.euprocuro.api.application.service.AdminAccessService;
 import com.euprocuro.api.application.usecase.AuthUseCase;
 import com.euprocuro.api.domain.model.UserProfile;
+import com.euprocuro.api.application.view.SocialAuthView;
 import com.euprocuro.api.entrypoints.rest.dto.request.ConfirmPhoneVerificationRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ConfirmRegistrationRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.ConfirmSocialPhoneVerificationRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.FacebookLoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ForgotPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.GoogleLoginRequest;
@@ -24,8 +26,10 @@ import com.euprocuro.api.entrypoints.rest.dto.request.LoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ResetPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.StartPhoneVerificationRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.StartRegistrationRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.StartSocialPhoneVerificationRequest;
 import com.euprocuro.api.entrypoints.rest.dto.response.ActionMessageResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.AuthResponse;
+import com.euprocuro.api.entrypoints.rest.dto.response.SocialAuthResponse;
 import com.euprocuro.api.entrypoints.rest.mapper.RestMapper;
 import com.euprocuro.api.entrypoints.rest.security.AuthCookieManager;
 import com.euprocuro.api.entrypoints.rest.security.CurrentUserContext;
@@ -112,29 +116,52 @@ public class AuthController {
     }
 
     @PostMapping("/google")
-    public AuthResponse googleLogin(
+    public SocialAuthResponse googleLogin(
             @Valid @RequestBody GoogleLoginRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse response
     ) {
         String clientIp = clientIpResolver.resolve(httpRequest);
         turnstileVerificationService.verify(request.getTurnstileToken(), clientIp);
-        return toCookieAuthResponse(
+        return toSocialAuthResponse(
                 authUseCase.loginWithGoogle(RestMapper.toGoogleLoginCommand(request, clientIp)),
                 response
         );
     }
 
     @PostMapping("/facebook")
-    public AuthResponse facebookLogin(
+    public SocialAuthResponse facebookLogin(
             @Valid @RequestBody FacebookLoginRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse response
     ) {
         String clientIp = clientIpResolver.resolve(httpRequest);
         turnstileVerificationService.verify(request.getTurnstileToken(), clientIp);
-        return toCookieAuthResponse(
+        return toSocialAuthResponse(
                 authUseCase.loginWithFacebook(RestMapper.toFacebookLoginCommand(request, clientIp)),
+                response
+        );
+    }
+
+    @PostMapping("/social/phone/start")
+    public ActionMessageResponse startSocialPhoneVerification(
+            @Valid @RequestBody StartSocialPhoneVerificationRequest request
+    ) {
+        authUseCase.startSocialPhoneVerification(RestMapper.toCommand(request));
+        return ActionMessageResponse.builder()
+                .message("Enviamos um codigo por SMS para o numero informado.")
+                .build();
+    }
+
+    @PostMapping("/social/phone/confirm")
+    public AuthResponse confirmSocialPhoneVerification(
+            @Valid @RequestBody ConfirmSocialPhoneVerificationRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response
+    ) {
+        String clientIp = clientIpResolver.resolve(httpRequest);
+        return toCookieAuthResponse(
+                authUseCase.confirmSocialPhoneVerification(RestMapper.toCommand(request, clientIp)),
                 response
         );
     }
@@ -194,6 +221,24 @@ public class AuthController {
         authCookieManager.writeSessionCookie(response, session.getToken(), session.getExpiresAt());
 
         return AuthResponse.builder()
+                .token(exposeSessionToken ? session.getToken() : null)
+                .expiresAt(session.getExpiresAt())
+                .user(RestMapper.toResponse(session.getUser(), adminAccessService.isAdmin(session.getUser().getEmail())))
+                .build();
+    }
+
+    private SocialAuthResponse toSocialAuthResponse(SocialAuthView view, HttpServletResponse response) {
+        if (view.isPhoneRequired()) {
+            return SocialAuthResponse.builder()
+                    .phoneRequired(true)
+                    .socialToken(view.getSocialToken())
+                    .build();
+        }
+
+        com.euprocuro.api.application.view.AuthenticatedSessionView session = view.getSession();
+        authCookieManager.writeSessionCookie(response, session.getToken(), session.getExpiresAt());
+        return SocialAuthResponse.builder()
+                .phoneRequired(false)
                 .token(exposeSessionToken ? session.getToken() : null)
                 .expiresAt(session.getExpiresAt())
                 .user(RestMapper.toResponse(session.getUser(), adminAccessService.isAdmin(session.getUser().getEmail())))

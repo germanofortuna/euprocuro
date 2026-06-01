@@ -24,8 +24,10 @@ import com.euprocuro.api.application.command.OperationalFieldsCommand;
 import com.euprocuro.api.application.command.PurchaseProductCommand;
 import com.euprocuro.api.application.command.ConfirmPhoneVerificationCommand;
 import com.euprocuro.api.application.command.ConfirmRegistrationCommand;
+import com.euprocuro.api.application.command.ConfirmSocialPhoneVerificationCommand;
 import com.euprocuro.api.application.command.StartPhoneVerificationCommand;
 import com.euprocuro.api.application.command.StartRegistrationCommand;
+import com.euprocuro.api.application.command.StartSocialPhoneVerificationCommand;
 import com.euprocuro.api.application.command.ReportInterestCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
 import com.euprocuro.api.application.command.SaveContentEntryCommand;
@@ -82,8 +84,10 @@ import com.euprocuro.api.entrypoints.rest.dto.request.ModerationDecisionRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.PurchaseProductRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ConfirmPhoneVerificationRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ConfirmRegistrationRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.ConfirmSocialPhoneVerificationRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.StartPhoneVerificationRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.StartRegistrationRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.StartSocialPhoneVerificationRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ReportInterestRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ResetPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.SaveContentEntryRequest;
@@ -131,6 +135,22 @@ public final class RestMapper {
         return ConfirmPhoneVerificationCommand.builder()
                 .phone(request.getPhone())
                 .code(request.getCode())
+                .build();
+    }
+
+    public static StartSocialPhoneVerificationCommand toCommand(StartSocialPhoneVerificationRequest request) {
+        return StartSocialPhoneVerificationCommand.builder()
+                .socialToken(request.getSocialToken())
+                .phone(request.getPhone())
+                .build();
+    }
+
+    public static ConfirmSocialPhoneVerificationCommand toCommand(ConfirmSocialPhoneVerificationRequest request, String clientIp) {
+        return ConfirmSocialPhoneVerificationCommand.builder()
+                .socialToken(request.getSocialToken())
+                .phone(request.getPhone())
+                .code(request.getCode())
+                .ipAddress(clientIp)
                 .build();
     }
 

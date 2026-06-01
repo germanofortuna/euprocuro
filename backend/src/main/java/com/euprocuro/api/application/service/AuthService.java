@@ -21,6 +21,7 @@ import org.springframework.util.StringUtils;
 
 import com.euprocuro.api.application.command.ConfirmPhoneVerificationCommand;
 import com.euprocuro.api.application.command.ConfirmRegistrationCommand;
+import com.euprocuro.api.application.command.ConfirmSocialPhoneVerificationCommand;
 import com.euprocuro.api.application.command.FacebookLoginCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.GoogleLoginCommand;
@@ -28,6 +29,7 @@ import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
 import com.euprocuro.api.application.command.StartPhoneVerificationCommand;
 import com.euprocuro.api.application.command.StartRegistrationCommand;
+import com.euprocuro.api.application.command.StartSocialPhoneVerificationCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.exception.UnauthorizedException;
@@ -37,6 +39,7 @@ import com.euprocuro.api.application.view.FacebookIdentityView;
 import com.euprocuro.api.application.view.GoogleIdentityView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.RegistrationView;
+import com.euprocuro.api.application.view.SocialAuthView;
 import com.euprocuro.api.domain.gateway.AuthSessionGateway;
 import com.euprocuro.api.domain.gateway.ContentReportGateway;
 import com.euprocuro.api.domain.gateway.ConversationMessageGateway;
@@ -47,6 +50,7 @@ import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.PasswordResetTokenGateway;
 import com.euprocuro.api.domain.gateway.PendingRegistrationGateway;
+import com.euprocuro.api.domain.gateway.PendingSocialAuthGateway;
 import com.euprocuro.api.domain.gateway.PhoneVerificationGateway;
 import com.euprocuro.api.domain.gateway.SellerItemGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
@@ -55,6 +59,7 @@ import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.PasswordResetToken;
 import com.euprocuro.api.domain.model.PendingRegistration;
+import com.euprocuro.api.domain.model.PendingSocialAuth;
 import com.euprocuro.api.domain.model.PhoneVerificationChannel;
 import com.euprocuro.api.domain.model.UserProfile;
 import com.euprocuro.api.infrastructure.security.FacebookIdentityService;
@@ -83,6 +88,7 @@ public class AuthService implements AuthUseCase {
     private final PasswordResetTokenGateway passwordResetTokenGateway;
     private final EmailVerificationTokenGateway emailVerificationTokenGateway;
     private final PendingRegistrationGateway pendingRegistrationGateway;
+    private final PendingSocialAuthGateway pendingSocialAuthGateway;
     private final PhoneVerificationGateway phoneVerificationGateway;
     private final InterestGateway interestGateway;
     private final OfferGateway offerGateway;
@@ -337,121 +343,193 @@ public class AuthService implements AuthUseCase {
     }
 
     @Override
-    public AuthenticatedSessionView loginWithGoogle(GoogleLoginCommand command) {
+    public SocialAuthView loginWithGoogle(GoogleLoginCommand command) {
         GoogleIdentityView identity = googleIdentityService.verify(command.getAccessToken());
         String normalizedEmail = normalizeEmail(identity.getEmail());
         validateHmlAccess(normalizedEmail);
-
-        String googleSubject = identity.getSubject();
-        UserProfile user = userGateway.findByEmail(normalizedEmail)
-                .map(existing -> {
-                    boolean needsVerification = !existing.isEmailVerified();
-                    boolean needsLink = !Objects.equals(existing.getGoogleSubject(), googleSubject)
-                            && StringUtils.hasText(googleSubject);
-                    if (!needsVerification && !needsLink) {
-                        return existing;
-                    }
-                    return userGateway.save(existing.toBuilder()
-                            .emailVerified(true)
-                            .googleSubject(StringUtils.hasText(googleSubject) ? googleSubject : existing.getGoogleSubject())
-                            .build());
-                })
-                .orElseGet(() -> userGateway.save(UserProfile.builder()
-                        .name(googleDisplayName(identity))
-                        .email(normalizedEmail)
-                        .emailVerified(true)
-                        .googleSubject(googleSubject)
-                        .buyerRating(4.8)
-                        .sellerRating(4.8)
-                        .sellerCredits(0)
-                        .purchasedCreditsTotal(0)
-                        .freeCreditsGranted(false)
-                        .ipAddress(command.getIpAddress())
-                        .termsAccepted(true)
-                        .termsAcceptedAt(Instant.now())
-                        .termsVersion(CURRENT_TERMS_VERSION)
-                        .country("Brasil")
-                        .build()));
-
-        AuthSession session = createSession(user);
-        auditLogService.record("AUTH_GOOGLE_LOGIN", user.getId(), user.getEmail(), "AUTH_SESSION", session.getToken(),
-                AuditLogService.OUTCOME_SUCCESS, Map.of("expiresAt", session.getExpiresAt()));
-        eventPublisherGateway.publish("auth.google-login", Map.of(
-                "userId", user.getId(),
-                "email", user.getEmail(),
-                "createdByGoogle", !StringUtils.hasText(user.getPasswordHash()),
-                "expiresAt", session.getExpiresAt()
-        ));
-
-        return AuthenticatedSessionView.builder()
-                .token(session.getToken())
-                .expiresAt(session.getExpiresAt())
-                .user(user)
-                .build();
-    }
-
-    private String googleDisplayName(GoogleIdentityView identity) {
-        return socialDisplayName(identity.getName(), identity.getEmail());
+        return resolveSocialAuth("google", identity.getSubject(), normalizedEmail,
+                socialDisplayName(identity.getName(), identity.getEmail()), command.getIpAddress());
     }
 
     @Override
-    public AuthenticatedSessionView loginWithFacebook(FacebookLoginCommand command) {
+    public SocialAuthView loginWithFacebook(FacebookLoginCommand command) {
         FacebookIdentityView identity = facebookIdentityService.verify(command.getAccessToken());
         String normalizedEmail = normalizeEmail(identity.getEmail());
         validateHmlAccess(normalizedEmail);
+        return resolveSocialAuth("facebook", identity.getSubject(), normalizedEmail,
+                socialDisplayName(identity.getName(), identity.getEmail()), command.getIpAddress());
+    }
 
-        String facebookSubject = identity.getSubject();
-        UserProfile user = userGateway.findByEmail(normalizedEmail)
-                .map(existing -> {
-                    boolean needsVerification = !existing.isEmailVerified();
-                    boolean needsLink = !Objects.equals(existing.getFacebookSubject(), facebookSubject)
-                            && StringUtils.hasText(facebookSubject);
-                    if (!needsVerification && !needsLink) {
-                        return existing;
-                    }
-                    return userGateway.save(existing.toBuilder()
-                            .emailVerified(true)
-                            .facebookSubject(StringUtils.hasText(facebookSubject)
-                                    ? facebookSubject
-                                    : existing.getFacebookSubject())
-                            .build());
-                })
-                .orElseGet(() -> userGateway.save(UserProfile.builder()
-                        .name(facebookDisplayName(identity))
-                        .email(normalizedEmail)
+    /**
+     * Decide o desfecho de um login social: se o usuario ja existe e tem telefone verificado,
+     * faz login (vinculando o provedor e marcando o e-mail como verificado se preciso). Caso
+     * contrario (conta nova ou sem telefone verificado), guarda um cadastro social pendente e
+     * exige a verificacao de telefone antes de concluir.
+     */
+    private SocialAuthView resolveSocialAuth(String provider, String subject, String normalizedEmail,
+            String displayName, String ipAddress) {
+        Optional<UserProfile> existing = userGateway.findByEmail(normalizedEmail);
+
+        if (existing.isPresent() && existing.get().isPhoneVerified()) {
+            UserProfile user = linkSocialProvider(existing.get(), provider, subject);
+            return SocialAuthView.ofSession(issueSocialSession(provider, user));
+        }
+
+        Instant now = Instant.now();
+        PendingSocialAuth pending = pendingSocialAuthGateway.save(PendingSocialAuth.builder()
+                .token(UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", ""))
+                .provider(provider)
+                .subject(subject)
+                .email(normalizedEmail)
+                .name(displayName)
+                .existingUserId(existing.map(UserProfile::getId).orElse(null))
+                .ipAddress(ipAddress)
+                .createdAt(now)
+                .expiresAt(now.plus(pendingRegistrationMinutes, ChronoUnit.MINUTES))
+                .build());
+
+        auditLogService.record("AUTH_SOCIAL_PHONE_REQUIRED", existing.map(UserProfile::getId).orElse(null),
+                normalizedEmail, "PENDING_SOCIAL_AUTH", normalizedEmail);
+
+        return SocialAuthView.ofPhoneRequired(pending.getToken());
+    }
+
+    @Override
+    public void startSocialPhoneVerification(StartSocialPhoneVerificationCommand command) {
+        PendingSocialAuth pending = requirePendingSocialAuth(command.getSocialToken());
+        String normalizedPhone = normalizePhone(command.getPhone());
+
+        userGateway.findByPhone(normalizedPhone)
+                .filter(other -> !Objects.equals(other.getId(), pending.getExistingUserId()))
+                .ifPresent(other -> {
+                    throw new BusinessException("Este telefone ja esta vinculado a outra conta.");
+                });
+
+        phoneVerificationGateway.startVerification(normalizedPhone, phoneChannel());
+        auditLogService.record("AUTH_SOCIAL_PHONE_VERIFICATION_STARTED", pending.getExistingUserId(),
+                pending.getEmail(), "PENDING_SOCIAL_AUTH", pending.getEmail());
+    }
+
+    @Override
+    public AuthenticatedSessionView confirmSocialPhoneVerification(ConfirmSocialPhoneVerificationCommand command) {
+        PendingSocialAuth pending = requirePendingSocialAuth(command.getSocialToken());
+        String normalizedPhone = normalizePhone(command.getPhone());
+
+        userGateway.findByPhone(normalizedPhone)
+                .filter(other -> !Objects.equals(other.getId(), pending.getExistingUserId()))
+                .ifPresent(other -> {
+                    throw new BusinessException("Este telefone ja esta vinculado a outra conta.");
+                });
+
+        if (!phoneVerificationGateway.checkVerification(normalizedPhone, command.getCode())) {
+            throw new BusinessException("Codigo invalido ou expirado.");
+        }
+
+        UserProfile baseUser = StringUtils.hasText(pending.getExistingUserId())
+                ? userGateway.findById(pending.getExistingUserId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Usuario nao encontrado."))
+                : UserProfile.builder()
+                        .email(pending.getEmail())
+                        .name(pending.getName())
                         .emailVerified(true)
-                        .facebookSubject(facebookSubject)
                         .buyerRating(4.8)
                         .sellerRating(4.8)
                         .sellerCredits(0)
                         .purchasedCreditsTotal(0)
                         .freeCreditsGranted(false)
-                        .ipAddress(command.getIpAddress())
+                        .ipAddress(pending.getIpAddress())
                         .termsAccepted(true)
                         .termsAcceptedAt(Instant.now())
                         .termsVersion(CURRENT_TERMS_VERSION)
                         .country("Brasil")
-                        .build()));
+                        .build();
 
+        boolean grantCredits = !Boolean.TRUE.equals(baseUser.getFreeCreditsGranted());
+        int credits = grantCredits
+                ? sellerCreditsOf(baseUser) + operationalCatalogService.initialFreeCredits()
+                : sellerCreditsOf(baseUser);
+
+        UserProfile.UserProfileBuilder builder = baseUser.toBuilder()
+                .emailVerified(true)
+                .phone(normalizedPhone)
+                .phoneVerified(true)
+                .sellerCredits(credits)
+                .freeCreditsGranted(true);
+        if ("google".equals(pending.getProvider()) && StringUtils.hasText(pending.getSubject())) {
+            builder.googleSubject(pending.getSubject());
+        }
+        if ("facebook".equals(pending.getProvider()) && StringUtils.hasText(pending.getSubject())) {
+            builder.facebookSubject(pending.getSubject());
+        }
+
+        boolean newAccount = !StringUtils.hasText(baseUser.getId());
+        UserProfile user = userGateway.save(builder.build());
+        pendingSocialAuthGateway.deleteByToken(pending.getToken());
+
+        if (newAccount) {
+            auditLogService.record("USER_REGISTERED", user.getId(), user.getEmail(), "USER", user.getId(),
+                    AuditLogService.OUTCOME_SUCCESS, Map.of("provider", pending.getProvider(), "phoneVerified", true));
+            eventPublisherGateway.publish("user.registered", Map.of(
+                    "userId", user.getId(),
+                    "email", user.getEmail(),
+                    "phoneVerified", true
+            ));
+        }
+        auditLogService.record("USER_PHONE_VERIFIED", user.getId(), user.getEmail(), "USER", user.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("creditsGranted", grantCredits));
+
+        return issueSocialSession(pending.getProvider(), user);
+    }
+
+    private PendingSocialAuth requirePendingSocialAuth(String token) {
+        if (!StringUtils.hasText(token)) {
+            throw new BusinessException("Sessao social invalida. Conecte-se novamente.");
+        }
+        PendingSocialAuth pending = pendingSocialAuthGateway.findByToken(token)
+                .orElseThrow(() -> new BusinessException("Sessao social expirada. Conecte-se novamente."));
+        if (pending.getExpiresAt() != null && pending.getExpiresAt().isBefore(Instant.now())) {
+            pendingSocialAuthGateway.deleteByToken(token);
+            throw new BusinessException("Sessao social expirada. Conecte-se novamente.");
+        }
+        return pending;
+    }
+
+    private UserProfile linkSocialProvider(UserProfile existing, String provider, String subject) {
+        boolean needsVerification = !existing.isEmailVerified();
+        boolean isGoogle = "google".equals(provider);
+        boolean isFacebook = "facebook".equals(provider);
+        boolean needsLink = StringUtils.hasText(subject)
+                && ((isGoogle && !Objects.equals(existing.getGoogleSubject(), subject))
+                || (isFacebook && !Objects.equals(existing.getFacebookSubject(), subject)));
+        if (!needsVerification && !needsLink) {
+            return existing;
+        }
+        UserProfile.UserProfileBuilder builder = existing.toBuilder().emailVerified(true);
+        if (isGoogle && StringUtils.hasText(subject)) {
+            builder.googleSubject(subject);
+        }
+        if (isFacebook && StringUtils.hasText(subject)) {
+            builder.facebookSubject(subject);
+        }
+        return userGateway.save(builder.build());
+    }
+
+    private AuthenticatedSessionView issueSocialSession(String provider, UserProfile user) {
         AuthSession session = createSession(user);
-        auditLogService.record("AUTH_FACEBOOK_LOGIN", user.getId(), user.getEmail(), "AUTH_SESSION", session.getToken(),
+        String auditAction = "facebook".equals(provider) ? "AUTH_FACEBOOK_LOGIN" : "AUTH_GOOGLE_LOGIN";
+        String event = "facebook".equals(provider) ? "auth.facebook-login" : "auth.google-login";
+        auditLogService.record(auditAction, user.getId(), user.getEmail(), "AUTH_SESSION", session.getToken(),
                 AuditLogService.OUTCOME_SUCCESS, Map.of("expiresAt", session.getExpiresAt()));
-        eventPublisherGateway.publish("auth.facebook-login", Map.of(
+        eventPublisherGateway.publish(event, Map.of(
                 "userId", user.getId(),
                 "email", user.getEmail(),
-                "createdByFacebook", !StringUtils.hasText(user.getPasswordHash()),
                 "expiresAt", session.getExpiresAt()
         ));
-
         return AuthenticatedSessionView.builder()
                 .token(session.getToken())
                 .expiresAt(session.getExpiresAt())
                 .user(user)
                 .build();
-    }
-
-    private String facebookDisplayName(FacebookIdentityView identity) {
-        return socialDisplayName(identity.getName(), identity.getEmail());
     }
 
     private String socialDisplayName(String rawName, String rawEmail) {

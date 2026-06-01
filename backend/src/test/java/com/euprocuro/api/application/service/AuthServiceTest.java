@@ -31,8 +31,10 @@ import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.GoogleLoginCommand;
 import com.euprocuro.api.application.command.LoginCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
+import com.euprocuro.api.application.command.ConfirmSocialPhoneVerificationCommand;
 import com.euprocuro.api.application.command.StartPhoneVerificationCommand;
 import com.euprocuro.api.application.command.StartRegistrationCommand;
+import com.euprocuro.api.application.command.StartSocialPhoneVerificationCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.exception.UnauthorizedException;
@@ -41,18 +43,21 @@ import com.euprocuro.api.application.view.FacebookIdentityView;
 import com.euprocuro.api.application.view.GoogleIdentityView;
 import com.euprocuro.api.application.view.PasswordResetRequestView;
 import com.euprocuro.api.application.view.RegistrationView;
+import com.euprocuro.api.application.view.SocialAuthView;
 import com.euprocuro.api.domain.gateway.AuthSessionGateway;
 import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.EmailVerificationTokenGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.PasswordResetTokenGateway;
 import com.euprocuro.api.domain.gateway.PendingRegistrationGateway;
+import com.euprocuro.api.domain.gateway.PendingSocialAuthGateway;
 import com.euprocuro.api.domain.gateway.PhoneVerificationGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.AuthSession;
 import com.euprocuro.api.domain.model.EmailVerificationToken;
 import com.euprocuro.api.domain.model.PasswordResetToken;
 import com.euprocuro.api.domain.model.PendingRegistration;
+import com.euprocuro.api.domain.model.PendingSocialAuth;
 import com.euprocuro.api.domain.model.PhoneVerificationChannel;
 import com.euprocuro.api.domain.model.UserProfile;
 import com.euprocuro.api.infrastructure.security.FacebookIdentityService;
@@ -71,6 +76,8 @@ class AuthServiceTest {
     private EmailVerificationTokenGateway emailVerificationTokenGateway;
     @Mock
     private PendingRegistrationGateway pendingRegistrationGateway;
+    @Mock
+    private PendingSocialAuthGateway pendingSocialAuthGateway;
     @Mock
     private PhoneVerificationGateway phoneVerificationGateway;
     @Mock
@@ -601,7 +608,7 @@ class AuthServiceTest {
     // ----------------------------------------------------------------------
 
     @Test
-    void googleLoginShouldCreateVerifiedUserWithoutInitialCredits() {
+    void googleLoginShouldRequirePhoneAndNotCreateUserForNewAccount() {
         when(googleIdentityService.verify("google-token")).thenReturn(GoogleIdentityView.builder()
                 .subject("google-sub")
                 .email("NOVA@TESTE.COM")
@@ -609,59 +616,30 @@ class AuthServiceTest {
                 .emailVerified(true)
                 .build());
         when(userGateway.findByEmail("nova@teste.com")).thenReturn(Optional.empty());
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
-            UserProfile user = invocation.getArgument(0);
-            user.setId("google-user");
-            return user;
-        });
-        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pendingSocialAuthGateway.save(any(PendingSocialAuth.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AuthenticatedSessionView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
+        SocialAuthView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
                 .accessToken("google-token")
                 .ipAddress("10.0.0.1")
                 .build());
 
-        assertThat(result.getUser().getId()).isEqualTo("google-user");
-        assertThat(result.getUser().getEmail()).isEqualTo("nova@teste.com");
-        assertThat(result.getUser().isEmailVerified()).isTrue();
-        assertThat(result.getUser().getSellerCredits()).isZero();
-        assertThat(result.getUser().getFreeCreditsGranted()).isFalse();
-        assertThat(result.getUser().getPasswordHash()).isNull();
-        assertThat(result.getUser().isTermsAccepted()).isTrue();
-        verify(eventPublisherGateway).publish(eq("auth.google-login"), any(Map.class));
+        assertThat(result.isPhoneRequired()).isTrue();
+        assertThat(result.getSocialToken()).isNotBlank();
+        ArgumentCaptor<PendingSocialAuth> captor = ArgumentCaptor.forClass(PendingSocialAuth.class);
+        verify(pendingSocialAuthGateway).save(captor.capture());
+        assertThat(captor.getValue().getProvider()).isEqualTo("google");
+        assertThat(captor.getValue().getEmail()).isEqualTo("nova@teste.com");
+        assertThat(captor.getValue().getExistingUserId()).isNull();
+        verify(userGateway, never()).save(any(UserProfile.class));
+        verify(authSessionGateway, never()).save(any(AuthSession.class));
     }
 
     @Test
-    void googleLoginShouldUseExistingAccountAndMarkEmailVerified() {
-        UserProfile existing = baseUser().toBuilder()
-                .email("ana@teste.com")
-                .emailVerified(false)
-                .build();
-        when(googleIdentityService.verify("google-token")).thenReturn(GoogleIdentityView.builder()
-                .subject("google-sub")
-                .email("ana@teste.com")
-                .name("Ana Silva")
-                .emailVerified(true)
-                .build());
-        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(existing));
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        AuthenticatedSessionView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
-                .accessToken("google-token")
-                .build());
-
-        assertThat(result.getUser().getId()).isEqualTo("user-1");
-        assertThat(result.getUser().isEmailVerified()).isTrue();
-        verify(userGateway).save(any(UserProfile.class));
-        verify(eventPublisherGateway).publish(eq("auth.google-login"), any(Map.class));
-    }
-
-    @Test
-    void googleLoginShouldLinkGoogleSubjectOnExistingVerifiedUser() {
+    void googleLoginShouldLoginExistingUserWithVerifiedPhone() {
         UserProfile existing = baseUser().toBuilder()
                 .email("ana@teste.com")
                 .emailVerified(true)
+                .phoneVerified(true)
                 .googleSubject(null)
                 .build();
         when(googleIdentityService.verify("google-token")).thenReturn(GoogleIdentityView.builder()
@@ -674,20 +652,22 @@ class AuthServiceTest {
         when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AuthenticatedSessionView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
+        SocialAuthView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
                 .accessToken("google-token")
                 .build());
 
-        assertThat(result.getUser().getGoogleSubject()).isEqualTo("google-sub");
-        verify(userGateway).save(any(UserProfile.class));
+        assertThat(result.isPhoneRequired()).isFalse();
+        assertThat(result.getSession().getUser().getGoogleSubject()).isEqualTo("google-sub");
+        verify(eventPublisherGateway).publish(eq("auth.google-login"), any(Map.class));
+        verify(pendingSocialAuthGateway, never()).save(any(PendingSocialAuth.class));
     }
 
     @Test
-    void googleLoginShouldSkipSaveWhenUserAlreadyLinkedAndVerified() {
+    void googleLoginShouldRequirePhoneForExistingUserWithoutVerifiedPhone() {
         UserProfile existing = baseUser().toBuilder()
                 .email("ana@teste.com")
                 .emailVerified(true)
-                .googleSubject("google-sub")
+                .phoneVerified(false)
                 .build();
         when(googleIdentityService.verify("google-token")).thenReturn(GoogleIdentityView.builder()
                 .subject("google-sub")
@@ -696,18 +676,21 @@ class AuthServiceTest {
                 .emailVerified(true)
                 .build());
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(existing));
-        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pendingSocialAuthGateway.save(any(PendingSocialAuth.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AuthenticatedSessionView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
+        SocialAuthView result = authService.loginWithGoogle(GoogleLoginCommand.builder()
                 .accessToken("google-token")
                 .build());
 
-        assertThat(result.getUser().getGoogleSubject()).isEqualTo("google-sub");
-        verify(userGateway, never()).save(any(UserProfile.class));
+        assertThat(result.isPhoneRequired()).isTrue();
+        ArgumentCaptor<PendingSocialAuth> captor = ArgumentCaptor.forClass(PendingSocialAuth.class);
+        verify(pendingSocialAuthGateway).save(captor.capture());
+        assertThat(captor.getValue().getExistingUserId()).isEqualTo("user-1");
+        verify(authSessionGateway, never()).save(any(AuthSession.class));
     }
 
     @Test
-    void facebookLoginShouldCreateVerifiedUserWithoutInitialCredits() {
+    void facebookLoginShouldRequirePhoneAndNotCreateUserForNewAccount() {
         when(facebookIdentityService.verify("fb-token")).thenReturn(FacebookIdentityView.builder()
                 .subject("fb-sub")
                 .email("NOVA@TESTE.COM")
@@ -715,85 +698,25 @@ class AuthServiceTest {
                 .emailVerified(true)
                 .build());
         when(userGateway.findByEmail("nova@teste.com")).thenReturn(Optional.empty());
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
-            UserProfile user = invocation.getArgument(0);
-            user.setId("fb-user");
-            return user;
-        });
-        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pendingSocialAuthGateway.save(any(PendingSocialAuth.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AuthenticatedSessionView result = authService.loginWithFacebook(FacebookLoginCommand.builder()
+        SocialAuthView result = authService.loginWithFacebook(FacebookLoginCommand.builder()
                 .accessToken("fb-token")
                 .ipAddress("10.0.0.1")
                 .build());
 
-        assertThat(result.getUser().getId()).isEqualTo("fb-user");
-        assertThat(result.getUser().getEmail()).isEqualTo("nova@teste.com");
-        assertThat(result.getUser().isEmailVerified()).isTrue();
-        assertThat(result.getUser().getSellerCredits()).isZero();
-        assertThat(result.getUser().getFreeCreditsGranted()).isFalse();
-        assertThat(result.getUser().getFacebookSubject()).isEqualTo("fb-sub");
-        assertThat(result.getUser().getPasswordHash()).isNull();
-        assertThat(result.getUser().isTermsAccepted()).isTrue();
-        verify(eventPublisherGateway).publish(eq("auth.facebook-login"), any(Map.class));
+        assertThat(result.isPhoneRequired()).isTrue();
+        assertThat(result.getSocialToken()).isNotBlank();
+        verify(userGateway, never()).save(any(UserProfile.class));
+        verify(authSessionGateway, never()).save(any(AuthSession.class));
     }
 
     @Test
-    void facebookLoginShouldUseExistingAccountAndMarkEmailVerified() {
-        UserProfile existing = baseUser().toBuilder()
-                .email("ana@teste.com")
-                .emailVerified(false)
-                .build();
-        when(facebookIdentityService.verify("fb-token")).thenReturn(FacebookIdentityView.builder()
-                .subject("fb-sub")
-                .email("ana@teste.com")
-                .name("Ana Silva")
-                .emailVerified(true)
-                .build());
-        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(existing));
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        AuthenticatedSessionView result = authService.loginWithFacebook(FacebookLoginCommand.builder()
-                .accessToken("fb-token")
-                .build());
-
-        assertThat(result.getUser().getId()).isEqualTo("user-1");
-        assertThat(result.getUser().isEmailVerified()).isTrue();
-        verify(userGateway).save(any(UserProfile.class));
-        verify(eventPublisherGateway).publish(eq("auth.facebook-login"), any(Map.class));
-    }
-
-    @Test
-    void facebookLoginShouldLinkFacebookSubjectOnExistingVerifiedUser() {
+    void facebookLoginShouldLoginExistingUserWithVerifiedPhone() {
         UserProfile existing = baseUser().toBuilder()
                 .email("ana@teste.com")
                 .emailVerified(true)
-                .facebookSubject(null)
-                .build();
-        when(facebookIdentityService.verify("fb-token")).thenReturn(FacebookIdentityView.builder()
-                .subject("fb-sub")
-                .email("ana@teste.com")
-                .name("Ana Silva")
-                .emailVerified(true)
-                .build());
-        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(existing));
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        AuthenticatedSessionView result = authService.loginWithFacebook(FacebookLoginCommand.builder()
-                .accessToken("fb-token")
-                .build());
-
-        assertThat(result.getUser().getFacebookSubject()).isEqualTo("fb-sub");
-        verify(userGateway).save(any(UserProfile.class));
-    }
-
-    @Test
-    void facebookLoginShouldSkipSaveWhenUserAlreadyLinkedAndVerified() {
-        UserProfile existing = baseUser().toBuilder()
-                .email("ana@teste.com")
-                .emailVerified(true)
+                .phoneVerified(true)
                 .facebookSubject("fb-sub")
                 .build();
         when(facebookIdentityService.verify("fb-token")).thenReturn(FacebookIdentityView.builder()
@@ -805,12 +728,136 @@ class AuthServiceTest {
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(existing));
         when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        AuthenticatedSessionView result = authService.loginWithFacebook(FacebookLoginCommand.builder()
+        SocialAuthView result = authService.loginWithFacebook(FacebookLoginCommand.builder()
                 .accessToken("fb-token")
                 .build());
 
+        assertThat(result.isPhoneRequired()).isFalse();
+        assertThat(result.getSession().getUser().getFacebookSubject()).isEqualTo("fb-sub");
+        verify(userGateway, never()).save(any(UserProfile.class));
+        verify(eventPublisherGateway).publish(eq("auth.facebook-login"), any(Map.class));
+    }
+
+    @Test
+    void startSocialPhoneVerificationShouldSendCode() {
+        PendingSocialAuth pending = pendingSocialAuth(null);
+        when(pendingSocialAuthGateway.findByToken("social-token")).thenReturn(Optional.of(pending));
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.empty());
+
+        authService.startSocialPhoneVerification(StartSocialPhoneVerificationCommand.builder()
+                .socialToken("social-token")
+                .phone("11912345678")
+                .build());
+
+        verify(phoneVerificationGateway).startVerification("+5511912345678", PhoneVerificationChannel.SMS);
+    }
+
+    @Test
+    void startSocialPhoneVerificationShouldRejectExpiredToken() {
+        PendingSocialAuth pending = pendingSocialAuth(null).toBuilder()
+                .expiresAt(Instant.now().minus(1, ChronoUnit.MINUTES))
+                .build();
+        when(pendingSocialAuthGateway.findByToken("social-token")).thenReturn(Optional.of(pending));
+
+        assertThatThrownBy(() -> authService.startSocialPhoneVerification(StartSocialPhoneVerificationCommand.builder()
+                .socialToken("social-token")
+                .phone("11912345678")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("expirada");
+        verify(phoneVerificationGateway, never()).startVerification(any(), any());
+    }
+
+    @Test
+    void confirmSocialPhoneVerificationShouldCreateNewUserWithCreditsAndSession() {
+        PendingSocialAuth pending = pendingSocialAuth(null);
+        when(pendingSocialAuthGateway.findByToken("social-token")).thenReturn(Optional.of(pending));
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.empty());
+        when(phoneVerificationGateway.checkVerification("+5511912345678", "12345")).thenReturn(true);
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
+            UserProfile user = invocation.getArgument(0);
+            user.setId("google-user");
+            return user;
+        });
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthenticatedSessionView result = authService.confirmSocialPhoneVerification(ConfirmSocialPhoneVerificationCommand.builder()
+                .socialToken("social-token")
+                .phone("11912345678")
+                .code("12345")
+                .build());
+
+        assertThat(result.getToken()).isNotBlank();
+        ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
+        verify(userGateway).save(userCaptor.capture());
+        UserProfile saved = userCaptor.getValue();
+        assertThat(saved.getEmail()).isEqualTo("nova@teste.com");
+        assertThat(saved.getGoogleSubject()).isEqualTo("google-sub");
+        assertThat(saved.isPhoneVerified()).isTrue();
+        assertThat(saved.getSellerCredits()).isEqualTo(15);
+        assertThat(saved.getFreeCreditsGranted()).isTrue();
+        verify(pendingSocialAuthGateway).deleteByToken("social-token");
+        verify(eventPublisherGateway).publish(eq("user.registered"), any(Map.class));
+    }
+
+    @Test
+    void confirmSocialPhoneVerificationShouldGrantCreditsToExistingUserOnce() {
+        PendingSocialAuth pending = pendingSocialAuth("user-1").toBuilder().provider("facebook").subject("fb-sub").build();
+        UserProfile existing = baseUser().toBuilder()
+                .sellerCredits(0)
+                .freeCreditsGranted(false)
+                .build();
+        when(pendingSocialAuthGateway.findByToken("social-token")).thenReturn(Optional.of(pending));
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.empty());
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(existing));
+        when(phoneVerificationGateway.checkVerification("+5511912345678", "12345")).thenReturn(true);
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AuthenticatedSessionView result = authService.confirmSocialPhoneVerification(ConfirmSocialPhoneVerificationCommand.builder()
+                .socialToken("social-token")
+                .phone("11912345678")
+                .code("12345")
+                .build());
+
+        assertThat(result.getUser().getSellerCredits()).isEqualTo(15);
         assertThat(result.getUser().getFacebookSubject()).isEqualTo("fb-sub");
-        verify(userGateway, org.mockito.Mockito.never()).save(any(UserProfile.class));
+        assertThat(result.getUser().isPhoneVerified()).isTrue();
+        verify(eventPublisherGateway).publish(eq("auth.facebook-login"), any(Map.class));
+        verify(eventPublisherGateway, never()).publish(eq("user.registered"), any(Map.class));
+    }
+
+    @Test
+    void confirmSocialPhoneVerificationShouldRejectInvalidCode() {
+        PendingSocialAuth pending = pendingSocialAuth(null);
+        when(pendingSocialAuthGateway.findByToken("social-token")).thenReturn(Optional.of(pending));
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.empty());
+        when(phoneVerificationGateway.checkVerification("+5511912345678", "00000")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.confirmSocialPhoneVerification(ConfirmSocialPhoneVerificationCommand.builder()
+                .socialToken("social-token")
+                .phone("11912345678")
+                .code("00000")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Codigo invalido");
+        verify(userGateway, never()).save(any(UserProfile.class));
+    }
+
+    @Test
+    void confirmSocialPhoneVerificationShouldRejectPhoneFromAnotherUser() {
+        PendingSocialAuth pending = pendingSocialAuth(null);
+        UserProfile other = baseUser().toBuilder().id("user-2").build();
+        when(pendingSocialAuthGateway.findByToken("social-token")).thenReturn(Optional.of(pending));
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.of(other));
+
+        assertThatThrownBy(() -> authService.confirmSocialPhoneVerification(ConfirmSocialPhoneVerificationCommand.builder()
+                .socialToken("social-token")
+                .phone("11912345678")
+                .code("12345")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("outra conta");
     }
 
     // ----------------------------------------------------------------------
@@ -1191,6 +1238,21 @@ class AuthServiceTest {
                 .passwordHash("hash")
                 .buyerRating(4.8)
                 .sellerRating(4.9)
+                .build();
+    }
+
+    private PendingSocialAuth pendingSocialAuth(String existingUserId) {
+        Instant now = Instant.now();
+        return PendingSocialAuth.builder()
+                .id("pending-social-1")
+                .token("social-token")
+                .provider("google")
+                .subject("google-sub")
+                .email("nova@teste.com")
+                .name("Nova Pessoa")
+                .existingUserId(existingUserId)
+                .createdAt(now)
+                .expiresAt(now.plus(15, ChronoUnit.MINUTES))
                 .build();
     }
 }

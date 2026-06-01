@@ -56,7 +56,7 @@ function passwordStatus(password: string) {
 }
 
 export function AuthModal() {
-  const { authModal, closeAuthModal, setAuthMode, signIn, signInWithGoogle, signInWithFacebook, startSignUp, confirmSignUp, setFeedback, operationalSettings } = usePlatform();
+  const { authModal, closeAuthModal, setAuthMode, signIn, signInWithGoogle, signInWithFacebook, startSignUp, confirmSignUp, socialPhoneStart, socialPhoneConfirm, setFeedback, operationalSettings } = usePlatform();
   const { termsVersion } = useLegalContent();
   const [loginForm, setLoginForm] = useState(initialLogin);
   const [registerForm, setRegisterForm] = useState(initialRegister);
@@ -73,6 +73,7 @@ export function AuthModal() {
   const [verificationCode, setVerificationCode] = useState("");
   const [pendingEmail, setPendingEmail] = useState("");
   const [resendIn, setResendIn] = useState(0);
+  const [social, setSocial] = useState<{ token: string; phone: string; step: "phone" | "code" } | null>(null);
 
   useEffect(() => {
     setTurnstileToken("");
@@ -81,6 +82,7 @@ export function AuthModal() {
     setRegisterEmailOpen(false);
     setRegisterStep("form");
     setVerificationCode("");
+    setSocial(null);
   }, [authModal.mode, authModal.visible]);
 
   useEffect(() => {
@@ -98,7 +100,10 @@ export function AuthModal() {
   const handleGoogleCredential = useCallback(async (accessToken: string) => {
     setIsSubmitting(true);
     try {
-      await signInWithGoogle(accessToken, turnstileToken || undefined);
+      const result = await signInWithGoogle(accessToken, turnstileToken || undefined);
+      if (result.phoneRequired && result.socialToken) {
+        setSocial({ token: result.socialToken, phone: "", step: "phone" });
+      }
     } catch (error) {
       setTurnstileToken("");
       setTurnstileResetKey((current) => current + 1);
@@ -115,7 +120,10 @@ export function AuthModal() {
   const handleFacebookCredential = useCallback(async (accessToken: string) => {
     setIsSubmitting(true);
     try {
-      await signInWithFacebook(accessToken, turnstileToken || undefined);
+      const result = await signInWithFacebook(accessToken, turnstileToken || undefined);
+      if (result.phoneRequired && result.socialToken) {
+        setSocial({ token: result.socialToken, phone: "", step: "phone" });
+      }
     } catch (error) {
       setTurnstileToken("");
       setTurnstileResetKey((current) => current + 1);
@@ -128,6 +136,57 @@ export function AuthModal() {
       setIsSubmitting(false);
     }
   }, [setFeedback, signInWithFacebook, turnstileToken]);
+
+  const submitSocialPhone: FormSubmitHandler = async (event) => {
+    event.preventDefault();
+    if (!social) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await socialPhoneStart(social.token, social.phone);
+      setSocial({ ...social, step: "code" });
+      setVerificationCode("");
+      setResendIn(RESEND_COOLDOWN_SECONDS);
+      setFeedback({ type: "info", title: "Confirme seu telefone", message: "Enviamos um código por SMS para o número informado." });
+    } catch (error) {
+      setFeedback({ type: "error", title: "Não foi possível enviar o código", message: error instanceof Error ? error.message : "Confira o número e tente novamente." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitSocialCode: FormSubmitHandler = async (event) => {
+    event.preventDefault();
+    if (!social) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await socialPhoneConfirm(social.token, social.phone, verificationCode.trim());
+      setSocial(null);
+    } catch (error) {
+      setFeedback({ type: "error", title: "Código inválido", message: error instanceof Error ? error.message : "Confira o código e tente novamente." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resendSocialCode = async () => {
+    if (!social || resendIn > 0) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await socialPhoneStart(social.token, social.phone);
+      setResendIn(RESEND_COOLDOWN_SECONDS);
+      setFeedback({ type: "info", title: "Código reenviado", message: "Enviamos um novo código por SMS." });
+    } catch (error) {
+      setFeedback({ type: "error", title: "Não foi possível reenviar", message: error instanceof Error ? error.message : "Tente novamente em instantes." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (!authModal.visible) {
     return null;
@@ -309,12 +368,14 @@ export function AuthModal() {
     setFeedback({ type: "warning", title: "Aceite os termos", message });
   }
 
-  const title = {
-    login: "Acesse sua conta",
-    register: "Crie sua conta",
-    forgot: "Recuperar acesso",
-    reset: "Criar nova senha"
-  }[authModal.mode];
+  const title = social
+    ? "Verifique seu telefone"
+    : {
+        login: "Acesse sua conta",
+        register: "Crie sua conta",
+        forgot: "Recuperar acesso",
+        reset: "Criar nova senha"
+      }[authModal.mode];
 
   const emailExpanded = (authModal.mode === "login" && loginEmailOpen)
     || (authModal.mode === "register" && registerEmailOpen);
@@ -354,6 +415,32 @@ export function AuthModal() {
             </button>
           </div>
 
+          {social ? (
+            social.step === "phone" ? (
+              <form className="stack-form auth-reveal" onSubmit={submitSocialPhone}>
+                <p className="auth-code-hint">Conta conectada! Para concluir e liberar seus créditos, confirme um número de celular por SMS.</p>
+                <label>Celular (com DDD)
+                  <input type="tel" inputMode="numeric" placeholder="(11) 91234-5678" value={social.phone} onChange={(event) => setSocial((current) => current ? { ...current, phone: event.target.value } : current)} required />
+                </label>
+                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Enviando código..." : "Enviar código por SMS"}</Button>
+              </form>
+            ) : (
+              <form className="stack-form" onSubmit={submitSocialCode}>
+                <p className="auth-code-hint">Enviamos um código por SMS para <strong>{social.phone}</strong>. Digite-o para concluir.</p>
+                <label>Código de verificação
+                  <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, ""))} required />
+                </label>
+                <Button type="submit" disabled={isSubmitting || verificationCode.trim().length < 4}>{isSubmitting ? "Confirmando..." : "Confirmar e entrar"}</Button>
+                <div className="auth-form-foot">
+                  <button type="button" className="text-button" onClick={() => setSocial((current) => current ? { ...current, step: "phone" } : current)}>← Trocar número</button>
+                  <button type="button" className="text-button" onClick={resendSocialCode} disabled={isSubmitting || resendIn > 0}>
+                    {resendIn > 0 ? `Reenviar em ${resendIn}s` : "Reenviar código"}
+                  </button>
+                </div>
+              </form>
+            )
+          ) : (
+          <>
           {authModal.mode !== "reset" && authModal.mode !== "forgot" ? (
             <div className="segmented-control">
               <button type="button" className={authModal.mode === "login" ? "is-active" : ""} onClick={() => setAuthMode("login")}>Entrar</button>
@@ -455,6 +542,8 @@ export function AuthModal() {
               <Button type="submit">Salvar nova senha</Button>
             </form>
           ) : null}
+          </>
+          )}
         </div>
       </div>
       <LegalModal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} />

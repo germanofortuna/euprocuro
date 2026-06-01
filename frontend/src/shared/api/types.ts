@@ -26,6 +26,14 @@ export type StoredSession = {
   user: User | null;
 };
 
+export type SocialAuthResult = {
+  phoneRequired?: boolean;
+  socialToken?: string | null;
+  expiresAt?: string | null;
+  token?: string | null;
+  user?: User | null;
+};
+
 export type Category = {
   code?: string;
   value: string;
