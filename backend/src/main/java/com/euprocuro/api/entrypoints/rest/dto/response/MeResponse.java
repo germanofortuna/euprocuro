@@ -11,6 +11,8 @@ public class MeResponse {
     private String id;
     private String name;
     private String email;
+    private String phone;
+    private boolean phoneVerified;
     private String postalCode;
     private String city;
     private String state;

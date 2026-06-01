@@ -32,7 +32,10 @@ import {
   login,
   logout,
   purchaseProduct,
-  register,
+  registerStart,
+  registerConfirm,
+  startPhoneVerification,
+  confirmPhoneVerification,
   renewInterest,
   reportInterest,
   storeSession,
@@ -82,7 +85,10 @@ type PlatformContextValue = {
   signIn: (payload: { email: string; password: string; turnstileToken?: string }) => Promise<void>;
   signInWithGoogle: (accessToken: string, turnstileToken?: string) => Promise<void>;
   signInWithFacebook: (accessToken: string, turnstileToken?: string) => Promise<void>;
-  signUp: (payload: Record<string, unknown>) => Promise<void>;
+  startSignUp: (payload: Record<string, unknown>) => Promise<{ message?: string }>;
+  confirmSignUp: (payload: { email: string; code: string }) => Promise<void>;
+  verifyPhoneStart: (phone: string, turnstileToken?: string) => Promise<void>;
+  verifyPhoneConfirm: (phone: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   recoverSession: () => Promise<void>;
@@ -458,12 +464,20 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       if (monetizationAccount) {
         setMonetization(monetizationAccount);
       }
-      setFeedback({
-        type: "info",
-        title: "Seus creditos iniciais",
-        message: creditOnboardingMessage(nextSession.user, monetizationAccount, operationalSettings),
-        afterClose: () => markCreditOnboardingSeen(nextSession.user)
-      });
+      // Mostra o onboarding de creditos apenas quando ja existe saldo (ex.: cadastro por e-mail
+      // com telefone verificado). Quem entra por Google/Facebook comeca com 0 e e convidado a
+      // verificar o telefone pelo card do painel, entao nao recebe esse aviso aqui.
+      const balance = Number(monetizationAccount?.sellerCredits ?? nextSession.user?.sellerCredits ?? nextSession.user?.credits ?? 0);
+      if (balance > 0) {
+        setFeedback({
+          type: "info",
+          title: "Seus creditos iniciais",
+          message: creditOnboardingMessage(nextSession.user, monetizationAccount, operationalSettings),
+          afterClose: () => markCreditOnboardingSeen(nextSession.user)
+        });
+      } else {
+        markCreditOnboardingSeen(nextSession.user);
+      }
     }
 
     const redirectTo = authModal.redirectTo;
@@ -483,12 +497,27 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     await completeSocialSignIn(auth);
   }, [completeSocialSignIn]);
 
-  const signUp = useCallback(async (payload: Record<string, unknown>) => {
-    await register(payload);
-    markPendingCreditOnboarding(payload.email);
-    setAuthModal((current) => ({ visible: true, mode: "login", redirectTo: current.redirectTo ?? null }));
-    setFeedback({ type: "success", title: "Confirme seu e-mail", message: "Sua conta foi criada. Confirme seu e-mail para entrar." });
+  const startSignUp = useCallback(async (payload: Record<string, unknown>) => {
+    const result = await registerStart(payload);
+    return result ?? {};
   }, []);
+
+  const confirmSignUp = useCallback(async (payload: { email: string; code: string }) => {
+    const auth = await registerConfirm(payload);
+    await completeSocialSignIn(auth);
+  }, [completeSocialSignIn]);
+
+  const verifyPhoneStart = useCallback(async (phone: string, turnstileToken?: string) => {
+    await startPhoneVerification({ phone, turnstileToken });
+  }, []);
+
+  const verifyPhoneConfirm = useCallback(async (phone: string, code: string) => {
+    const me = await confirmPhoneVerification({ phone, code });
+    const nextSession = normalizeMe(me as Record<string, unknown>, getStoredSession());
+    storeSession(nextSession);
+    setSession(nextSession);
+    await refreshPrivateData();
+  }, [refreshPrivateData]);
 
   const signOut = useCallback(async () => {
     try {
@@ -641,7 +670,10 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signInWithGoogle,
     signInWithFacebook,
-    signUp,
+    startSignUp,
+    confirmSignUp,
+    verifyPhoneStart,
+    verifyPhoneConfirm,
     signOut,
     deleteAccount,
     recoverSession,
@@ -700,7 +732,10 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     signInWithGoogle,
     signInWithFacebook,
     signOut,
-    signUp,
+    startSignUp,
+    confirmSignUp,
+    verifyPhoneStart,
+    verifyPhoneConfirm,
     submitOffer,
     submitOmbudsman,
     submitReport

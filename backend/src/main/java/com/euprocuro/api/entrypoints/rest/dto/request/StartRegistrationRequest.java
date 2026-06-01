@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-public class RegisterRequest {
+public class StartRegistrationRequest {
     @NotBlank
     private String name;
 
@@ -16,21 +16,10 @@ public class RegisterRequest {
     private String email;
 
     @NotBlank
-    private String documentNumber;
-
-    @NotBlank
     private String password;
 
-    private String postalCode;
-
     @NotBlank
-    private String city;
-
-    @NotBlank
-    private String state;
-
-    private String neighborhood;
-    private String country;
+    private String phone;
 
     @AssertTrue(message = "e necessario aceitar os termos de uso")
     private boolean termsAccepted;
@@ -38,5 +27,4 @@ public class RegisterRequest {
     private String termsVersion;
 
     private String turnstileToken;
-
 }

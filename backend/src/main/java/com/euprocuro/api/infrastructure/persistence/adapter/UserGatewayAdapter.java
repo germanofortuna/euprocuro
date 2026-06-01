@@ -48,6 +48,11 @@ public class UserGatewayAdapter implements UserGateway {
     }
 
     @Override
+    public Optional<UserProfile> findByPhone(String phone) {
+        return repository.findByPhone(phone).map(UserPersistenceMapper::toDomain);
+    }
+
+    @Override
     public long count() {
         return repository.count();
     }

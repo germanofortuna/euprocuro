@@ -24,12 +24,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.euprocuro.api.application.command.ConfirmPhoneVerificationCommand;
+import com.euprocuro.api.application.command.ConfirmRegistrationCommand;
 import com.euprocuro.api.application.command.FacebookLoginCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.GoogleLoginCommand;
 import com.euprocuro.api.application.command.LoginCommand;
-import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
+import com.euprocuro.api.application.command.StartPhoneVerificationCommand;
+import com.euprocuro.api.application.command.StartRegistrationCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.exception.UnauthorizedException;
@@ -43,10 +46,14 @@ import com.euprocuro.api.domain.gateway.EmailGateway;
 import com.euprocuro.api.domain.gateway.EmailVerificationTokenGateway;
 import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.PasswordResetTokenGateway;
+import com.euprocuro.api.domain.gateway.PendingRegistrationGateway;
+import com.euprocuro.api.domain.gateway.PhoneVerificationGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.AuthSession;
 import com.euprocuro.api.domain.model.EmailVerificationToken;
 import com.euprocuro.api.domain.model.PasswordResetToken;
+import com.euprocuro.api.domain.model.PendingRegistration;
+import com.euprocuro.api.domain.model.PhoneVerificationChannel;
 import com.euprocuro.api.domain.model.UserProfile;
 import com.euprocuro.api.infrastructure.security.FacebookIdentityService;
 import com.euprocuro.api.infrastructure.security.GoogleIdentityService;
@@ -62,6 +69,10 @@ class AuthServiceTest {
     private PasswordResetTokenGateway passwordResetTokenGateway;
     @Mock
     private EmailVerificationTokenGateway emailVerificationTokenGateway;
+    @Mock
+    private PendingRegistrationGateway pendingRegistrationGateway;
+    @Mock
+    private PhoneVerificationGateway phoneVerificationGateway;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
@@ -85,7 +96,8 @@ class AuthServiceTest {
         ReflectionTestUtils.setField(authService, "sessionHours", 24L);
         ReflectionTestUtils.setField(authService, "sessionRenewalThresholdHours", 0L);
         ReflectionTestUtils.setField(authService, "passwordResetHours", 2L);
-        ReflectionTestUtils.setField(authService, "emailVerificationHours", 24L);
+        ReflectionTestUtils.setField(authService, "pendingRegistrationMinutes", 15L);
+        ReflectionTestUtils.setField(authService, "phoneVerificationChannel", "SMS");
         ReflectionTestUtils.setField(authService, "resetBaseUrl", "https://app.euprocuro.com");
         ReflectionTestUtils.setField(authService, "exposeResetPreview", true);
         ReflectionTestUtils.setField(authService, "hmlAccessEnabled", false);
@@ -94,189 +106,147 @@ class AuthServiceTest {
         lenient().when(operationalCatalogService.initialFreeCredits()).thenReturn(15);
     }
 
+    // ----------------------------------------------------------------------
+    // startRegistration
+    // ----------------------------------------------------------------------
+
     @Test
-    void registerShouldCreateUnverifiedUserAndSendVerificationEmail() {
-        RegisterUserCommand command = RegisterUserCommand.builder()
+    void startRegistrationShouldSavePendingAndSendSms() {
+        StartRegistrationCommand command = StartRegistrationCommand.builder()
                 .name("Ana Silva")
-                .email("ana@teste.com")
-                .documentNumber("529.982.247-25")
+                .email("ANA@TESTE.COM")
                 .password("Senha123")
-                .city("Sao Paulo")
-                .state("SP")
+                .phone("(11) 91234-5678")
                 .ipAddress("192.168.1.100")
                 .termsAccepted(true)
                 .termsVersion("2026-05-05")
                 .build();
 
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
-        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.empty());
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("Senha123")).thenReturn("senha-hash");
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
-            UserProfile user = invocation.getArgument(0);
-            user.setId("user-1");
-            return user;
-        });
-        when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(emailGateway.sendEmailVerificationEmail(any(UserProfile.class), any(String.class))).thenReturn(true);
+        when(pendingRegistrationGateway.save(any(PendingRegistration.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        RegistrationView result = authService.register(command);
-
-        assertThat(result.isVerificationSentByEmail()).isTrue();
-        ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
-        verify(userGateway).save(userCaptor.capture());
-        assertThat(userCaptor.getValue().getIpAddress()).isEqualTo("192.168.1.100");  // <- Novo
-        assertThat(userCaptor.getValue().isTermsAccepted()).isTrue();
-        assertThat(userCaptor.getValue().getTermsAcceptedAt()).isNotNull();
-        assertThat(userCaptor.getValue().getTermsVersion()).isEqualTo("2026-05-05");
-    }
-
-    @Test
-    void registerShouldReturnVerificationSentMessageWhenEmailIsDelivered() {
-        RegisterUserCommand command = RegisterUserCommand.builder()
-                .name("Ana Silva")
-                .email("ana@teste.com")
-                .documentNumber("529.982.247-25")
-                .password("Senha123")
-                .city("Sao Paulo")
-                .state("SP")
-                .ipAddress("192.168.1.100")  // <- Adicionado
-                .termsAccepted(true)
-                .build();
-
-        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
-        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("Senha123")).thenReturn("senha-hash");
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
-            UserProfile user = invocation.getArgument(0);
-            user.setId("user-1");
-            return user;
-        });
-        when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(emailGateway.sendEmailVerificationEmail(any(UserProfile.class), any(String.class))).thenReturn(true);
-
-        RegistrationView result = authService.register(command);
-
-        assertThat(result.isVerificationSentByEmail()).isTrue();
-        assertThat(result.getMessage()).contains("Enviamos um link");
-    }
-
-    @Test
-    void registerShouldAcceptValidCnpj() {
-        RegisterUserCommand command = RegisterUserCommand.builder()
-                .name("Loja Teste")
-                .email("loja@teste.com")
-                .documentNumber("11.222.333/0001-81")
-                .password("Senha123")
-                .city("Erechim")
-                .state("rs")
-                .termsAccepted(true)
-                .build();
-
-        when(userGateway.findByEmail("loja@teste.com")).thenReturn(Optional.empty());
-        when(userGateway.findByDocumentNumber("11222333000181")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("Senha123")).thenReturn("senha-hash");
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
-            UserProfile user = invocation.getArgument(0);
-            user.setId("user-cnpj");
-            return user;
-        });
-        when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(emailGateway.sendEmailVerificationEmail(any(UserProfile.class), any(String.class))).thenReturn(true);
-
-        RegistrationView result = authService.register(command);
-
-        assertThat(result.getMessage()).contains("Conta criada");
-        ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
-        verify(userGateway).save(userCaptor.capture());
-        assertThat(userCaptor.getValue().getDocumentNumber()).isEqualTo("11222333000181");
-        assertThat(userCaptor.getValue().getDocumentType()).isEqualTo("CNPJ");
-        assertThat(userCaptor.getValue().getState()).isEqualTo("RS");
-        verify(eventPublisherGateway).publish(eq("user.registered"), any(Map.class));
-    }
-
-    @Test
-    void registerShouldRollbackUserWhenVerificationEmailFails() {
-        RegisterUserCommand command = RegisterUserCommand.builder()
-                .name("Ana Silva")
-                .email("ana@teste.com")
-                .documentNumber("529.982.247-25")
-                .password("Senha123")
-                .city("Sao Paulo")
-                .state("SP")
-                .termsAccepted(true)
-                .build();
-
-        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
-        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("Senha123")).thenReturn("senha-hash");
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
-            UserProfile user = invocation.getArgument(0);
-            user.setId("user-1");
-            return user;
-        });
-        when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenReturn(EmailVerificationToken.builder()
-                .token("verify-123")
-                .userId("user-1")
-                .createdAt(Instant.now())
-                .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
-                .build());
-        when(emailGateway.sendEmailVerificationEmail(any(UserProfile.class), any(String.class))).thenReturn(false);
-
-        assertThatThrownBy(() -> authService.register(command))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("e-mail de confirma");
-
-        verify(emailVerificationTokenGateway).deleteByToken("verify-123");
-        verify(userGateway).deleteById("user-1");
-        verify(eventPublisherGateway, never()).publish(eq("user.registered"), any(Map.class));
-    }
-
-    @Test
-    void registerShouldSkipVerificationEmailWhenNotRequired() {
-        ReflectionTestUtils.setField(authService, "emailVerificationRequired", false);
-        RegisterUserCommand command = RegisterUserCommand.builder()
-                .name("Ana Silva")
-                .email("ana@teste.com")
-                .documentNumber("529.982.247-25")
-                .password("Senha123")
-                .city("Sao Paulo")
-                .state("SP")
-                .termsAccepted(true)
-                .build();
-
-        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
-        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("Senha123")).thenReturn("senha-hash");
-        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
-            UserProfile user = invocation.getArgument(0);
-            user.setId("user-1");
-            return user;
-        });
-
-        RegistrationView result = authService.register(command);
+        RegistrationView result = authService.startRegistration(command);
 
         assertThat(result.isVerificationSentByEmail()).isFalse();
-        assertThat(result.getMessage()).isEqualTo("Conta criada");
-        ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
-        verify(userGateway).save(userCaptor.capture());
-        assertThat(userCaptor.getValue().isEmailVerified()).isTrue();
-        verify(emailVerificationTokenGateway, never()).save(any(EmailVerificationToken.class));
-        verify(emailGateway, never()).sendEmailVerificationEmail(any(UserProfile.class), any(String.class));
-        verify(eventPublisherGateway).publish(eq("user.registered"), any(Map.class));
+        assertThat(result.getMessage()).contains("SMS");
+
+        ArgumentCaptor<PendingRegistration> pendingCaptor = ArgumentCaptor.forClass(PendingRegistration.class);
+        verify(pendingRegistrationGateway).save(pendingCaptor.capture());
+        assertThat(pendingCaptor.getValue().getEmail()).isEqualTo("ana@teste.com");
+        assertThat(pendingCaptor.getValue().getPhone()).isEqualTo("+5511912345678");
+        assertThat(pendingCaptor.getValue().getPasswordHash()).isEqualTo("senha-hash");
+        assertThat(pendingCaptor.getValue().getExpiresAt()).isAfter(Instant.now());
+        verify(phoneVerificationGateway).startVerification("+5511912345678", PhoneVerificationChannel.SMS);
+        verify(userGateway, never()).save(any(UserProfile.class));
     }
 
     @Test
-    void registerShouldRejectWhenTermsAreNotAccepted() {
-        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
-        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.empty());
+    void startRegistrationShouldRejectExistingEmail() {
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(baseUser()));
 
-        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
+        assertThatThrownBy(() -> authService.startRegistration(StartRegistrationCommand.builder()
                 .name("Ana Silva")
                 .email("ana@teste.com")
-                .documentNumber("52998224725")
                 .password("Senha123")
-                .city("Sao Paulo")
-                .state("SP")
+                .phone("11912345678")
+                .termsAccepted(true)
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("e-mail");
+        verify(phoneVerificationGateway, never()).startVerification(any(), any());
+    }
+
+    @Test
+    void startRegistrationShouldRejectExistingPhone() {
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.of(baseUser()));
+
+        assertThatThrownBy(() -> authService.startRegistration(StartRegistrationCommand.builder()
+                .name("Ana Silva")
+                .email("ana@teste.com")
+                .password("Senha123")
+                .phone("11912345678")
+                .termsAccepted(true)
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("telefone");
+    }
+
+    @Test
+    void startRegistrationShouldRejectInvalidPhone() {
+        assertThatThrownBy(() -> authService.startRegistration(StartRegistrationCommand.builder()
+                .name("Ana Silva")
+                .email("ana@teste.com")
+                .password("Senha123")
+                .phone("123")
+                .termsAccepted(true)
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("telefone valido");
+    }
+
+    @Test
+    void startRegistrationShouldRejectWeakPassword() {
+        assertThatThrownBy(() -> authService.startRegistration(StartRegistrationCommand.builder()
+                .name("Ana Silva")
+                .email("ana@teste.com")
+                .password("123")
+                .phone("11912345678")
+                .termsAccepted(true)
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("8 caracteres");
+    }
+
+    @Test
+    void startRegistrationShouldRejectIncompleteName() {
+        assertThatThrownBy(() -> authService.startRegistration(StartRegistrationCommand.builder()
+                .name("Ana")
+                .email("ana@teste.com")
+                .password("Senha123")
+                .phone("11912345678")
+                .termsAccepted(true)
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("nome e sobrenome");
+    }
+
+    @Test
+    void startRegistrationShouldRejectDisposableEmail() {
+        assertThatThrownBy(() -> authService.startRegistration(StartRegistrationCommand.builder()
+                .name("Ana Silva")
+                .email("ana@mailinator.com")
+                .password("Senha123")
+                .phone("11912345678")
+                .termsAccepted(true)
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("e-mail permanente");
+    }
+
+    @Test
+    void startRegistrationShouldRejectInvalidEmailFormat() {
+        assertThatThrownBy(() -> authService.startRegistration(StartRegistrationCommand.builder()
+                .name("Ana Silva")
+                .email("email-invalido")
+                .password("Senha123")
+                .phone("11912345678")
+                .termsAccepted(true)
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("e-mail valido");
+    }
+
+    @Test
+    void startRegistrationShouldRejectWhenTermsAreNotAccepted() {
+        assertThatThrownBy(() -> authService.startRegistration(StartRegistrationCommand.builder()
+                .name("Ana Silva")
+                .email("ana@teste.com")
+                .password("Senha123")
+                .phone("11912345678")
                 .termsAccepted(false)
                 .build()))
                 .isInstanceOf(BusinessException.class)
@@ -284,166 +254,230 @@ class AuthServiceTest {
     }
 
     @Test
-    void registerShouldRejectWeakPassword() {
-        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
-                .name("Ana Silva")
-                .email("ana@teste.com")
-                .documentNumber("52998224725")
-                .password("123")
-                .build()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("8 caracteres");
-    }
-
-    @Test
-    void registerShouldRejectDuplicateEmail() {
-        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(baseUser()));
-
-        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
-                .name("Ana Silva")
-                .email("ana@teste.com")
-                .documentNumber("52998224725")
-                .password("Senha123")
-                .build()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Ja existe usuario");
-    }
-
-    @Test
-    void registerShouldRejectDuplicateDocument() {
-        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
-        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.of(baseUser()));
-
-        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
-                .name("Ana Silva")
-                .email("ana@teste.com")
-                .documentNumber("529.982.247-25")
-                .password("Senha123")
-                .build()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("CPF/CNPJ");
-    }
-
-    @Test
-    void registerShouldRejectInvalidDocument() {
-        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
-                .name("Ana Silva")
-                .email("ana@teste.com")
-                .documentNumber("111.111.111-11")
-                .password("Senha123")
-                .build()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("CPF ou CNPJ valido");
-    }
-
-    @Test
-    void registerShouldRejectInvalidEmailFormat() {
-        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
-                .name("Ana Silva")
-                .email("email-invalido")
-                .documentNumber("52998224725")
-                .password("Senha123")
-                .build()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("e-mail valido");
-    }
-
-    @Test
-    void registerShouldRejectStateWithMoreThanTwoLetters() {
-        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
-                .name("Ana Silva")
-                .email("ana@teste.com")
-                .documentNumber("52998224725")
-                .password("Senha123")
-                .state("SPO")
-                .termsAccepted(true)
-                .build()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("UF com 2 letras");
-    }
-
-    @Test
-    void registerShouldRejectCnpjWithRepeatedDigits() {
-        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
-                .name("Loja Teste")
-                .email("loja@teste.com")
-                .documentNumber("11.111.111/1111-11")
-                .password("Senha123")
-                .build()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("CPF ou CNPJ valido");
-    }
-
-    @Test
-    void registerShouldRejectDisposableEmail() {
-        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
-                .name("Ana Silva")
-                .email("ana@mailinator.com")
-                .documentNumber("52998224725")
-                .password("Senha123")
-                .build()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("e-mail permanente");
-    }
-
-    @Test
-    void registerShouldRejectEmailOutsideHmlAllowlistWhenEnabled() {
+    void startRegistrationShouldRejectEmailOutsideHmlAllowlistWhenEnabled() {
         ReflectionTestUtils.setField(authService, "hmlAccessEnabled", true);
-        ReflectionTestUtils.setField(authService, "hmlAllowedEmails", "liberado@teste.com, outro@teste.com");
+        ReflectionTestUtils.setField(authService, "hmlAllowedEmails", "liberado@teste.com");
 
-        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
+        assertThatThrownBy(() -> authService.startRegistration(StartRegistrationCommand.builder()
                 .name("Ana Silva")
                 .email("ana@teste.com")
-                .documentNumber("52998224725")
                 .password("Senha123")
+                .phone("11912345678")
+                .termsAccepted(true)
                 .build()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Ambiente restrito");
     }
 
+    // ----------------------------------------------------------------------
+    // confirmRegistration
+    // ----------------------------------------------------------------------
+
     @Test
-    void registerShouldAcceptEmailInsideHmlAllowlistWhenEnabled() {
-        ReflectionTestUtils.setField(authService, "hmlAccessEnabled", true);
-        ReflectionTestUtils.setField(authService, "hmlAllowedEmails", "liberado@teste.com, ana@teste.com");
-
-        RegisterUserCommand command = RegisterUserCommand.builder()
-                .name("Ana Silva")
-                .email("ANA@TESTE.COM")
-                .documentNumber("529.982.247-25")
-                .password("Senha123")
-                .termsAccepted(true)
-                .build();
-
+    void confirmRegistrationShouldCreateVerifiedUserWithCreditsAndAutoLogin() {
+        PendingRegistration pending = pendingRegistration();
+        when(pendingRegistrationGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(pending));
+        when(phoneVerificationGateway.checkVerification("+5511912345678", "12345")).thenReturn(true);
         when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
-        when(userGateway.findByDocumentNumber("52998224725")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("Senha123")).thenReturn("senha-hash");
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.empty());
         when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> {
             UserProfile user = invocation.getArgument(0);
-            user.setId("user-allowlist");
+            user.setId("user-1");
             return user;
         });
-        when(emailVerificationTokenGateway.save(any(EmailVerificationToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(emailGateway.sendEmailVerificationEmail(any(UserProfile.class), any(String.class))).thenReturn(true);
+        when(authSessionGateway.save(any(AuthSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        RegistrationView result = authService.register(command);
+        AuthenticatedSessionView result = authService.confirmRegistration(ConfirmRegistrationCommand.builder()
+                .email("ANA@TESTE.COM")
+                .code("12345")
+                .ipAddress("10.0.0.9")
+                .build());
 
-        assertThat(result.getMessage()).contains("Conta criada");
+        assertThat(result.getToken()).isNotBlank();
         ArgumentCaptor<UserProfile> userCaptor = ArgumentCaptor.forClass(UserProfile.class);
         verify(userGateway).save(userCaptor.capture());
-        assertThat(userCaptor.getValue().getEmail()).isEqualTo("ana@teste.com");
+        UserProfile saved = userCaptor.getValue();
+        assertThat(saved.getEmail()).isEqualTo("ana@teste.com");
+        assertThat(saved.getPhone()).isEqualTo("+5511912345678");
+        assertThat(saved.isPhoneVerified()).isTrue();
+        assertThat(saved.isEmailVerified()).isTrue();
+        assertThat(saved.getSellerCredits()).isEqualTo(15);
+        assertThat(saved.getFreeCreditsGranted()).isTrue();
+        assertThat(saved.getPasswordHash()).isEqualTo("senha-hash");
+        verify(pendingRegistrationGateway).deleteByEmail("ana@teste.com");
+        verify(eventPublisherGateway).publish(eq("user.registered"), any(Map.class));
     }
 
     @Test
-    void registerShouldRejectIncompleteName() {
-        assertThatThrownBy(() -> authService.register(RegisterUserCommand.builder()
-                .name("Ana")
+    void confirmRegistrationShouldRejectWhenPendingMissing() {
+        when(pendingRegistrationGateway.findByEmail("ana@teste.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.confirmRegistration(ConfirmRegistrationCommand.builder()
                 .email("ana@teste.com")
-                .documentNumber("52998224725")
-                .password("Senha123")
+                .code("12345")
                 .build()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("nome e sobrenome");
+                .hasMessageContaining("cadastro pendente");
     }
+
+    @Test
+    void confirmRegistrationShouldRejectAndDeleteExpiredPending() {
+        PendingRegistration pending = pendingRegistration().toBuilder()
+                .expiresAt(Instant.now().minus(1, ChronoUnit.MINUTES))
+                .build();
+        when(pendingRegistrationGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(pending));
+
+        assertThatThrownBy(() -> authService.confirmRegistration(ConfirmRegistrationCommand.builder()
+                .email("ana@teste.com")
+                .code("12345")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("expirou");
+        verify(pendingRegistrationGateway).deleteByEmail("ana@teste.com");
+        verify(userGateway, never()).save(any(UserProfile.class));
+    }
+
+    @Test
+    void confirmRegistrationShouldRejectInvalidCode() {
+        PendingRegistration pending = pendingRegistration();
+        when(pendingRegistrationGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(pending));
+        when(phoneVerificationGateway.checkVerification("+5511912345678", "00000")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.confirmRegistration(ConfirmRegistrationCommand.builder()
+                .email("ana@teste.com")
+                .code("00000")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Codigo invalido");
+        verify(userGateway, never()).save(any(UserProfile.class));
+    }
+
+    @Test
+    void confirmRegistrationShouldRejectWhenEmailGotTakenMeanwhile() {
+        PendingRegistration pending = pendingRegistration();
+        when(pendingRegistrationGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(pending));
+        when(phoneVerificationGateway.checkVerification("+5511912345678", "12345")).thenReturn(true);
+        when(userGateway.findByEmail("ana@teste.com")).thenReturn(Optional.of(baseUser()));
+
+        assertThatThrownBy(() -> authService.confirmRegistration(ConfirmRegistrationCommand.builder()
+                .email("ana@teste.com")
+                .code("12345")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("e-mail");
+        verify(pendingRegistrationGateway).deleteByEmail("ana@teste.com");
+        verify(userGateway, never()).save(any(UserProfile.class));
+    }
+
+    // ----------------------------------------------------------------------
+    // phone verification (lazy credits)
+    // ----------------------------------------------------------------------
+
+    @Test
+    void startPhoneVerificationShouldSendCode() {
+        UserProfile user = baseUser();
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.empty());
+
+        authService.startPhoneVerification("user-1", StartPhoneVerificationCommand.builder()
+                .phone("11912345678")
+                .build());
+
+        verify(phoneVerificationGateway).startVerification("+5511912345678", PhoneVerificationChannel.SMS);
+    }
+
+    @Test
+    void startPhoneVerificationShouldRejectPhoneFromAnotherUser() {
+        UserProfile user = baseUser();
+        UserProfile other = baseUser().toBuilder().id("user-2").build();
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.of(other));
+
+        assertThatThrownBy(() -> authService.startPhoneVerification("user-1", StartPhoneVerificationCommand.builder()
+                .phone("11912345678")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("outra conta");
+        verify(phoneVerificationGateway, never()).startVerification(any(), any());
+    }
+
+    @Test
+    void confirmPhoneVerificationShouldGrantCreditsOnFirstVerification() {
+        UserProfile user = baseUser().toBuilder()
+                .sellerCredits(0)
+                .freeCreditsGranted(false)
+                .build();
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.empty());
+        when(phoneVerificationGateway.checkVerification("+5511912345678", "12345")).thenReturn(true);
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserProfile result = authService.confirmPhoneVerification("user-1", ConfirmPhoneVerificationCommand.builder()
+                .phone("11912345678")
+                .code("12345")
+                .build());
+
+        assertThat(result.isPhoneVerified()).isTrue();
+        assertThat(result.getPhone()).isEqualTo("+5511912345678");
+        assertThat(result.getSellerCredits()).isEqualTo(15);
+        assertThat(result.getFreeCreditsGranted()).isTrue();
+        verify(eventPublisherGateway).publish(eq("user.phone-verified"), any(Map.class));
+    }
+
+    @Test
+    void confirmPhoneVerificationShouldNotGrantCreditsTwice() {
+        UserProfile user = baseUser().toBuilder()
+                .sellerCredits(8)
+                .freeCreditsGranted(true)
+                .build();
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.empty());
+        when(phoneVerificationGateway.checkVerification("+5511912345678", "12345")).thenReturn(true);
+        when(userGateway.save(any(UserProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserProfile result = authService.confirmPhoneVerification("user-1", ConfirmPhoneVerificationCommand.builder()
+                .phone("11912345678")
+                .code("12345")
+                .build());
+
+        assertThat(result.getSellerCredits()).isEqualTo(8);
+        assertThat(result.getFreeCreditsGranted()).isTrue();
+    }
+
+    @Test
+    void confirmPhoneVerificationShouldRejectInvalidCode() {
+        UserProfile user = baseUser();
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.empty());
+        when(phoneVerificationGateway.checkVerification("+5511912345678", "00000")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.confirmPhoneVerification("user-1", ConfirmPhoneVerificationCommand.builder()
+                .phone("11912345678")
+                .code("00000")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Codigo invalido");
+        verify(userGateway, never()).save(any(UserProfile.class));
+    }
+
+    @Test
+    void confirmPhoneVerificationShouldRejectPhoneFromAnotherUser() {
+        UserProfile user = baseUser();
+        UserProfile other = baseUser().toBuilder().id("user-2").build();
+        when(userGateway.findById("user-1")).thenReturn(Optional.of(user));
+        when(userGateway.findByPhone("+5511912345678")).thenReturn(Optional.of(other));
+
+        assertThatThrownBy(() -> authService.confirmPhoneVerification("user-1", ConfirmPhoneVerificationCommand.builder()
+                .phone("11912345678")
+                .code("12345")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("outra conta");
+    }
+
+    // ----------------------------------------------------------------------
+    // login
+    // ----------------------------------------------------------------------
 
     @Test
     void loginShouldReturnSessionWhenCredentialsAreValid() {
@@ -562,8 +596,12 @@ class AuthServiceTest {
                 .hasMessageContaining("Ambiente restrito");
     }
 
+    // ----------------------------------------------------------------------
+    // social login (no free credits on creation anymore)
+    // ----------------------------------------------------------------------
+
     @Test
-    void googleLoginShouldCreateVerifiedUserWithInitialCredits() {
+    void googleLoginShouldCreateVerifiedUserWithoutInitialCredits() {
         when(googleIdentityService.verify("google-token")).thenReturn(GoogleIdentityView.builder()
                 .subject("google-sub")
                 .email("NOVA@TESTE.COM")
@@ -586,7 +624,8 @@ class AuthServiceTest {
         assertThat(result.getUser().getId()).isEqualTo("google-user");
         assertThat(result.getUser().getEmail()).isEqualTo("nova@teste.com");
         assertThat(result.getUser().isEmailVerified()).isTrue();
-        assertThat(result.getUser().getSellerCredits()).isEqualTo(15);
+        assertThat(result.getUser().getSellerCredits()).isZero();
+        assertThat(result.getUser().getFreeCreditsGranted()).isFalse();
         assertThat(result.getUser().getPasswordHash()).isNull();
         assertThat(result.getUser().isTermsAccepted()).isTrue();
         verify(eventPublisherGateway).publish(eq("auth.google-login"), any(Map.class));
@@ -664,11 +703,11 @@ class AuthServiceTest {
                 .build());
 
         assertThat(result.getUser().getGoogleSubject()).isEqualTo("google-sub");
-        verify(userGateway, org.mockito.Mockito.never()).save(any(UserProfile.class));
+        verify(userGateway, never()).save(any(UserProfile.class));
     }
 
     @Test
-    void facebookLoginShouldCreateVerifiedUserWithInitialCredits() {
+    void facebookLoginShouldCreateVerifiedUserWithoutInitialCredits() {
         when(facebookIdentityService.verify("fb-token")).thenReturn(FacebookIdentityView.builder()
                 .subject("fb-sub")
                 .email("NOVA@TESTE.COM")
@@ -691,7 +730,8 @@ class AuthServiceTest {
         assertThat(result.getUser().getId()).isEqualTo("fb-user");
         assertThat(result.getUser().getEmail()).isEqualTo("nova@teste.com");
         assertThat(result.getUser().isEmailVerified()).isTrue();
-        assertThat(result.getUser().getSellerCredits()).isEqualTo(15);
+        assertThat(result.getUser().getSellerCredits()).isZero();
+        assertThat(result.getUser().getFreeCreditsGranted()).isFalse();
         assertThat(result.getUser().getFacebookSubject()).isEqualTo("fb-sub");
         assertThat(result.getUser().getPasswordHash()).isNull();
         assertThat(result.getUser().isTermsAccepted()).isTrue();
@@ -773,6 +813,10 @@ class AuthServiceTest {
         verify(userGateway, org.mockito.Mockito.never()).save(any(UserProfile.class));
     }
 
+    // ----------------------------------------------------------------------
+    // me / logout / delete
+    // ----------------------------------------------------------------------
+
     @Test
     void meByUserIdShouldReturnCurrentUserData() {
         UserProfile user = baseUser();
@@ -821,6 +865,10 @@ class AuthServiceTest {
 
         verify(authSessionGateway).deleteByToken("token-123");
     }
+
+    // ----------------------------------------------------------------------
+    // forgot / reset password
+    // ----------------------------------------------------------------------
 
     @Test
     void forgotPasswordShouldReturnPreviewWhenEmailDeliveryFailsAndPreviewIsEnabled() {
@@ -955,6 +1003,30 @@ class AuthServiceTest {
     }
 
     @Test
+    void resetPasswordShouldRejectUsedToken() {
+        PasswordResetToken resetToken = PasswordResetToken.builder()
+                .token("reset-123")
+                .userId("user-1")
+                .usedAt(Instant.now())
+                .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+
+        when(passwordResetTokenGateway.findByToken("reset-123")).thenReturn(Optional.of(resetToken));
+
+        assertThatThrownBy(() -> authService.resetPassword(ResetPasswordCommand.builder()
+                .token("reset-123")
+                .newPassword("nova1234")
+                .confirmPassword("nova1234")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ja foi utilizado");
+    }
+
+    // ----------------------------------------------------------------------
+    // verifyEmail
+    // ----------------------------------------------------------------------
+
+    @Test
     void verifyEmailShouldMarkUserAsVerifiedAndUseToken() {
         EmailVerificationToken token = EmailVerificationToken.builder()
                 .token("verify-123")
@@ -1070,26 +1142,6 @@ class AuthServiceTest {
     }
 
     @Test
-    void resetPasswordShouldRejectUsedToken() {
-        PasswordResetToken resetToken = PasswordResetToken.builder()
-                .token("reset-123")
-                .userId("user-1")
-                .usedAt(Instant.now())
-                .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
-                .build();
-
-        when(passwordResetTokenGateway.findByToken("reset-123")).thenReturn(Optional.of(resetToken));
-
-        assertThatThrownBy(() -> authService.resetPassword(ResetPasswordCommand.builder()
-                .token("reset-123")
-                .newPassword("nova1234")
-                .confirmPassword("nova1234")
-                .build()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("ja foi utilizado");
-    }
-
-    @Test
     void requireAuthenticatedUserShouldRejectBlankToken() {
         assertThatThrownBy(() -> authService.requireAuthenticatedUser(" "))
                 .isInstanceOf(UnauthorizedException.class)
@@ -1113,16 +1165,30 @@ class AuthServiceTest {
                 .hasMessageContaining("Sessão inválida");
     }
 
+    // ----------------------------------------------------------------------
+    // helpers
+    // ----------------------------------------------------------------------
+
+    private PendingRegistration pendingRegistration() {
+        Instant now = Instant.now();
+        return PendingRegistration.builder()
+                .id("pending-1")
+                .email("ana@teste.com")
+                .phone("+5511912345678")
+                .name("Ana Silva")
+                .passwordHash("senha-hash")
+                .termsVersion("2026-05-05")
+                .createdAt(now)
+                .expiresAt(now.plus(15, ChronoUnit.MINUTES))
+                .build();
+    }
+
     private UserProfile baseUser() {
         return UserProfile.builder()
                 .id("user-1")
                 .name("Ana Silva")
                 .email("ana@teste.com")
-                .documentNumber("52998224725")
-                .documentType("CPF")
                 .passwordHash("hash")
-                .city("Sao Paulo")
-                .state("SP")
                 .buyerRating(4.8)
                 .sellerRating(4.9)
                 .build();

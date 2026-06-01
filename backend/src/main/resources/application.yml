@@ -56,6 +56,16 @@ application:
     session-hours: ${APP_AUTH_SESSION_HOURS:168}
     session-renewal-threshold-hours: ${APP_AUTH_SESSION_RENEWAL_THRESHOLD_HOURS:24}
     password-reset-hours: ${APP_AUTH_PASSWORD_RESET_HOURS:2}
+    pending-registration-minutes: ${APP_AUTH_PENDING_REGISTRATION_MINUTES:15}
+    phone-verification:
+      provider: ${PHONE_VERIFICATION_PROVIDER:LOG}
+      channel: ${PHONE_VERIFICATION_CHANNEL:SMS}
+      dev-bypass-code: ${PHONE_VERIFICATION_DEV_BYPASS_CODE:}
+      twilio:
+        api-base-url: ${TWILIO_VERIFY_API_BASE_URL:https://verify.twilio.com/v2}
+        account-sid: ${TWILIO_ACCOUNT_SID:}
+        auth-token: ${TWILIO_AUTH_TOKEN:}
+        verify-service-sid: ${TWILIO_VERIFY_SERVICE_SID:}
     email-verification-hours: ${APP_AUTH_EMAIL_VERIFICATION_HOURS:24}
     email-verification-required: ${APP_AUTH_EMAIL_VERIFICATION_REQUIRED:true}
     reset-base-url: ${APP_RESET_BASE_URL:http://localhost:5173}

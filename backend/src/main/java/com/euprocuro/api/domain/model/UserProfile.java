@@ -20,6 +20,8 @@ public class UserProfile {
     private String passwordHash;
     private String googleSubject;
     private String facebookSubject;
+    private String phone;
+    private boolean phoneVerified;
     private String postalCode;
     private String city;
     private String state;
@@ -30,6 +32,7 @@ public class UserProfile {
     private double sellerRating;
     private Integer sellerCredits;
     private Integer purchasedCreditsTotal;
+    private Boolean freeCreditsGranted;
     private String subscriptionPlan;
     private Instant subscriptionActiveUntil;
     private String ipAddress;

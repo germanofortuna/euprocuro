@@ -14,12 +14,16 @@ import org.springframework.web.bind.annotation.*;
 
 import com.euprocuro.api.application.service.AdminAccessService;
 import com.euprocuro.api.application.usecase.AuthUseCase;
+import com.euprocuro.api.domain.model.UserProfile;
+import com.euprocuro.api.entrypoints.rest.dto.request.ConfirmPhoneVerificationRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.ConfirmRegistrationRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.FacebookLoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ForgotPasswordRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.GoogleLoginRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.LoginRequest;
-import com.euprocuro.api.entrypoints.rest.dto.request.RegisterRequest;
 import com.euprocuro.api.entrypoints.rest.dto.request.ResetPasswordRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.StartPhoneVerificationRequest;
+import com.euprocuro.api.entrypoints.rest.dto.request.StartRegistrationRequest;
 import com.euprocuro.api.entrypoints.rest.dto.response.ActionMessageResponse;
 import com.euprocuro.api.entrypoints.rest.dto.response.AuthResponse;
 import com.euprocuro.api.entrypoints.rest.mapper.RestMapper;
@@ -45,17 +49,56 @@ public class AuthController {
     @Value("${application.auth.expose-session-token:false}")
     private boolean exposeSessionToken;
 
-    @PostMapping("/register")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ActionMessageResponse register(
-            @Valid @RequestBody RegisterRequest request,
+    @PostMapping("/register/start")
+    public ActionMessageResponse startRegistration(
+            @Valid @RequestBody StartRegistrationRequest request,
             HttpServletRequest httpRequest
     ) {
         String clientIp = clientIpResolver.resolve(httpRequest);
         turnstileVerificationService.verify(request.getTurnstileToken(), clientIp);
         return RestMapper.toResponse(
-                authUseCase.register(RestMapper.toCommand(request, clientIp))
+                authUseCase.startRegistration(RestMapper.toCommand(request, clientIp))
         );
+    }
+
+    @PostMapping("/register/confirm")
+    public AuthResponse confirmRegistration(
+            @Valid @RequestBody ConfirmRegistrationRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response
+    ) {
+        String clientIp = clientIpResolver.resolve(httpRequest);
+        return toCookieAuthResponse(
+                authUseCase.confirmRegistration(RestMapper.toCommand(request, clientIp)),
+                response
+        );
+    }
+
+    @PostMapping("/phone/start")
+    public ActionMessageResponse startPhoneVerification(
+            @Valid @RequestBody StartPhoneVerificationRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        turnstileVerificationService.verify(request.getTurnstileToken(), clientIpResolver.resolve(httpRequest));
+        authUseCase.startPhoneVerification(CurrentUserContext.userId(httpRequest), RestMapper.toCommand(request));
+        return ActionMessageResponse.builder()
+                .message("Enviamos um codigo por SMS para o numero informado.")
+                .build();
+    }
+
+    @PostMapping("/phone/confirm")
+    public MeResponse confirmPhoneVerification(
+            @Valid @RequestBody ConfirmPhoneVerificationRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        UserProfile user = authUseCase.confirmPhoneVerification(
+                CurrentUserContext.userId(httpRequest),
+                RestMapper.toCommand(request)
+        );
+        MeResponse response = RestMapper.toMeResponse(user);
+        response.setAdmin(adminAccessService.isAdmin(user.getEmail()));
+        CurrentUserContext.optionalSessionExpiresAt(httpRequest).ifPresent(response::setExpiresAt);
+        return response;
     }
 
     @PostMapping("/login")
@@ -99,7 +142,7 @@ public class AuthController {
     @GetMapping("/me")
     public MeResponse me(HttpServletRequest request) {
         String userId = CurrentUserContext.userId(request);
-        com.euprocuro.api.domain.model.UserProfile user = authUseCase.meByUserId(userId);
+        UserProfile user = authUseCase.meByUserId(userId);
         MeResponse response = RestMapper.toMeResponse(user);
         response.setAdmin(adminAccessService.isAdmin(user.getEmail()));
         CurrentUserContext.optionalSessionExpiresAt(request).ifPresent(response::setExpiresAt);

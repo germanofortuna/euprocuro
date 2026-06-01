@@ -19,12 +19,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import com.euprocuro.api.application.command.ConfirmPhoneVerificationCommand;
+import com.euprocuro.api.application.command.ConfirmRegistrationCommand;
 import com.euprocuro.api.application.command.FacebookLoginCommand;
 import com.euprocuro.api.application.command.ForgotPasswordCommand;
 import com.euprocuro.api.application.command.GoogleLoginCommand;
 import com.euprocuro.api.application.command.LoginCommand;
-import com.euprocuro.api.application.command.RegisterUserCommand;
 import com.euprocuro.api.application.command.ResetPasswordCommand;
+import com.euprocuro.api.application.command.StartPhoneVerificationCommand;
+import com.euprocuro.api.application.command.StartRegistrationCommand;
 import com.euprocuro.api.application.exception.BusinessException;
 import com.euprocuro.api.application.exception.ResourceNotFoundException;
 import com.euprocuro.api.application.exception.UnauthorizedException;
@@ -43,13 +46,16 @@ import com.euprocuro.api.domain.gateway.EventPublisherGateway;
 import com.euprocuro.api.domain.gateway.InterestGateway;
 import com.euprocuro.api.domain.gateway.OfferGateway;
 import com.euprocuro.api.domain.gateway.PasswordResetTokenGateway;
+import com.euprocuro.api.domain.gateway.PendingRegistrationGateway;
+import com.euprocuro.api.domain.gateway.PhoneVerificationGateway;
 import com.euprocuro.api.domain.gateway.SellerItemGateway;
 import com.euprocuro.api.domain.gateway.UserGateway;
 import com.euprocuro.api.domain.model.AuthSession;
-import com.euprocuro.api.domain.model.EmailVerificationToken;
 import com.euprocuro.api.domain.model.InterestPost;
 import com.euprocuro.api.domain.model.Offer;
 import com.euprocuro.api.domain.model.PasswordResetToken;
+import com.euprocuro.api.domain.model.PendingRegistration;
+import com.euprocuro.api.domain.model.PhoneVerificationChannel;
 import com.euprocuro.api.domain.model.UserProfile;
 import com.euprocuro.api.infrastructure.security.FacebookIdentityService;
 import com.euprocuro.api.infrastructure.security.GoogleIdentityService;
@@ -76,6 +82,8 @@ public class AuthService implements AuthUseCase {
     private final AuthSessionGateway authSessionGateway;
     private final PasswordResetTokenGateway passwordResetTokenGateway;
     private final EmailVerificationTokenGateway emailVerificationTokenGateway;
+    private final PendingRegistrationGateway pendingRegistrationGateway;
+    private final PhoneVerificationGateway phoneVerificationGateway;
     private final InterestGateway interestGateway;
     private final OfferGateway offerGateway;
     private final ConversationMessageGateway conversationMessageGateway;
@@ -98,8 +106,11 @@ public class AuthService implements AuthUseCase {
     @Value("${application.auth.password-reset-hours:2}")
     private long passwordResetHours;
 
-    @Value("${application.auth.email-verification-hours:24}")
-    private long emailVerificationHours;
+    @Value("${application.auth.pending-registration-minutes:15}")
+    private long pendingRegistrationMinutes;
+
+    @Value("${application.auth.phone-verification.channel:SMS}")
+    private String phoneVerificationChannel;
 
     @Value("${application.auth.reset-base-url:http://localhost:5173}")
     private String resetBaseUrl;
@@ -117,111 +128,179 @@ public class AuthService implements AuthUseCase {
     private boolean emailVerificationRequired;
 
     @Override
-    public RegistrationView register(RegisterUserCommand command) {
+    public RegistrationView startRegistration(StartRegistrationCommand command) {
         String normalizedName = normalizeName(command.getName());
         String normalizedEmail = normalizeEmail(command.getEmail());
-        String normalizedDocument = normalizeDocument(command.getDocumentNumber());
-        String documentType = documentType(normalizedDocument);
+        String normalizedPhone = normalizePhone(command.getPhone());
 
         validateName(normalizedName);
         validateEmail(normalizedEmail);
         validateHmlAccess(normalizedEmail);
-        validateDocument(normalizedDocument);
         validatePassword(command.getPassword());
-
-        userGateway.findByEmail(normalizedEmail).ifPresent(existing -> {
-            throw new BusinessException("Ja existe usuario com este e-mail.");
-        });
-        userGateway.findByDocumentNumber(normalizedDocument).ifPresent(existing -> {
-            throw new BusinessException("Ja existe usuario com este CPF/CNPJ.");
-        });
 
         if (!command.isTermsAccepted()) {
             throw new BusinessException("E necessario aceitar os termos de uso para criar a conta.");
         }
 
-        UserProfile user = userGateway.save(UserProfile.builder()
-                .name(normalizedName)
+        userGateway.findByEmail(normalizedEmail).ifPresent(existing -> {
+            throw new BusinessException("Ja existe usuario com este e-mail.");
+        });
+        userGateway.findByPhone(normalizedPhone).ifPresent(existing -> {
+            throw new BusinessException("Ja existe usuario com este telefone.");
+        });
+
+        Instant now = Instant.now();
+        pendingRegistrationGateway.deleteByEmail(normalizedEmail);
+        pendingRegistrationGateway.save(PendingRegistration.builder()
                 .email(normalizedEmail)
-                .documentNumber(normalizedDocument)
-                .documentType(documentType)
+                .phone(normalizedPhone)
+                .name(normalizedName)
                 .passwordHash(passwordEncoder.encode(command.getPassword()))
-                .postalCode(normalizePostalCode(command.getPostalCode()))
-                .city(normalizeText(command.getCity()))
-                .state(normalizeState(command.getState()))
-                .neighborhood(normalizeText(command.getNeighborhood()))
-                .country(normalizeCountry(command.getCountry()))
-                .emailVerified(!emailVerificationRequired)
+                .termsVersion(StringUtils.hasText(command.getTermsVersion())
+                        ? command.getTermsVersion()
+                        : CURRENT_TERMS_VERSION)
+                .ipAddress(command.getIpAddress())
+                .createdAt(now)
+                .expiresAt(now.plus(pendingRegistrationMinutes, ChronoUnit.MINUTES))
+                .build());
+
+        phoneVerificationGateway.startVerification(normalizedPhone, phoneChannel());
+        auditLogService.record("USER_REGISTRATION_STARTED", null, normalizedEmail,
+                "PENDING_REGISTRATION", normalizedEmail);
+
+        return RegistrationView.builder()
+                .verificationSentByEmail(false)
+                .message("Enviamos um codigo por SMS para " + maskPhone(normalizedPhone)
+                        + ". Digite-o para concluir o cadastro.")
+                .build();
+    }
+
+    @Override
+    public AuthenticatedSessionView confirmRegistration(ConfirmRegistrationCommand command) {
+        String normalizedEmail = normalizeEmail(command.getEmail());
+        PendingRegistration pending = pendingRegistrationGateway.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new BusinessException(
+                        "Nao encontramos um cadastro pendente para este e-mail. Comece novamente."));
+
+        if (pending.getExpiresAt() != null && pending.getExpiresAt().isBefore(Instant.now())) {
+            pendingRegistrationGateway.deleteByEmail(normalizedEmail);
+            throw new BusinessException("O codigo expirou. Comece o cadastro novamente.");
+        }
+
+        if (!phoneVerificationGateway.checkVerification(pending.getPhone(), command.getCode())) {
+            throw new BusinessException("Codigo invalido ou expirado.");
+        }
+
+        userGateway.findByEmail(normalizedEmail).ifPresent(existing -> {
+            pendingRegistrationGateway.deleteByEmail(normalizedEmail);
+            throw new BusinessException("Ja existe usuario com este e-mail.");
+        });
+        userGateway.findByPhone(pending.getPhone()).ifPresent(existing -> {
+            pendingRegistrationGateway.deleteByEmail(normalizedEmail);
+            throw new BusinessException("Ja existe usuario com este telefone.");
+        });
+
+        UserProfile user = userGateway.save(UserProfile.builder()
+                .name(pending.getName())
+                .email(normalizedEmail)
+                .passwordHash(pending.getPasswordHash())
+                .phone(pending.getPhone())
+                .phoneVerified(true)
+                .emailVerified(true)
                 .buyerRating(4.8)
                 .sellerRating(4.8)
                 .sellerCredits(operationalCatalogService.initialFreeCredits())
                 .purchasedCreditsTotal(0)
-                .ipAddress(command.getIpAddress())
+                .freeCreditsGranted(true)
+                .ipAddress(StringUtils.hasText(command.getIpAddress())
+                        ? command.getIpAddress()
+                        : pending.getIpAddress())
                 .termsAccepted(true)
                 .termsAcceptedAt(Instant.now())
-                .termsVersion(StringUtils.hasText(command.getTermsVersion())
-                        ? command.getTermsVersion()
+                .termsVersion(StringUtils.hasText(pending.getTermsVersion())
+                        ? pending.getTermsVersion()
                         : CURRENT_TERMS_VERSION)
+                .country("Brasil")
                 .build());
 
-        boolean verificationSent = emailVerificationRequired && sendRequiredEmailVerification(user);
-        auditLogService.record("USER_REGISTERED", user.getId(), user.getEmail(), "USER", user.getId(),
-                AuditLogService.OUTCOME_SUCCESS, Map.of("emailVerificationRequired", emailVerificationRequired));
+        pendingRegistrationGateway.deleteByEmail(normalizedEmail);
 
+        auditLogService.record("USER_REGISTERED", user.getId(), user.getEmail(), "USER", user.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("phoneVerified", true));
         eventPublisherGateway.publish("user.registered", Map.of(
                 "userId", user.getId(),
                 "email", user.getEmail(),
-                "verificationSentByEmail", verificationSent
+                "phoneVerified", true
         ));
 
-        String message = emailVerificationRequired
-                ? "Conta criada. Enviamos um link para confirmar seu e-mail antes do login."
-                : "Conta criada";
+        AuthSession session = createSession(user);
+        eventPublisherGateway.publish("auth.login", Map.of(
+                "userId", user.getId(),
+                "email", user.getEmail(),
+                "expiresAt", session.getExpiresAt()
+        ));
 
-        return RegistrationView.builder()
-                .verificationSentByEmail(verificationSent)
-                .message(message)
+        return AuthenticatedSessionView.builder()
+                .token(session.getToken())
+                .expiresAt(session.getExpiresAt())
+                .user(user)
                 .build();
     }
 
-    private boolean sendRequiredEmailVerification(UserProfile user) {
-        EmailVerificationToken verificationToken = null;
+    @Override
+    public void startPhoneVerification(String userId, StartPhoneVerificationCommand command) {
+        UserProfile user = userGateway.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Usuario nao encontrado."));
+        String normalizedPhone = normalizePhone(command.getPhone());
 
-        try {
-            verificationToken = emailVerificationTokenGateway.save(buildEmailVerificationToken(user));
-            String verificationLink = buildEmailVerificationLink(verificationToken.getToken());
-            boolean verificationSent = emailGateway.sendEmailVerificationEmail(user, verificationLink);
+        userGateway.findByPhone(normalizedPhone)
+                .filter(existing -> !Objects.equals(existing.getId(), user.getId()))
+                .ifPresent(existing -> {
+                    throw new BusinessException("Este telefone ja esta vinculado a outra conta.");
+                });
 
-            if (verificationSent) {
-                return true;
-            }
-        } catch (RuntimeException exception) {
-            rollbackPendingRegistration(user, verificationToken);
-            throw new BusinessException("Não foi possível enviar o e-mail de confirmação. Tente novamente mais tarde.");
-        }
-
-        rollbackPendingRegistration(user, verificationToken);
-        throw new BusinessException("Não foi possível enviar o e-mail de confirmação. Tente novamente mais tarde.");
+        phoneVerificationGateway.startVerification(normalizedPhone, phoneChannel());
+        auditLogService.record("USER_PHONE_VERIFICATION_STARTED", user.getId(), user.getEmail(),
+                "USER", user.getId());
     }
 
-    private EmailVerificationToken buildEmailVerificationToken(UserProfile user) {
-        Instant now = Instant.now();
-        return EmailVerificationToken.builder()
-                .token(UUID.randomUUID().toString().replace("-", ""))
-                .userId(user.getId())
-                .createdAt(now)
-                .expiresAt(now.plus(emailVerificationHours, ChronoUnit.HOURS))
-                .build();
-    }
+    @Override
+    public UserProfile confirmPhoneVerification(String userId, ConfirmPhoneVerificationCommand command) {
+        UserProfile user = userGateway.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("Usuario nao encontrado."));
+        String normalizedPhone = normalizePhone(command.getPhone());
 
-    private void rollbackPendingRegistration(UserProfile user, EmailVerificationToken verificationToken) {
-        if (verificationToken != null && StringUtils.hasText(verificationToken.getToken())) {
-            emailVerificationTokenGateway.deleteByToken(verificationToken.getToken());
+        userGateway.findByPhone(normalizedPhone)
+                .filter(existing -> !Objects.equals(existing.getId(), user.getId()))
+                .ifPresent(existing -> {
+                    throw new BusinessException("Este telefone ja esta vinculado a outra conta.");
+                });
+
+        if (!phoneVerificationGateway.checkVerification(normalizedPhone, command.getCode())) {
+            throw new BusinessException("Codigo invalido ou expirado.");
         }
 
-        if (user != null && StringUtils.hasText(user.getId())) {
-            userGateway.deleteById(user.getId());
-        }
+        boolean grantCredits = !Boolean.TRUE.equals(user.getFreeCreditsGranted());
+        int credits = grantCredits
+                ? sellerCreditsOf(user) + operationalCatalogService.initialFreeCredits()
+                : sellerCreditsOf(user);
+
+        UserProfile updated = userGateway.save(user.toBuilder()
+                .phone(normalizedPhone)
+                .phoneVerified(true)
+                .sellerCredits(credits)
+                .freeCreditsGranted(true)
+                .build());
+
+        auditLogService.record("USER_PHONE_VERIFIED", user.getId(), user.getEmail(), "USER", user.getId(),
+                AuditLogService.OUTCOME_SUCCESS, Map.of("creditsGranted", grantCredits));
+        eventPublisherGateway.publish("user.phone-verified", Map.of(
+                "userId", user.getId(),
+                "email", user.getEmail(),
+                "creditsGranted", grantCredits
+        ));
+
+        return updated;
     }
 
     @Override
@@ -284,8 +363,9 @@ public class AuthService implements AuthUseCase {
                         .googleSubject(googleSubject)
                         .buyerRating(4.8)
                         .sellerRating(4.8)
-                        .sellerCredits(operationalCatalogService.initialFreeCredits())
+                        .sellerCredits(0)
                         .purchasedCreditsTotal(0)
+                        .freeCreditsGranted(false)
                         .ipAddress(command.getIpAddress())
                         .termsAccepted(true)
                         .termsAcceptedAt(Instant.now())
@@ -343,8 +423,9 @@ public class AuthService implements AuthUseCase {
                         .facebookSubject(facebookSubject)
                         .buyerRating(4.8)
                         .sellerRating(4.8)
-                        .sellerCredits(operationalCatalogService.initialFreeCredits())
+                        .sellerCredits(0)
                         .purchasedCreditsTotal(0)
+                        .freeCreditsGranted(false)
                         .ipAddress(command.getIpAddress())
                         .termsAccepted(true)
                         .termsAcceptedAt(Instant.now())
@@ -561,8 +642,9 @@ public class AuthService implements AuthUseCase {
             throw new BusinessException("Token de verificacao invalido.");
         }
 
-        EmailVerificationToken verificationToken = emailVerificationTokenGateway.findByToken(token)
-                .orElseThrow(() -> new ResourceNotFoundException("Token de verificacao nao encontrado."));
+        com.euprocuro.api.domain.model.EmailVerificationToken verificationToken =
+                emailVerificationTokenGateway.findByToken(token)
+                        .orElseThrow(() -> new ResourceNotFoundException("Token de verificacao nao encontrado."));
 
         if (verificationToken.getUsedAt() != null) {
             UserProfile user = userGateway.findById(verificationToken.getUserId())
@@ -689,16 +771,6 @@ public class AuthService implements AuthUseCase {
         }
     }
 
-    private void validateDocument(String documentNumber) {
-        boolean valid = documentNumber.length() == 11
-                ? isValidCpf(documentNumber)
-                : documentNumber.length() == 14 && isValidCnpj(documentNumber);
-
-        if (!valid) {
-            throw new BusinessException("Informe um CPF ou CNPJ valido.");
-        }
-    }
-
     private void validatePassword(String password) {
         String value = Optional.ofNullable(password).orElse("");
         if (value.length() < 8 || !value.matches(".*[A-Za-z].*") || !value.matches(".*\\d.*")) {
@@ -718,89 +790,38 @@ public class AuthService implements AuthUseCase {
         return Optional.ofNullable(value).orElse("").trim();
     }
 
-    private String normalizeState(String value) {
-        String state = normalizeText(value).toUpperCase(Locale.ROOT);
-        if (state.length() > 2) {
-            throw new BusinessException("Informe a UF com 2 letras.");
-        }
-        return state;
-    }
-
-    private String normalizePostalCode(String value) {
+    private String normalizePhone(String value) {
         String digits = Optional.ofNullable(value).orElse("").replaceAll("\\D", "");
-        if (!StringUtils.hasText(digits)) {
-            return null;
+        if (digits.startsWith("55") && digits.length() > 11) {
+            digits = digits.substring(2);
         }
-        if (digits.length() != 8) {
-            throw new BusinessException("Informe um CEP valido com 8 digitos.");
+        if (!digits.matches("\\d{10,11}")) {
+            throw new BusinessException("Informe um telefone valido com DDD (ex: (11) 91234-5678).");
         }
-        return digits.substring(0, 5) + "-" + digits.substring(5);
+        return "+55" + digits;
     }
 
-    private String normalizeCountry(String value) {
-        String country = normalizeText(value);
-        return StringUtils.hasText(country) ? country : "Brasil";
-    }
-
-    private String normalizeDocument(String value) {
-        return Optional.ofNullable(value).orElse("").replaceAll("\\D", "");
-    }
-
-    private String documentType(String documentNumber) {
-        return documentNumber.length() == 11 ? "CPF" : "CNPJ";
-    }
-
-    private boolean isValidCpf(String documentNumber) {
-        if (hasAllSameDigits(documentNumber)) {
-            return false;
+    private String maskPhone(String phoneE164) {
+        if (phoneE164 == null || phoneE164.length() < 4) {
+            return "número informado";
         }
-
-        int firstDigit = calculateCpfDigit(documentNumber, 9);
-        int secondDigit = calculateCpfDigit(documentNumber, 10);
-        return firstDigit == Character.getNumericValue(documentNumber.charAt(9))
-                && secondDigit == Character.getNumericValue(documentNumber.charAt(10));
+        return "•••••-" + phoneE164.substring(phoneE164.length() - 4);
     }
 
-    private int calculateCpfDigit(String documentNumber, int length) {
-        int sum = 0;
-        for (int index = 0; index < length; index++) {
-            sum += Character.getNumericValue(documentNumber.charAt(index)) * (length + 1 - index);
+    private PhoneVerificationChannel phoneChannel() {
+        try {
+            return PhoneVerificationChannel.valueOf(normalizeText(phoneVerificationChannel).toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            return PhoneVerificationChannel.SMS;
         }
-        int remainder = (sum * 10) % 11;
-        return remainder == 10 ? 0 : remainder;
     }
 
-    private boolean isValidCnpj(String documentNumber) {
-        if (hasAllSameDigits(documentNumber)) {
-            return false;
-        }
-
-        int firstDigit = calculateCnpjDigit(documentNumber, new int[] {5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2});
-        int secondDigit = calculateCnpjDigit(documentNumber, new int[] {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2});
-        return firstDigit == Character.getNumericValue(documentNumber.charAt(12))
-                && secondDigit == Character.getNumericValue(documentNumber.charAt(13));
-    }
-
-    private int calculateCnpjDigit(String documentNumber, int[] weights) {
-        int sum = 0;
-        for (int index = 0; index < weights.length; index++) {
-            sum += Character.getNumericValue(documentNumber.charAt(index)) * weights[index];
-        }
-        int remainder = sum % 11;
-        return remainder < 2 ? 0 : 11 - remainder;
-    }
-
-    private boolean hasAllSameDigits(String documentNumber) {
-        return documentNumber.chars().distinct().count() == 1;
+    private int sellerCreditsOf(UserProfile user) {
+        return user.getSellerCredits() == null ? 0 : user.getSellerCredits();
     }
 
     private String buildResetLink(String token) {
         String normalizedBase = resetBaseUrl.endsWith("/") ? resetBaseUrl.substring(0, resetBaseUrl.length() - 1) : resetBaseUrl;
         return normalizedBase + "?mode=reset&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
-    }
-
-    private String buildEmailVerificationLink(String token) {
-        String normalizedBase = resetBaseUrl.endsWith("/") ? resetBaseUrl.substring(0, resetBaseUrl.length() - 1) : resetBaseUrl;
-        return normalizedBase + "?mode=verify-email&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
     }
 }

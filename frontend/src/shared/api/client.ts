@@ -273,7 +273,10 @@ export function connectChatSocket({ onMessage, onOpen, onClose, onError }: {
 export const login = (payload: unknown) => request<StoredSession>("/auth/login", { method: "POST", body: JSON.stringify(payload) });
 export const googleLogin = (payload: unknown) => request<StoredSession>("/auth/google", { method: "POST", body: JSON.stringify(payload) });
 export const facebookLogin = (payload: unknown) => request<StoredSession>("/auth/facebook", { method: "POST", body: JSON.stringify(payload) });
-export const register = (payload: unknown) => request<{ message?: string }>("/auth/register", { method: "POST", body: JSON.stringify(payload) });
+export const registerStart = (payload: unknown) => request<{ message?: string }>("/auth/register/start", { method: "POST", body: JSON.stringify(payload) });
+export const registerConfirm = (payload: unknown) => request<StoredSession>("/auth/register/confirm", { method: "POST", body: JSON.stringify(payload) });
+export const startPhoneVerification = (payload: unknown) => request<{ message?: string }>("/auth/phone/start", { method: "POST", body: JSON.stringify(payload) });
+export const confirmPhoneVerification = (payload: unknown) => request<Record<string, unknown>>("/auth/phone/confirm", { method: "POST", body: JSON.stringify(payload) });
 export const fetchMe = () => request<Record<string, unknown>>("/auth/me");
 export const logout = () => request<null>("/auth/logout", { method: "POST" });
 export const deleteAccount = () => request<null>("/auth/me", { method: "DELETE" });

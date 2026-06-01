@@ -16,6 +16,7 @@ import { readImageFile } from "@/shared/lib/image-upload";
 import { rememberInterestListHref } from "@/shared/lib/interest-list-navigation";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { PhoneVerificationCard } from "@/features/auth/phone-verification-card";
 
 type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
 
@@ -78,6 +79,7 @@ export function MyInterestsPage() {
         </div>
         <Link className="button button--primary" href="/cadastrar-interesse"><Plus size={16} /> Publicar nova procura</Link>
       </div>
+      <PhoneVerificationCard />
       <div className="stat-grid">
         <StatCard title="Minhas Procuras Ativas" value={interests.length} detail={`${interests.filter((item) => item.boostedUntil).length} com boost ativo`} icon={Search} />
         <StatCard title="Propostas Recebidas" value={receivedOffers.length} detail="Acompanhe respostas das suas procuras" icon={MessageSquare} />

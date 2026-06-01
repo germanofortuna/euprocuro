@@ -10,4 +10,6 @@ public interface SpringDataUserRepository extends MongoRepository<UserDocument, 
     Optional<UserDocument> findByEmailIgnoreCase(String email);
 
     Optional<UserDocument> findByDocumentNumber(String documentNumber);
+
+    Optional<UserDocument> findByPhone(String phone);
 }

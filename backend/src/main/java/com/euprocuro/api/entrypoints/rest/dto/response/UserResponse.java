@@ -11,6 +11,8 @@ public class UserResponse {
     String id;
     String name;
     String email;
+    String phone;
+    boolean phoneVerified;
     String postalCode;
     String city;
     String state;
