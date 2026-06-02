@@ -3487,12 +3487,17 @@ small {
 }
 
 .auth-modal .auth-social-block {
-  gap: 8px;
-  margin: 10px 0;
+  gap: 12px;
+  margin: 12px 0;
 }
 
 .auth-modal .auth-social-block > span {
   font-size: 0.74rem;
+  margin: 2px 0;
+}
+
+.auth-modal .auth-social-block .terms-box {
+  margin: 2px 0 0;
 }
 
 .auth-modal .google-signin,
@@ -3513,6 +3518,85 @@ small {
 .auth-modal .auth-email-cta {
   width: 100%;
   min-height: 46px;
+}
+
+.auth-modal .auth-form-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.auth-modal .auth-form-foot:has(> :only-child) {
+  justify-content: flex-start;
+}
+
+.phone-verify-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.phone-verify-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.phone-verify-card__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary, #4f46e5) 12%, transparent);
+  color: var(--primary, #4f46e5);
+}
+
+.phone-verify-card__head h2 {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+  line-height: 1.25;
+}
+
+.phone-verify-card__head p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.phone-verify-card__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+}
+
+.phone-verify-card__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.phone-verify-card__form .inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.auth-social-buttons--gated {
+  cursor: not-allowed;
+}
+
+.auth-social-buttons--gated > * {
+  opacity: 0.55;
+  filter: saturate(0.6);
+  pointer-events: none;
 }
 
 .auth-reveal {

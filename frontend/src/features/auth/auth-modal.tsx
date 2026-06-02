@@ -56,7 +56,7 @@ function passwordStatus(password: string) {
 }
 
 export function AuthModal() {
-  const { authModal, closeAuthModal, setAuthMode, signIn, signInWithGoogle, signInWithFacebook, startSignUp, confirmSignUp, setFeedback, operationalSettings } = usePlatform();
+  const { authModal, closeAuthModal, setAuthMode, signIn, signInWithGoogle, signInWithFacebook, startSignUp, confirmSignUp, socialPhoneStart, socialPhoneConfirm, setFeedback, operationalSettings } = usePlatform();
   const { termsVersion } = useLegalContent();
   const [loginForm, setLoginForm] = useState(initialLogin);
   const [registerForm, setRegisterForm] = useState(initialRegister);
@@ -73,6 +73,7 @@ export function AuthModal() {
   const [verificationCode, setVerificationCode] = useState("");
   const [pendingEmail, setPendingEmail] = useState("");
   const [resendIn, setResendIn] = useState(0);
+  const [social, setSocial] = useState<{ token: string; phone: string; step: "phone" | "code" } | null>(null);
 
   useEffect(() => {
     setTurnstileToken("");
@@ -81,6 +82,7 @@ export function AuthModal() {
     setRegisterEmailOpen(false);
     setRegisterStep("form");
     setVerificationCode("");
+    setSocial(null);
   }, [authModal.mode, authModal.visible]);
 
   useEffect(() => {
@@ -98,7 +100,10 @@ export function AuthModal() {
   const handleGoogleCredential = useCallback(async (accessToken: string) => {
     setIsSubmitting(true);
     try {
-      await signInWithGoogle(accessToken, turnstileToken || undefined);
+      const result = await signInWithGoogle(accessToken, turnstileToken || undefined);
+      if (result.phoneRequired && result.socialToken) {
+        setSocial({ token: result.socialToken, phone: "", step: "phone" });
+      }
     } catch (error) {
       setTurnstileToken("");
       setTurnstileResetKey((current) => current + 1);
@@ -115,7 +120,10 @@ export function AuthModal() {
   const handleFacebookCredential = useCallback(async (accessToken: string) => {
     setIsSubmitting(true);
     try {
-      await signInWithFacebook(accessToken, turnstileToken || undefined);
+      const result = await signInWithFacebook(accessToken, turnstileToken || undefined);
+      if (result.phoneRequired && result.socialToken) {
+        setSocial({ token: result.socialToken, phone: "", step: "phone" });
+      }
     } catch (error) {
       setTurnstileToken("");
       setTurnstileResetKey((current) => current + 1);
@@ -128,6 +136,57 @@ export function AuthModal() {
       setIsSubmitting(false);
     }
   }, [setFeedback, signInWithFacebook, turnstileToken]);
+
+  const submitSocialPhone: FormSubmitHandler = async (event) => {
+    event.preventDefault();
+    if (!social) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await socialPhoneStart(social.token, social.phone);
+      setSocial({ ...social, step: "code" });
+      setVerificationCode("");
+      setResendIn(RESEND_COOLDOWN_SECONDS);
+      setFeedback({ type: "info", title: "Confirme seu telefone", message: "Enviamos um código por SMS para o número informado." });
+    } catch (error) {
+      setFeedback({ type: "error", title: "Não foi possível enviar o código", message: error instanceof Error ? error.message : "Confira o número e tente novamente." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitSocialCode: FormSubmitHandler = async (event) => {
+    event.preventDefault();
+    if (!social) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await socialPhoneConfirm(social.token, social.phone, verificationCode.trim());
+      setSocial(null);
+    } catch (error) {
+      setFeedback({ type: "error", title: "Código inválido", message: error instanceof Error ? error.message : "Confira o código e tente novamente." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resendSocialCode = async () => {
+    if (!social || resendIn > 0) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await socialPhoneStart(social.token, social.phone);
+      setResendIn(RESEND_COOLDOWN_SECONDS);
+      setFeedback({ type: "info", title: "Código reenviado", message: "Enviamos um novo código por SMS." });
+    } catch (error) {
+      setFeedback({ type: "error", title: "Não foi possível reenviar", message: error instanceof Error ? error.message : "Tente novamente em instantes." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (!authModal.visible) {
     return null;
@@ -297,15 +356,34 @@ export function AuthModal() {
     setFeedback({ type: "warning", title: "Abra os termos primeiro", message: TERMS_GATE_MESSAGE });
   }
 
-  const title = {
-    login: "Acesse sua conta",
-    register: "Crie sua conta",
-    forgot: "Recuperar acesso",
-    reset: "Criar nova senha"
-  }[authModal.mode];
+  function blockSocialTerms() {
+    if (shouldUseTurnstile && !turnstileToken) {
+      setFeedback({ type: "warning", title: "Verificacao de seguranca", message: "Confirme a verificacao de seguranca para continuar." });
+      return;
+    }
+    const message = registerForm.termsOpened
+      ? "Marque o aceite dos Termos de Uso para continuar."
+      : TERMS_GATE_MESSAGE;
+    setTermsReminder(message);
+    setFeedback({ type: "warning", title: "Aceite os termos", message });
+  }
 
+  const title = social
+    ? "Verifique seu telefone"
+    : {
+        login: "Acesse sua conta",
+        register: "Crie sua conta",
+        forgot: "Recuperar acesso",
+        reset: "Criar nova senha"
+      }[authModal.mode];
+
+  const emailExpanded = (authModal.mode === "login" && loginEmailOpen)
+    || (authModal.mode === "register" && registerEmailOpen);
   const showSocial = (isGoogleSignInEnabled || isFacebookSignInEnabled)
-    && (authModal.mode === "login" || (authModal.mode === "register" && registerStep === "form"));
+    && (authModal.mode === "login" || (authModal.mode === "register" && registerStep === "form"))
+    && !emailExpanded;
+  const socialTermsGate = authModal.mode === "register";
+  const socialTermsBlocked = socialTermsGate && !registerForm.termsAccepted;
 
   const turnstileNeeded = authModal.mode === "login"
     || authModal.mode === "forgot"
@@ -313,6 +391,16 @@ export function AuthModal() {
   const turnstile = shouldUseTurnstile && turnstileNeeded
     ? <TurnstileWidget onToken={handleTurnstileToken} resetKey={turnstileResetKey} />
     : null;
+
+  const termsBox = (
+    <div className={termsReminder ? "terms-box terms-box--attention" : "terms-box"}>
+      <label className={!registerForm.termsOpened ? "is-disabled checkbox-row" : "checkbox-row"} title={!registerForm.termsOpened ? TERMS_GATE_MESSAGE : undefined} onClickCapture={!registerForm.termsOpened ? (event) => { if ((event.target as HTMLElement).closest(".text-button--inline")) { return; } event.preventDefault(); remindTermsGate(); } : undefined}>
+        <input type="checkbox" checked={registerForm.termsAccepted} aria-disabled={!registerForm.termsOpened} aria-describedby="terms-acceptance-helper" onChange={(event) => { if (!registerForm.termsOpened) { event.preventDefault(); remindTermsGate(); return; } setRegisterForm((current) => ({ ...current, termsAccepted: event.target.checked })); }} />
+        <span>Li e aceito os <button type="button" className="text-button text-button--inline" onClick={openTerms}>Termos de Uso da plataforma</button></span>
+      </label>
+      <small id="terms-acceptance-helper" className={termsReminder ? "terms-helper terms-helper--warning" : "terms-helper"}>{registerForm.termsOpened ? `Versão dos termos: ${termsVersion}` : termsReminder || "Abra os termos para habilitar o aceite."}</small>
+    </div>
+  );
 
   return (
     <>
@@ -327,6 +415,32 @@ export function AuthModal() {
             </button>
           </div>
 
+          {social ? (
+            social.step === "phone" ? (
+              <form className="stack-form auth-reveal" onSubmit={submitSocialPhone}>
+                <p className="auth-code-hint">Conta conectada! Para concluir e liberar seus créditos, confirme um número de celular por SMS.</p>
+                <label>Celular (com DDD)
+                  <input type="tel" inputMode="numeric" placeholder="(11) 91234-5678" value={social.phone} onChange={(event) => setSocial((current) => current ? { ...current, phone: event.target.value } : current)} required />
+                </label>
+                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Enviando código..." : "Enviar código por SMS"}</Button>
+              </form>
+            ) : (
+              <form className="stack-form" onSubmit={submitSocialCode}>
+                <p className="auth-code-hint">Enviamos um código por SMS para <strong>{social.phone}</strong>. Digite-o para concluir.</p>
+                <label>Código de verificação
+                  <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, ""))} required />
+                </label>
+                <Button type="submit" disabled={isSubmitting || verificationCode.trim().length < 4}>{isSubmitting ? "Confirmando..." : "Confirmar e entrar"}</Button>
+                <div className="auth-form-foot">
+                  <button type="button" className="text-button" onClick={() => setSocial((current) => current ? { ...current, step: "phone" } : current)}>← Trocar número</button>
+                  <button type="button" className="text-button" onClick={resendSocialCode} disabled={isSubmitting || resendIn > 0}>
+                    {resendIn > 0 ? `Reenviar em ${resendIn}s` : "Reenviar código"}
+                  </button>
+                </div>
+              </form>
+            )
+          ) : (
+          <>
           {authModal.mode !== "reset" && authModal.mode !== "forgot" ? (
             <div className="segmented-control">
               <button type="button" className={authModal.mode === "login" ? "is-active" : ""} onClick={() => setAuthMode("login")}>Entrar</button>
@@ -336,7 +450,10 @@ export function AuthModal() {
 
           {showSocial ? (
             <div className="auth-social-block">
-              <div className="auth-social-buttons">
+              <div
+                className={socialTermsBlocked ? "auth-social-buttons auth-social-buttons--gated" : "auth-social-buttons"}
+                onClickCapture={socialTermsBlocked ? (event) => { event.preventDefault(); event.stopPropagation(); blockSocialTerms(); } : undefined}
+              >
                 <GoogleSignInButton
                   disabled={isSubmitting || (shouldUseTurnstile && !turnstileToken)}
                   label={authModal.mode === "register" ? "signup_with" : "continue_with"}
@@ -348,6 +465,7 @@ export function AuthModal() {
                   onCredential={handleFacebookCredential}
                 />
               </div>
+              {socialTermsGate ? termsBox : null}
               <span>ou use seu e-mail</span>
             </div>
           ) : null}
@@ -366,7 +484,10 @@ export function AuthModal() {
                   <input type="password" value={loginForm.password} onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))} required />
                 </label>
                 <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Entrando..." : "Entrar na plataforma"}</Button>
-                <button type="button" className="text-button" onClick={() => setAuthMode("forgot")}>Esqueci minha senha</button>
+                <div className="auth-form-foot">
+                  <button type="button" className="text-button" onClick={() => setLoginEmailOpen(false)}>← Voltar</button>
+                  <button type="button" className="text-button" onClick={() => setAuthMode("forgot")}>Esqueci minha senha</button>
+                </div>
               </form>
             ) : (
               <Button type="button" variant="outline" className="auth-email-cta" onClick={() => setLoginEmailOpen(true)}>Entrar com e-mail e senha</Button>
@@ -380,14 +501,11 @@ export function AuthModal() {
                 <label>E-mail<input type="email" value={registerForm.email} onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))} required /></label>
                 <label>Celular (com DDD)<input type="tel" inputMode="numeric" placeholder="(11) 91234-5678" value={registerForm.phone} onChange={(event) => setRegisterForm((current) => ({ ...current, phone: event.target.value }))} required /></label>
                 <label>Senha<input type="password" value={registerForm.password} onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))} required /><small>{passwordStatus(registerForm.password)}</small></label>
-                <div className={termsReminder ? "terms-box terms-box--attention" : "terms-box"}>
-                  <label className={!registerForm.termsOpened ? "is-disabled checkbox-row" : "checkbox-row"} title={!registerForm.termsOpened ? TERMS_GATE_MESSAGE : undefined} onClickCapture={!registerForm.termsOpened ? (event) => { if ((event.target as HTMLElement).closest(".text-button--inline")) { return; } event.preventDefault(); remindTermsGate(); } : undefined}>
-                    <input type="checkbox" checked={registerForm.termsAccepted} aria-disabled={!registerForm.termsOpened} aria-describedby="terms-acceptance-helper" onChange={(event) => { if (!registerForm.termsOpened) { event.preventDefault(); remindTermsGate(); return; } setRegisterForm((current) => ({ ...current, termsAccepted: event.target.checked })); }} />
-                    <span>Li e aceito os <button type="button" className="text-button text-button--inline" onClick={openTerms}>Termos de Uso da plataforma</button></span>
-                  </label>
-                  <small id="terms-acceptance-helper" className={termsReminder ? "terms-helper terms-helper--warning" : "terms-helper"}>{registerForm.termsOpened ? `Versão dos termos: ${termsVersion}` : termsReminder || "Abra os termos para habilitar o aceite."}</small>
-                </div>
+                {termsBox}
                 <Button type="submit" disabled={isSubmitting || !registerForm.termsAccepted}>{isSubmitting ? "Enviando código..." : "Continuar"}</Button>
+                <div className="auth-form-foot">
+                  <button type="button" className="text-button" onClick={() => setRegisterEmailOpen(false)}>← Voltar</button>
+                </div>
               </form>
             ) : (
               <Button type="button" variant="outline" className="auth-email-cta" onClick={() => setRegisterEmailOpen(true)}>Criar conta com e-mail</Button>
@@ -424,6 +542,8 @@ export function AuthModal() {
               <Button type="submit">Salvar nova senha</Button>
             </form>
           ) : null}
+          </>
+          )}
         </div>
       </div>
       <LegalModal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} />

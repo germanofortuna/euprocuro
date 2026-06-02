@@ -107,6 +107,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
                     || "/api/auth/register/start".equals(uri)
                     || "/api/auth/register/confirm".equals(uri)
                     || "/api/auth/phone/start".equals(uri)
+                    || "/api/auth/social/phone/start".equals(uri)
+                    || "/api/auth/social/phone/confirm".equals(uri)
                     || "/api/auth/forgot-password".equals(uri)
                     || "/api/auth/reset-password".equals(uri)
                     || uri.matches("^/api/offers/[^/]+/messages$");

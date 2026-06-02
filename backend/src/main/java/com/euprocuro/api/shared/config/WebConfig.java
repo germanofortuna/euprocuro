@@ -55,6 +55,8 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/auth/facebook",
                         "/api/auth/register/start",
                         "/api/auth/register/confirm",
+                        "/api/auth/social/phone/start",
+                        "/api/auth/social/phone/confirm",
                         "/api/auth/forgot-password",
                         "/api/auth/reset-password",
                         "/api/auth/verify-email",

@@ -10,6 +10,7 @@ import type {
   OperationalSettings,
   PublicContentCatalog,
   SellerItemGroup,
+  SocialAuthResult,
   StoredSession
 } from "./types";
 
@@ -271,8 +272,10 @@ export function connectChatSocket({ onMessage, onOpen, onClose, onError }: {
 }
 
 export const login = (payload: unknown) => request<StoredSession>("/auth/login", { method: "POST", body: JSON.stringify(payload) });
-export const googleLogin = (payload: unknown) => request<StoredSession>("/auth/google", { method: "POST", body: JSON.stringify(payload) });
-export const facebookLogin = (payload: unknown) => request<StoredSession>("/auth/facebook", { method: "POST", body: JSON.stringify(payload) });
+export const googleLogin = (payload: unknown) => request<SocialAuthResult>("/auth/google", { method: "POST", body: JSON.stringify(payload) });
+export const facebookLogin = (payload: unknown) => request<SocialAuthResult>("/auth/facebook", { method: "POST", body: JSON.stringify(payload) });
+export const startSocialPhoneVerification = (payload: unknown) => request<{ message?: string }>("/auth/social/phone/start", { method: "POST", body: JSON.stringify(payload) });
+export const confirmSocialPhoneVerification = (payload: unknown) => request<StoredSession>("/auth/social/phone/confirm", { method: "POST", body: JSON.stringify(payload) });
 export const registerStart = (payload: unknown) => request<{ message?: string }>("/auth/register/start", { method: "POST", body: JSON.stringify(payload) });
 export const registerConfirm = (payload: unknown) => request<StoredSession>("/auth/register/confirm", { method: "POST", body: JSON.stringify(payload) });
 export const startPhoneVerification = (payload: unknown) => request<{ message?: string }>("/auth/phone/start", { method: "POST", body: JSON.stringify(payload) });
