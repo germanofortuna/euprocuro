@@ -67,8 +67,7 @@ export function AuthModal() {
   const [termsReminder, setTermsReminder] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
-  const [loginEmailOpen, setLoginEmailOpen] = useState(false);
-  const [registerEmailOpen, setRegisterEmailOpen] = useState(false);
+  const [emailMode, setEmailMode] = useState<"closed" | "login" | "register">("closed");
   const [registerStep, setRegisterStep] = useState<"form" | "code">("form");
   const [verificationCode, setVerificationCode] = useState("");
   const [pendingEmail, setPendingEmail] = useState("");
@@ -78,8 +77,9 @@ export function AuthModal() {
   useEffect(() => {
     setTurnstileToken("");
     setTurnstileResetKey((current) => current + 1);
-    setLoginEmailOpen(false);
-    setRegisterEmailOpen(false);
+    // "register" como intencao de entrada abre direto o formulario de cadastro por e-mail;
+    // os botoes sociais continuam acessiveis pelo botao "Voltar".
+    setEmailMode(authModal.mode === "register" ? "register" : "closed");
     setRegisterStep("form");
     setVerificationCode("");
     setSocial(null);
@@ -247,10 +247,6 @@ export function AuthModal() {
 
   const submitRegister: FormSubmitHandler = async (event) => {
     event.preventDefault();
-    if (!registerForm.termsOpened || !registerForm.termsAccepted) {
-      setFeedback({ type: "error", title: "Aceite os termos", message: "Abra os Termos de Uso e marque o aceite para criar sua conta." });
-      return;
-    }
     if (!requireTurnstile()) {
       return;
     }
@@ -356,39 +352,25 @@ export function AuthModal() {
     setFeedback({ type: "warning", title: "Abra os termos primeiro", message: TERMS_GATE_MESSAGE });
   }
 
-  function blockSocialTerms() {
-    if (shouldUseTurnstile && !turnstileToken) {
-      setFeedback({ type: "warning", title: "Verificacao de seguranca", message: "Confirme a verificacao de seguranca para continuar." });
-      return;
-    }
-    const message = registerForm.termsOpened
-      ? "Marque o aceite dos Termos de Uso para continuar."
-      : TERMS_GATE_MESSAGE;
-    setTermsReminder(message);
-    setFeedback({ type: "warning", title: "Aceite os termos", message });
-  }
-
+  const isMainAuth = authModal.mode === "login" || authModal.mode === "register";
   const title = social
     ? "Verifique seu telefone"
-    : {
-        login: "Acesse sua conta",
-        register: "Crie sua conta",
-        forgot: "Recuperar acesso",
-        reset: "Criar nova senha"
-      }[authModal.mode];
+    : authModal.mode === "forgot"
+      ? "Recuperar acesso"
+      : authModal.mode === "reset"
+        ? "Criar nova senha"
+        : emailMode === "register"
+          ? "Crie sua conta"
+          : "Acesse sua conta";
 
-  const emailExpanded = (authModal.mode === "login" && loginEmailOpen)
-    || (authModal.mode === "register" && registerEmailOpen);
+  const emailExpanded = emailMode !== "closed";
   const showSocial = (isGoogleSignInEnabled || isFacebookSignInEnabled)
-    && (authModal.mode === "login" || (authModal.mode === "register" && registerStep === "form"))
-    && !emailExpanded;
-  const socialTermsGate = authModal.mode === "register";
-  const socialTermsBlocked = socialTermsGate && !registerForm.termsAccepted;
+    && isMainAuth
+    && !emailExpanded
+    && !social;
 
-  const turnstileNeeded = authModal.mode === "login"
-    || authModal.mode === "forgot"
-    || (authModal.mode === "register" && registerStep === "form");
-  const turnstile = shouldUseTurnstile && turnstileNeeded
+  const turnstileNeeded = isMainAuth || authModal.mode === "forgot";
+  const turnstile = shouldUseTurnstile && turnstileNeeded && !social
     ? <TurnstileWidget onToken={handleTurnstileToken} resetKey={turnstileResetKey} />
     : null;
 
@@ -441,78 +423,70 @@ export function AuthModal() {
             )
           ) : (
           <>
-          {authModal.mode !== "reset" && authModal.mode !== "forgot" ? (
-            <div className="segmented-control">
-              <button type="button" className={authModal.mode === "login" ? "is-active" : ""} onClick={() => setAuthMode("login")}>Entrar</button>
-              <button type="button" className={authModal.mode === "register" ? "is-active" : ""} onClick={() => setAuthMode("register")}>Criar conta</button>
-            </div>
-          ) : null}
-
           {showSocial ? (
             <div className="auth-social-block">
-              <div
-                className={socialTermsBlocked ? "auth-social-buttons auth-social-buttons--gated" : "auth-social-buttons"}
-                onClickCapture={socialTermsBlocked ? (event) => { event.preventDefault(); event.stopPropagation(); blockSocialTerms(); } : undefined}
-              >
+              <div className="auth-social-buttons">
                 <GoogleSignInButton
                   disabled={isSubmitting || (shouldUseTurnstile && !turnstileToken)}
-                  label={authModal.mode === "register" ? "signup_with" : "continue_with"}
+                  label="continue_with"
                   onCredential={handleGoogleCredential}
                 />
                 <FacebookSignInButton
                   disabled={isSubmitting || (shouldUseTurnstile && !turnstileToken)}
-                  label={authModal.mode === "register" ? "signup_with" : "continue_with"}
+                  label="continue_with"
                   onCredential={handleFacebookCredential}
                 />
               </div>
-              {socialTermsGate ? termsBox : null}
+              <small className="auth-social-terms">Ao continuar com Google ou Facebook, você aceita os <button type="button" className="text-button text-button--inline" onClick={openTerms}>Termos de Uso</button>.</small>
               <span>ou use seu e-mail</span>
             </div>
           ) : null}
 
           {turnstile ? <div className="auth-turnstile">{turnstile}</div> : null}
 
-          {authModal.mode === "login" ? (
-            loginEmailOpen ? (
-              <form className="stack-form auth-reveal" onSubmit={submitLogin}>
-                <label>
-                  E-mail
-                  <input type="email" value={loginForm.email} onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))} required />
-                </label>
-                <label>
-                  Senha
-                  <input type="password" value={loginForm.password} onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))} required />
-                </label>
+          {isMainAuth && emailMode === "closed" ? (
+            <Button type="button" variant="outline" className="auth-email-cta" onClick={() => setEmailMode("login")}>Entrar com e-mail e senha</Button>
+          ) : null}
+
+          {isMainAuth && emailMode === "login" ? (
+            <form className="stack-form auth-reveal" onSubmit={submitLogin}>
+              <label>
+                E-mail
+                <input type="email" value={loginForm.email} onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))} required />
+              </label>
+              <label>
+                Senha
+                <input type="password" value={loginForm.password} onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))} required />
+              </label>
+              <div className="auth-cta-row">
                 <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Entrando..." : "Entrar na plataforma"}</Button>
-                <div className="auth-form-foot">
-                  <button type="button" className="text-button" onClick={() => setLoginEmailOpen(false)}>← Voltar</button>
-                  <button type="button" className="text-button" onClick={() => setAuthMode("forgot")}>Esqueci minha senha</button>
-                </div>
-              </form>
-            ) : (
-              <Button type="button" variant="outline" className="auth-email-cta" onClick={() => setLoginEmailOpen(true)}>Entrar com e-mail e senha</Button>
-            )
+                <Button type="button" variant="outline" onClick={() => setEmailMode("register")}>Criar conta</Button>
+              </div>
+              <div className="auth-form-foot">
+                <button type="button" className="text-button" onClick={() => setEmailMode("closed")}>← Voltar</button>
+                <button type="button" className="text-button" onClick={() => setAuthMode("forgot")}>Esqueci minha senha</button>
+              </div>
+            </form>
           ) : null}
 
-          {authModal.mode === "register" && registerStep === "form" ? (
-            registerEmailOpen ? (
-              <form className="stack-form auth-reveal" onSubmit={submitRegister}>
-                <label>Nome completo<input value={registerForm.name} onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))} required /></label>
-                <label>E-mail<input type="email" value={registerForm.email} onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))} required /></label>
-                <label>Celular (com DDD)<input type="tel" inputMode="numeric" placeholder="(11) 91234-5678" value={registerForm.phone} onChange={(event) => setRegisterForm((current) => ({ ...current, phone: event.target.value }))} required /></label>
-                <label>Senha<input type="password" value={registerForm.password} onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))} required /><small>{passwordStatus(registerForm.password)}</small></label>
-                {termsBox}
-                <Button type="submit" disabled={isSubmitting || !registerForm.termsAccepted}>{isSubmitting ? "Enviando código..." : "Continuar"}</Button>
-                <div className="auth-form-foot">
-                  <button type="button" className="text-button" onClick={() => setRegisterEmailOpen(false)}>← Voltar</button>
-                </div>
-              </form>
-            ) : (
-              <Button type="button" variant="outline" className="auth-email-cta" onClick={() => setRegisterEmailOpen(true)}>Criar conta com e-mail</Button>
-            )
+          {isMainAuth && emailMode === "register" && registerStep === "form" ? (
+            <form className="stack-form auth-reveal" onSubmit={submitRegister}>
+              <label>Nome completo<input value={registerForm.name} onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))} required /></label>
+              <label>E-mail<input type="email" value={registerForm.email} onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))} required /></label>
+              <label>Celular (com DDD)<input type="tel" inputMode="numeric" placeholder="(11) 91234-5678" value={registerForm.phone} onChange={(event) => setRegisterForm((current) => ({ ...current, phone: event.target.value }))} required /></label>
+              <label>Senha<input type="password" value={registerForm.password} onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))} required /><small>{passwordStatus(registerForm.password)}</small></label>
+              {termsBox}
+              <div className="auth-cta-row">
+                <Button type="submit" disabled={isSubmitting || !registerForm.termsAccepted}>{isSubmitting ? "Enviando código..." : "Criar conta"}</Button>
+                <Button type="button" variant="outline" onClick={() => setEmailMode("login")}>Já tenho conta</Button>
+              </div>
+              <div className="auth-form-foot">
+                <button type="button" className="text-button" onClick={() => setEmailMode("closed")}>← Voltar</button>
+              </div>
+            </form>
           ) : null}
 
-          {authModal.mode === "register" && registerStep === "code" ? (
+          {isMainAuth && emailMode === "register" && registerStep === "code" ? (
             <form className="stack-form" onSubmit={submitRegisterCode}>
               <p className="auth-code-hint">Enviamos um código por SMS para o celular informado. Digite-o abaixo para concluir o cadastro de <strong>{pendingEmail}</strong>.</p>
               <label>Código de verificação

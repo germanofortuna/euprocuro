@@ -3520,6 +3520,29 @@ small {
   min-height: 46px;
 }
 
+.auth-modal .auth-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.auth-modal .auth-cta-row > .button {
+  flex: 1 1 0;
+  min-width: 140px;
+}
+
+.auth-social-terms {
+  display: block;
+  text-align: center;
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.auth-social-terms .text-button--inline {
+  font-size: inherit;
+}
+
 .auth-modal .auth-form-foot {
   display: flex;
   align-items: center;
@@ -4572,7 +4595,7 @@ small {
   }
 
   .auth-modal .auth-social-block {
-    margin: 0 0 4px;
+    margin: 14px 0 4px;
   }
 
   .auth-modal--register .stack-form {
